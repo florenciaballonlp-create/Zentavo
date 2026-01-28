@@ -1045,96 +1045,30 @@ class _HomePageState extends State<HomePage> {
                 ),
               ),
             ),
-            // Gráfico de torta
+            // Botón de gráficos
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              child: Card(
-                elevation: 0,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                child: Padding(
-                  padding: const EdgeInsets.all(20),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        '📊 Distribución Mensual',
-                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: Color(0xFF4B5563)),
-                      ),
-                      const SizedBox(height: 20),
-                      SizedBox(
-                        height: 200,
-                        child: PieChart(
-                          PieChartData(
-                            sections: _obtenerDatosGraficoMensual(),
-                            centerSpaceRadius: 40,
-                            sectionsSpace: 2,
-                          ),
-                        ),
-                      ),
-                    ],
+              child: SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  icon: const Icon(Icons.pie_chart, size: 24),
+                  label: const Text('Ver Gráficos', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF10B981),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                   ),
-                ),
-              ),
-            ),
-            // Gráfico de torta anual
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              child: Card(
-                elevation: 0,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                child: Padding(
-                  padding: const EdgeInsets.all(20),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        '📈 Distribución Anual',
-                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: Color(0xFF4B5563)),
+                  onPressed: () {
+                    Navigator.of(context).push(MaterialPageRoute(
+                      builder: (_) => ChartsPage(
+                        transacciones: _transacciones,
+                        obtenerDatosGraficoMensual: _obtenerDatosGraficoMensual,
+                        obtenerDatosGraficoAnual: _obtenerDatosGraficoAnual,
+                        obtenerDatosEgresosPorCategoria: _obtenerDatosEgresosPorCategoria,
                       ),
-                      const SizedBox(height: 20),
-                      SizedBox(
-                        height: 200,
-                        child: PieChart(
-                          PieChartData(
-                            sections: _obtenerDatosGraficoAnual(),
-                            centerSpaceRadius: 40,
-                            sectionsSpace: 2,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-            // Gráfico de egresos por categoría
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              child: Card(
-                elevation: 0,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                child: Padding(
-                  padding: const EdgeInsets.all(20),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        '💰 Egresos por Categoría',
-                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: Color(0xFF4B5563)),
-                      ),
-                      const SizedBox(height: 20),
-                      SizedBox(
-                        height: 200,
-                        child: PieChart(
-                          PieChartData(
-                            sections: _obtenerDatosEgresosPorCategoria(),
-                            centerSpaceRadius: 40,
-                            sectionsSpace: 2,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
+                    ));
+                  },
                 ),
               ),
             ),
@@ -1229,6 +1163,132 @@ class _HomePageState extends State<HomePage> {
             label: const Text('Egreso', style: TextStyle(fontWeight: FontWeight.w600)),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// Página separada para los gráficos
+class ChartsPage extends StatelessWidget {
+  final List<Map<String, dynamic>> transacciones;
+  final Function obtenerDatosGraficoMensual;
+  final Function obtenerDatosGraficoAnual;
+  final Function obtenerDatosEgresosPorCategoria;
+
+  const ChartsPage({
+    required this.transacciones,
+    required this.obtenerDatosGraficoMensual,
+    required this.obtenerDatosGraficoAnual,
+    required this.obtenerDatosEgresosPorCategoria,
+    super.key,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('📊 Gráficos', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 22)),
+        centerTitle: true,
+        elevation: 0,
+      ),
+      body: SingleChildScrollView(
+        child: Column(
+          children: [
+            // Gráfico de distribución mensual
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              child: Card(
+                elevation: 0,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                child: Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        '📊 Distribución Mensual',
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: Color(0xFF4B5563)),
+                      ),
+                      const SizedBox(height: 20),
+                      SizedBox(
+                        height: 200,
+                        child: PieChart(
+                          PieChartData(
+                            sections: obtenerDatosGraficoMensual(),
+                            centerSpaceRadius: 40,
+                            sectionsSpace: 2,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            // Gráfico de distribución anual
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              child: Card(
+                elevation: 0,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                child: Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        '📈 Distribución Anual',
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: Color(0xFF4B5563)),
+                      ),
+                      const SizedBox(height: 20),
+                      SizedBox(
+                        height: 200,
+                        child: PieChart(
+                          PieChartData(
+                            sections: obtenerDatosGraficoAnual(),
+                            centerSpaceRadius: 40,
+                            sectionsSpace: 2,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            // Gráfico de egresos por categoría
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              child: Card(
+                elevation: 0,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                child: Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        '💰 Egresos por Categoría',
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: Color(0xFF4B5563)),
+                      ),
+                      const SizedBox(height: 20),
+                      SizedBox(
+                        height: 200,
+                        child: PieChart(
+                          PieChartData(
+                            sections: obtenerDatosEgresosPorCategoria(),
+                            centerSpaceRadius: 40,
+                            sectionsSpace: 2,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
