@@ -1213,11 +1213,7 @@ class _HomePageState extends State<HomePage> {
           PopupMenuButton<String>(
             icon: const Icon(Icons.more_vert),
             onSelected: (value) async {
-              if (value == 'exportar') {
-                _showExportFormatDialog();
-              } else if (value == 'guardar') {
-                _showSaveAsDialog();
-              } else if (value == 'descargar') {
+              if (value == 'descargar') {
                 _showDownloadDialog();
               } else if (value == 'compartir') {
                 _showShareDialog();
@@ -1232,8 +1228,6 @@ class _HomePageState extends State<HomePage> {
               }
             },
             itemBuilder: (ctx) => [
-              const PopupMenuItem(value: 'exportar', child: Text('Exportar')),
-              const PopupMenuItem(value: 'guardar', child: Text('Guardar como')),
               const PopupMenuItem(value: 'descargar', child: Text('Descargar')),
               const PopupMenuItem(value: 'compartir', child: Text('Compartir')),
               const PopupMenuDivider(),
