@@ -7,12 +7,14 @@ void main() {
       'titulo': 'Sueldo',
       'monto': 1000.0,
       'tipo': 'Ingreso',
+      'categoria': 'Servicios',
       'justificacion': 'Pago mensual',
     },
     {
       'titulo': 'Alquiler',
       'monto': -300.0,
       'tipo': 'Egreso',
+      'categoria': 'Vivienda',
       'justificacion': 'Casa',
     },
   ];
@@ -26,7 +28,7 @@ void main() {
 
   test('exportToCsv produces expected header and rows', () {
     final csv = exportToCsv(sample);
-    expect(csv, contains('titulo,monto,tipo,justificacion'));
+    expect(csv, contains('titulo,monto,tipo,categoria,justificacion'));
     expect(csv, contains('Sueldo'));
     expect(csv, contains('Alquiler'));
   });

@@ -20,7 +20,22 @@ class ExpenseApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'Control de Gastos',
-      theme: ThemeData(colorSchemeSeed: Colors.green, useMaterial3: true),
+      theme: ThemeData(
+        colorSchemeSeed: const Color(0xFF10B981),
+        useMaterial3: true,
+        brightness: Brightness.light,
+        cardTheme: CardThemeData(
+          elevation: 2,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          clipBehavior: Clip.antiAlias,
+        ),
+        appBarTheme: AppBarTheme(
+          elevation: 0,
+          centerTitle: true,
+          backgroundColor: const Color(0xFF10B981),
+          foregroundColor: Colors.white,
+        ),
+      ),
       home: const HomePage(),
     );
   }
@@ -42,8 +57,22 @@ class _HomePageState extends State<HomePage> {
   final _montoController = TextEditingController();
   final _justificacionController = TextEditingController();
   late String _tipoSeleccionado;
+  late String _categoriaSeleccionada;
   late SharedPreferences _prefs;
   String _exportDefault = 'ask'; // 'ask' or 'documents'
+
+  // Mapa de categorías con iconos
+  static const Map<String, String> _categorias = {
+    'Comida': '🍔',
+    'Transporte': '🚗',
+    'Diversión': '🎮',
+    'Salud': '🏥',
+    'Servicios': '💡',
+    'Utilidades': '📱',
+    'Vivienda': '🏠',
+    'Educación': '📚',
+    'Otro': '❓',
+  };
 
   @override
   void initState() {
@@ -234,6 +263,7 @@ class _HomePageState extends State<HomePage> {
         'titulo': nombre,
         'monto': _tipoSeleccionado == 'Ingreso' ? monto : -monto,
         'tipo': _tipoSeleccionado,
+        'categoria': _categoriaSeleccionada,
         'justificacion': razon,
       });
     });
@@ -256,55 +286,83 @@ class _HomePageState extends State<HomePage> {
   // Mostrar formulario para crear o editar. Si index != null editamos.
   void _mostrarFormularioConIndice(BuildContext ctx, String tipo, {int? index}) {
     _tipoSeleccionado = tipo;
+    _categoriaSeleccionada = 'Otro';
     if (index != null) {
       final existing = _transacciones[index];
       _tituloController.text = existing['titulo'] ?? '';
       // monto puede ser negativo para egresos
       _montoController.text = (existing['monto'] ?? 0).abs().toString();
       _justificacionController.text = existing['justificacion'] ?? '';
+      _categoriaSeleccionada = existing['categoria'] ?? 'Otro';
     } else {
       _tituloController.clear();
       _montoController.clear();
       _justificacionController.clear();
       _tipoSeleccionado = tipo;
+      _categoriaSeleccionada = 'Otro';
     }
 
     showModalBottomSheet(
       context: ctx,
+      isScrollControlled: true,
       builder: (_) {
-        return Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                index == null ? (tipo == 'Ingreso' ? 'Nuevo Ingreso' : 'Nuevo Egreso') : 'Editar Movimiento',
-                style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+        return StatefulBuilder(
+          builder: (BuildContext context, StateSetter setState) {
+            return Padding(
+              padding: EdgeInsets.fromLTRB(20, 20, 20, MediaQuery.of(context).viewInsets.bottom + 20),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      index == null ? (tipo == 'Ingreso' ? 'Nuevo Ingreso' : 'Nuevo Egreso') : 'Editar Movimiento',
+                      style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 20),
+                    TextField(controller: _tituloController, decoration: const InputDecoration(labelText: 'Título (ej. Sueldo, Alquiler)')),
+                    const SizedBox(height: 12),
+                    TextField(controller: _montoController, decoration: const InputDecoration(labelText: 'Monto \$'), keyboardType: TextInputType.number),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<String>(
+                      value: _categoriaSeleccionada,
+                      decoration: const InputDecoration(labelText: 'Categoría'),
+                      items: _categorias.entries.map((entry) {
+                        return DropdownMenuItem(
+                          value: entry.key,
+                          child: Text('${entry.value} ${entry.key}'),
+                        );
+                      }).toList(),
+                      onChanged: (value) {
+                        setState(() {
+                          _categoriaSeleccionada = value ?? 'Otro';
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(controller: _justificacionController, decoration: const InputDecoration(labelText: 'Justificación')),
+                    const SizedBox(height: 20),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        TextButton(onPressed: () { Navigator.of(context).pop(); }, child: const Text('Cancelar')),
+                        const SizedBox(width: 8),
+                        ElevatedButton(
+                          onPressed: () {
+                            if (index == null) {
+                              _agregarNuevaTransaccion();
+                            } else {
+                              _guardarEdicion(index);
+                            }
+                          },
+                          child: const Text('Guardar'),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
-              const SizedBox(height: 20),
-              TextField(controller: _tituloController, decoration: const InputDecoration(labelText: 'Título (ej. Sueldo, Alquiler)')),
-              TextField(controller: _montoController, decoration: const InputDecoration(labelText: 'Monto \$'), keyboardType: TextInputType.number),
-              TextField(controller: _justificacionController, decoration: const InputDecoration(labelText: 'Justificación')),
-              const SizedBox(height: 20),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  TextButton(onPressed: () { Navigator.of(context).pop(); }, child: const Text('Cancelar')),
-                  const SizedBox(width: 8),
-                  ElevatedButton(
-                    onPressed: () {
-                      if (index == null) {
-                        _agregarNuevaTransaccion();
-                      } else {
-                        _guardarEdicion(index);
-                      }
-                    },
-                    child: const Text('Guardar'),
-                  ),
-                ],
-              ),
-            ],
-          ),
+            );
+          },
         );
       },
     );
@@ -322,6 +380,7 @@ class _HomePageState extends State<HomePage> {
         'titulo': nombre,
         'monto': _tipoSeleccionado == 'Ingreso' ? monto : -monto,
         'tipo': _tipoSeleccionado,
+        'categoria': _categoriaSeleccionada,
         'justificacion': razon,
       };
     });
@@ -818,8 +877,9 @@ class _HomePageState extends State<HomePage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Control de Gastos'),
+        title: const Text('💰 Control de Gastos', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 22)),
         centerTitle: true,
+        elevation: 0,
         actions: [
           PopupMenuButton<String>(
             icon: const Icon(Icons.more_vert),
@@ -852,28 +912,32 @@ class _HomePageState extends State<HomePage> {
           children: [
             // Tarjetas de ingresos y egresos
             Padding(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
               child: Row(
                 children: [
                   // Tarjeta de Ingresos
                   Expanded(
                     child: Card(
-                      elevation: 4,
-                      color: Colors.green[50],
+                      elevation: 0,
+                      color: const Color(0xFFECFDF5),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(20),
+                        side: const BorderSide(color: Color(0xFF10B981), width: 2),
+                      ),
                       child: Padding(
-                        padding: const EdgeInsets.all(16),
+                        padding: const EdgeInsets.all(20),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             const Row(
                               children: [
-                                Icon(Icons.add_circle, color: Colors.green, size: 24),
-                                SizedBox(width: 8),
-                                Text('Ingresos', style: TextStyle(fontSize: 14, color: Colors.green, fontWeight: FontWeight.bold)),
+                                Icon(Icons.trending_up, color: Color(0xFF10B981), size: 28),
+                                SizedBox(width: 12),
+                                Text('Ingresos', style: TextStyle(fontSize: 16, color: Color(0xFF10B981), fontWeight: FontWeight.w600)),
                               ],
                             ),
-                            const SizedBox(height: 8),
-                            Text('\$${ingresos.toStringAsFixed(2)}', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.green)),
+                            const SizedBox(height: 12),
+                            Text('\$${ingresos.toStringAsFixed(2)}', style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w800, color: Color(0xFF10B981))),
                           ],
                         ),
                       ),
@@ -883,22 +947,26 @@ class _HomePageState extends State<HomePage> {
                   // Tarjeta de Egresos
                   Expanded(
                     child: Card(
-                      elevation: 4,
-                      color: Colors.red[50],
+                      elevation: 0,
+                      color: const Color(0xFFFEF2F2),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(20),
+                        side: const BorderSide(color: Color(0xFFEF4444), width: 2),
+                      ),
                       child: Padding(
-                        padding: const EdgeInsets.all(16),
+                        padding: const EdgeInsets.all(20),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             const Row(
                               children: [
-                                Icon(Icons.remove_circle, color: Colors.red, size: 24),
-                                SizedBox(width: 8),
-                                Text('Egresos', style: TextStyle(fontSize: 14, color: Colors.red, fontWeight: FontWeight.bold)),
+                                Icon(Icons.trending_down, color: Color(0xFFEF4444), size: 28),
+                                SizedBox(width: 12),
+                                Text('Egresos', style: TextStyle(fontSize: 16, color: Color(0xFFEF4444), fontWeight: FontWeight.w600)),
                               ],
                             ),
-                            const SizedBox(height: 8),
-                            Text('\$${egresos.toStringAsFixed(2)}', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.red)),
+                            const SizedBox(height: 12),
+                            Text('\$${egresos.toStringAsFixed(2)}', style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w800, color: Color(0xFFEF4444))),
                           ],
                         ),
                       ),
@@ -909,35 +977,38 @@ class _HomePageState extends State<HomePage> {
             ),
             // Resumen de balance
             Card(
-              elevation: 4,
-              margin: const EdgeInsets.all(16),
+              elevation: 0,
+              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              color: balance >= 0 ? const Color(0xFFECFDF5) : const Color(0xFFFEF2F2),
               child: Padding(
-                padding: const EdgeInsets.all(20),
+                padding: const EdgeInsets.all(24),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text('Balance:', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                    const Text('Balance Total:', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: Color(0xFF4B5563))),
                     Text('\$${balance.toStringAsFixed(2)}', 
-                      style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: balance >= 0 ? Colors.green : Colors.red)),
+                      style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800, color: balance >= 0 ? const Color(0xFF10B981) : const Color(0xFFEF4444))),
                   ],
                 ),
               ),
             ),
             // Gráfico de torta
             Padding(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               child: Card(
-                elevation: 4,
+                elevation: 0,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                 child: Padding(
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.all(20),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Text(
-                        'Distribución Mensual',
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                        '📊 Distribución Mensual',
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: Color(0xFF4B5563)),
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 20),
                       SizedBox(
                         height: 200,
                         child: PieChart(
@@ -955,19 +1026,20 @@ class _HomePageState extends State<HomePage> {
             ),
             // Gráfico de torta anual
             Padding(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               child: Card(
-                elevation: 4,
+                elevation: 0,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                 child: Padding(
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.all(20),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Text(
-                        'Distribución Anual',
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                        '📈 Distribución Anual',
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: Color(0xFF4B5563)),
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 20),
                       SizedBox(
                         height: 200,
                         child: PieChart(
@@ -1015,15 +1087,18 @@ class _HomePageState extends State<HomePage> {
                         },
                         child: ListTile(
                           leading: CircleAvatar(
-                            backgroundColor: t['tipo'] == 'Ingreso' ? Colors.green : Colors.red,
-                            child: Icon(t['tipo'] == 'Ingreso' ? Icons.add : Icons.remove, color: Colors.white),
+                            backgroundColor: t['tipo'] == 'Ingreso' ? const Color(0xFF10B981) : const Color(0xFFEF4444),
+                            child: Text(
+                              _categorias[t['categoria']] ?? '❓',
+                              style: const TextStyle(fontSize: 20),
+                            ),
                           ),
                           title: Text(t['titulo'], style: const TextStyle(fontWeight: FontWeight.bold)),
-                          subtitle: Text(t['justificacion']),
+                          subtitle: Text('${t['categoria']} • ${t['justificacion']}'),
                           trailing: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Text('\$${t['monto']}', style: const TextStyle(fontSize: 16)),
+                              Text('\$${t['monto']}', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
                               IconButton(
                                 icon: const Icon(Icons.share, size: 20),
                                 onPressed: () async {
@@ -1055,18 +1130,20 @@ class _HomePageState extends State<HomePage> {
       floatingActionButton: Row(
         mainAxisAlignment: MainAxisAlignment.end,
         children: [
-          FloatingActionButton(
+          FloatingActionButton.extended(
             heroTag: 'ingreso',
-            backgroundColor: Colors.green,
+            backgroundColor: const Color(0xFF10B981),
             onPressed: () => _mostrarFormulario(context, 'Ingreso'),
-            child: const Icon(Icons.add),
+            icon: const Icon(Icons.add),
+            label: const Text('Ingreso', style: TextStyle(fontWeight: FontWeight.w600)),
           ),
-          const SizedBox(width: 16),
-          FloatingActionButton(
+          const SizedBox(width: 12),
+          FloatingActionButton.extended(
             heroTag: 'egreso',
-            backgroundColor: Colors.red,
+            backgroundColor: const Color(0xFFEF4444),
             onPressed: () => _mostrarFormulario(context, 'Egreso'),
-            child: const Icon(Icons.remove),
+            icon: const Icon(Icons.remove),
+            label: const Text('Egreso', style: TextStyle(fontWeight: FontWeight.w600)),
           ),
         ],
       ),

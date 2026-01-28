@@ -10,11 +10,12 @@ String exportToJson(List<Map<String, dynamic>> items) {
 
 String exportToCsv(List<Map<String, dynamic>> items) {
   final sb = StringBuffer();
-  sb.writeln('titulo,monto,tipo,justificacion');
+  sb.writeln('titulo,monto,tipo,categoria,justificacion');
   for (final t in items) {
     final titulo = (t['titulo'] ?? '').toString().replaceAll('"', '""');
+    final cat = (t['categoria'] ?? 'Otro').toString().replaceAll('"', '""');
     final just = (t['justificacion'] ?? '').toString().replaceAll('"', '""');
-    sb.writeln('"$titulo",${t['monto']},${t['tipo']},"$just"');
+    sb.writeln('"$titulo",${t['monto']},${t['tipo']},"$cat","$just"');
   }
   return sb.toString();
 }
@@ -23,7 +24,8 @@ String exportToText(List<Map<String, dynamic>> items) {
   final sb = StringBuffer();
   for (var i = 0; i < items.length; i++) {
     final t = items[i];
-    sb.writeln('${i + 1}. ${t['titulo']} — ${t['tipo']} — \$${t['monto']} — ${t['justificacion']}');
+    final cat = t['categoria'] ?? 'Otro';
+    sb.writeln('${i + 1}. ${t['titulo']} — ${t['tipo']} — $cat — \$${t['monto']} — ${t['justificacion']}');
   }
   return sb.toString();
 }
