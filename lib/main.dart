@@ -394,6 +394,50 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  void _showConfigurationDialog() {
+    showDialog(
+      context: context,
+      builder: (_) {
+        return AlertDialog(
+          title: const Text('Configuración'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.brightness_6),
+                title: const Text('Tema'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  _showThemeDialog();
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.language),
+                title: const Text('Idioma'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  _showLanguageDialog();
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.currency_exchange),
+                title: const Text('Moneda'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  _showCurrencyDialog();
+                },
+              ),
+            ],
+          ),
+          actions: [TextButton(onPressed: () => Navigator.of(context).pop(), child: Text(_strings.cerrar))],
+        );
+      },
+    );
+  }
+
   Future<void> _guardarTransacciones() async {
     try {
       // Asegurarse de que _prefs está inicializado
@@ -1219,12 +1263,8 @@ class _HomePageState extends State<HomePage> {
                 _showShareDialog();
               } else if (value == 'prefs') {
                 _showExportPreferencesDialog();
-              } else if (value == 'tema') {
-                _showThemeDialog();
-              } else if (value == 'idioma') {
-                _showLanguageDialog();
-              } else if (value == 'moneda') {
-                _showCurrencyDialog();
+              } else if (value == 'configuracion') {
+                _showConfigurationDialog();
               }
             },
             itemBuilder: (ctx) => [
@@ -1232,9 +1272,7 @@ class _HomePageState extends State<HomePage> {
               const PopupMenuItem(value: 'compartir', child: Text('Compartir')),
               const PopupMenuDivider(),
               const PopupMenuItem(value: 'prefs', child: Text('Preferencias')),
-              const PopupMenuItem(value: 'tema', child: Text('Tema')),
-              const PopupMenuItem(value: 'idioma', child: Text('Idioma')),
-              const PopupMenuItem(value: 'moneda', child: Text('Moneda')),
+              const PopupMenuItem(value: 'configuracion', child: Text('Configuración')),
             ],
           ),
         ],
