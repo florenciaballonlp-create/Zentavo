@@ -9,6 +9,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:path/path.dart' as p;
 import 'export_utils.dart';
 import 'package:file_picker/file_picker.dart';
+import 'localization.dart';
 
 void main() => runApp(const ExpenseApp());
 
@@ -130,6 +131,9 @@ class _HomePageState extends State<HomePage> {
   late String _categoriaSeleccionada;
   late SharedPreferences _prefs;
   String _exportDefault = 'ask'; // 'ask' or 'documents'
+  late AppLanguage _appLanguage = AppLanguage.spanish;
+  late AppCurrency _appCurrency = AppCurrency.usd;
+  late AppStrings _strings = AppStrings(language: AppLanguage.spanish);
   
   // Control de mes seleccionado
   late DateTime _mesSeleccionado;
@@ -166,6 +170,21 @@ class _HomePageState extends State<HomePage> {
     _prefs = await SharedPreferences.getInstance();
     final String? datosGuardados = _prefs.getString('transacciones');
     _exportDefault = _prefs.getString('export_default') ?? 'ask';
+    
+    // Cargar idioma y moneda
+    final String languageCode = _prefs.getString('app_language') ?? 'spanish';
+    _appLanguage = AppLanguage.values.firstWhere(
+      (lang) => lang.toString().split('.').last == languageCode,
+      orElse: () => AppLanguage.spanish,
+    );
+    
+    final String currencyCode = _prefs.getString('app_currency') ?? 'usd';
+    _appCurrency = AppCurrency.values.firstWhere(
+      (curr) => curr.toString().split('.').last == currencyCode,
+      orElse: () => AppCurrency.usd,
+    );
+    
+    _strings = AppStrings(language: _appLanguage);
     
     if (datosGuardados != null) {
       try {
@@ -269,6 +288,107 @@ class _HomePageState extends State<HomePage> {
             ],
           ),
           actions: [TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Cerrar'))],
+        );
+      },
+    );
+  }
+
+  void _showLanguageDialog() {
+    showDialog(
+      context: context,
+      builder: (_) {
+        return AlertDialog(
+          title: Text(_strings.idiomaTitle),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              RadioListTile<AppLanguage>(
+                title: const Text('Español'),
+                secondary: const Text('🇪🇸'),
+                value: AppLanguage.spanish,
+                groupValue: _appLanguage,
+                onChanged: (v) async {
+                  Navigator.of(context).pop();
+                  if (v != null) {
+                    await _prefs.setString('app_language', v.toString().split('.').last);
+                    setState(() {
+                      _appLanguage = v;
+                      _strings = AppStrings(language: _appLanguage);
+                    });
+                  }
+                },
+              ),
+              RadioListTile<AppLanguage>(
+                title: const Text('English'),
+                secondary: const Text('🇺🇸'),
+                value: AppLanguage.english,
+                groupValue: _appLanguage,
+                onChanged: (v) async {
+                  Navigator.of(context).pop();
+                  if (v != null) {
+                    await _prefs.setString('app_language', v.toString().split('.').last);
+                    setState(() {
+                      _appLanguage = v;
+                      _strings = AppStrings(language: _appLanguage);
+                    });
+                  }
+                },
+              ),
+              RadioListTile<AppLanguage>(
+                title: const Text('Português'),
+                secondary: const Text('🇧🇷'),
+                value: AppLanguage.portuguese,
+                groupValue: _appLanguage,
+                onChanged: (v) async {
+                  Navigator.of(context).pop();
+                  if (v != null) {
+                    await _prefs.setString('app_language', v.toString().split('.').last);
+                    setState(() {
+                      _appLanguage = v;
+                      _strings = AppStrings(language: _appLanguage);
+                    });
+                  }
+                },
+              ),
+            ],
+          ),
+          actions: [TextButton(onPressed: () => Navigator.of(context).pop(), child: Text(_strings.cerrar))],
+        );
+      },
+    );
+  }
+
+  void _showCurrencyDialog() {
+    showDialog(
+      context: context,
+      builder: (_) {
+        return AlertDialog(
+          title: Text(_strings.monedaTitle),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: ListView.builder(
+              shrinkWrap: true,
+              itemCount: AppCurrency.values.length,
+              itemBuilder: (ctx, idx) {
+                final currency = AppCurrency.values[idx];
+                return RadioListTile<AppCurrency>(
+                  title: Text(currency.name),
+                  value: currency,
+                  groupValue: _appCurrency,
+                  onChanged: (v) async {
+                    Navigator.of(context).pop();
+                    if (v != null) {
+                      await _prefs.setString('app_currency', v.toString().split('.').last);
+                      setState(() {
+                        _appCurrency = v;
+                      });
+                    }
+                  },
+                );
+              },
+            ),
+          ),
+          actions: [TextButton(onPressed: () => Navigator.of(context).pop(), child: Text(_strings.cerrar))],
         );
       },
     );
@@ -1086,7 +1206,7 @@ class _HomePageState extends State<HomePage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('💰 Control de Gastos', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 22)),
+        title: Text('💰 ${_strings.appTitle}', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 22)),
         centerTitle: true,
         elevation: 0,
         actions: [
@@ -1105,6 +1225,10 @@ class _HomePageState extends State<HomePage> {
                 _showExportPreferencesDialog();
               } else if (value == 'tema') {
                 _showThemeDialog();
+              } else if (value == 'idioma') {
+                _showLanguageDialog();
+              } else if (value == 'moneda') {
+                _showCurrencyDialog();
               }
             },
             itemBuilder: (ctx) => [
@@ -1115,6 +1239,8 @@ class _HomePageState extends State<HomePage> {
               const PopupMenuDivider(),
               const PopupMenuItem(value: 'prefs', child: Text('Preferencias')),
               const PopupMenuItem(value: 'tema', child: Text('Tema')),
+              const PopupMenuItem(value: 'idioma', child: Text('Idioma')),
+              const PopupMenuItem(value: 'moneda', child: Text('Moneda')),
             ],
           ),
         ],
@@ -1141,15 +1267,15 @@ class _HomePageState extends State<HomePage> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Row(
+                            Row(
                               children: [
-                                Icon(Icons.trending_up, color: Color(0xFF10B981), size: 28),
-                                SizedBox(width: 12),
-                                Text('Ingresos', style: TextStyle(fontSize: 16, color: Color(0xFF10B981), fontWeight: FontWeight.w600)),
+                                const Icon(Icons.trending_up, color: Color(0xFF10B981), size: 28),
+                                const SizedBox(width: 12),
+                                Text(_strings.ingresos, style: const TextStyle(fontSize: 16, color: Color(0xFF10B981), fontWeight: FontWeight.w600)),
                               ],
                             ),
                             const SizedBox(height: 12),
-                            Text('\$${ingresos.toStringAsFixed(2)}', style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w800, color: Color(0xFF10B981))),
+                            Text(_appCurrency.formatAmount(ingresos), style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w800, color: Color(0xFF10B981))),
                           ],
                         ),
                       ),
@@ -1170,15 +1296,15 @@ class _HomePageState extends State<HomePage> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Row(
+                            Row(
                               children: [
-                                Icon(Icons.trending_down, color: Color(0xFFEF4444), size: 28),
-                                SizedBox(width: 12),
-                                Text('Egresos', style: TextStyle(fontSize: 16, color: Color(0xFFEF4444), fontWeight: FontWeight.w600)),
+                                const Icon(Icons.trending_down, color: Color(0xFFEF4444), size: 28),
+                                const SizedBox(width: 12),
+                                Text(_strings.egresos, style: const TextStyle(fontSize: 16, color: Color(0xFFEF4444), fontWeight: FontWeight.w600)),
                               ],
                             ),
                             const SizedBox(height: 12),
-                            Text('\$${egresos.toStringAsFixed(2)}', style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w800, color: Color(0xFFEF4444))),
+                            Text(_appCurrency.formatAmount(egresos), style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w800, color: Color(0xFFEF4444))),
                           ],
                         ),
                       ),
@@ -1198,8 +1324,8 @@ class _HomePageState extends State<HomePage> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text('Balance Total:', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: Color(0xFF4B5563))),
-                    Text('\$${balance.toStringAsFixed(2)}', 
+                    Text(_strings.balanceTotal, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: Color(0xFF4B5563))),
+                    Text(_appCurrency.formatAmount(balance), 
                       style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800, color: balance >= 0 ? const Color(0xFF10B981) : const Color(0xFFEF4444))),
                   ],
                 ),
