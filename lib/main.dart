@@ -251,6 +251,56 @@ class _HomePageState extends State<HomePage> {
     ];
   }
 
+  // Paleta de colores para categorías
+  static const List<Color> _coloresCategorias = [
+    Color(0xFFEF4444), // Rojo
+    Color(0xFFFF9500), // Naranja
+    Color(0xFFEAB308), // Amarillo
+    Color(0xFF22C55E), // Verde
+    Color(0xFF06B6D4), // Cian
+    Color(0xFF3B82F6), // Azul
+    Color(0xFF8B5CF6), // Púrpura
+    Color(0xFFEC4899), // Rosa
+    Color(0xFF6B7280), // Gris
+  ];
+
+  List<PieChartSectionData> _obtenerDatosEgresosPorCategoria() {
+    // Agrupar egresos por categoría
+    Map<String, double> egresosPorCategoria = {};
+    for (var t in _transacciones) {
+      if (t['tipo'] == 'Egreso') {
+        String cat = t['categoria'] ?? 'Otro';
+        egresosPorCategoria[cat] = (egresosPorCategoria[cat] ?? 0) + (t['monto'].abs() as double);
+      }
+    }
+
+    if (egresosPorCategoria.isEmpty) {
+      return [
+        PieChartSectionData(
+          value: 100,
+          color: Colors.grey[300],
+          title: 'Sin gastos',
+          radius: 60,
+          titleStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+        ),
+      ];
+    }
+
+    int colorIndex = 0;
+    return egresosPorCategoria.entries.map((entry) {
+      final color = _coloresCategorias[colorIndex % _coloresCategorias.length];
+      colorIndex++;
+      final emoji = _categorias[entry.key] ?? '❓';
+      return PieChartSectionData(
+        value: entry.value,
+        color: color,
+        title: '${emoji}\n\$${entry.value.toStringAsFixed(2)}',
+        radius: 60,
+        titleStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
+      );
+    }).toList();
+  }
+
   void _agregarNuevaTransaccion() {
     final nombre = _tituloController.text;
     final monto = double.tryParse(_montoController.text) ?? 0.0;
@@ -323,22 +373,24 @@ class _HomePageState extends State<HomePage> {
                     const SizedBox(height: 12),
                     TextField(controller: _montoController, decoration: const InputDecoration(labelText: 'Monto \$'), keyboardType: TextInputType.number),
                     const SizedBox(height: 12),
-                    DropdownButtonFormField<String>(
-                      value: _categoriaSeleccionada,
-                      decoration: const InputDecoration(labelText: 'Categoría'),
-                      items: _categorias.entries.map((entry) {
-                        return DropdownMenuItem(
-                          value: entry.key,
-                          child: Text('${entry.value} ${entry.key}'),
-                        );
-                      }).toList(),
-                      onChanged: (value) {
-                        setState(() {
-                          _categoriaSeleccionada = value ?? 'Otro';
-                        });
-                      },
-                    ),
-                    const SizedBox(height: 12),
+                    // Mostrar categoría solo para egresos
+                    if (tipo == 'Egreso')
+                      DropdownButtonFormField<String>(
+                        value: _categoriaSeleccionada,
+                        decoration: const InputDecoration(labelText: 'Categoría'),
+                        items: _categorias.entries.map((entry) {
+                          return DropdownMenuItem(
+                            value: entry.key,
+                            child: Text('${entry.value} ${entry.key}'),
+                          );
+                        }).toList(),
+                        onChanged: (value) {
+                          setState(() {
+                            _categoriaSeleccionada = value ?? 'Otro';
+                          });
+                        },
+                      ),
+                    if (tipo == 'Egreso') const SizedBox(height: 12),
                     TextField(controller: _justificacionController, decoration: const InputDecoration(labelText: 'Justificación')),
                     const SizedBox(height: 20),
                     Row(
@@ -1045,6 +1097,37 @@ class _HomePageState extends State<HomePage> {
                         child: PieChart(
                           PieChartData(
                             sections: _obtenerDatosGraficoAnual(),
+                            centerSpaceRadius: 40,
+                            sectionsSpace: 2,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            // Gráfico de egresos por categoría
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              child: Card(
+                elevation: 0,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                child: Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        '💰 Egresos por Categoría',
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: Color(0xFF4B5563)),
+                      ),
+                      const SizedBox(height: 20),
+                      SizedBox(
+                        height: 200,
+                        child: PieChart(
+                          PieChartData(
+                            sections: _obtenerDatosEgresosPorCategoria(),
                             centerSpaceRadius: 40,
                             sectionsSpace: 2,
                           ),
