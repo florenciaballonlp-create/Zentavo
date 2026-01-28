@@ -463,6 +463,353 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  void _showSaveAsDialog() {
+    showDialog(
+      context: context,
+      builder: (_) {
+        return AlertDialog(
+          title: const Text('Guardar en:'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                title: const Text('Carpeta elegida'),
+                subtitle: const Text('JSON'),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  _showSaveFormatDialog('folder');
+                },
+              ),
+              ListTile(
+                title: const Text('Documents'),
+                subtitle: const Text('JSON'),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  _showSaveFormatDialog('documents');
+                },
+              ),
+              ListTile(
+                title: const Text('Usar preferencia'),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  _showSaveFormatDialog('default');
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _showSaveFormatDialog(String saveType) {
+    showDialog(
+      context: context,
+      builder: (_) {
+        return AlertDialog(
+          title: const Text('Formato:'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                title: const Text('JSON'),
+                onTap: () async {
+                  Navigator.of(context).pop();
+                  if (saveType == 'folder') {
+                    await _exportToFolder('json');
+                  } else if (saveType == 'documents') {
+                    await _exportToDocuments('json');
+                  } else {
+                    if (_exportDefault == 'documents') {
+                      await _exportToDocuments('json');
+                    } else {
+                      await _exportToFolder('json');
+                    }
+                  }
+                },
+              ),
+              ListTile(
+                title: const Text('CSV'),
+                onTap: () async {
+                  Navigator.of(context).pop();
+                  if (saveType == 'folder') {
+                    await _exportToFolder('csv');
+                  } else if (saveType == 'documents') {
+                    await _exportToDocuments('csv');
+                  } else {
+                    if (_exportDefault == 'documents') {
+                      await _exportToDocuments('csv');
+                    } else {
+                      await _exportToFolder('csv');
+                    }
+                  }
+                },
+              ),
+              ListTile(
+                title: const Text('TXT'),
+                onTap: () async {
+                  Navigator.of(context).pop();
+                  if (saveType == 'folder') {
+                    await _exportToFolder('txt');
+                  } else if (saveType == 'documents') {
+                    await _exportToDocuments('txt');
+                  } else {
+                    if (_exportDefault == 'documents') {
+                      await _exportToDocuments('txt');
+                    } else {
+                      await _exportToFolder('txt');
+                    }
+                  }
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _showDownloadDialog() {
+    showDialog(
+      context: context,
+      builder: (_) {
+        return AlertDialog(
+          title: const Text('Descargar como:'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                title: const Text('JSON'),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  _showExportDialog('Descargar JSON', _exportToJsonString());
+                },
+              ),
+              ListTile(
+                title: const Text('CSV'),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  _showExportDialog('Descargar CSV', _exportToCsvString());
+                },
+              ),
+              ListTile(
+                title: const Text('TXT'),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  _showExportDialog('Descargar TXT', _exportToTextString());
+                },
+              ),
+              ListTile(
+                title: const Text('PDF'),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  _downloadPdf();
+                },
+              ),
+              ListTile(
+                title: const Text('Excel'),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  _downloadExcel();
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _showExportFormatDialog() {
+    showDialog(
+      context: context,
+      builder: (_) {
+        return AlertDialog(
+          title: const Text('Exportar como:'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                title: const Text('JSON'),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  _showExportDialog('Exportar JSON', _exportToJsonString());
+                },
+              ),
+              ListTile(
+                title: const Text('CSV'),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  _showExportDialog('Exportar CSV', _exportToCsvString());
+                },
+              ),
+              ListTile(
+                title: const Text('TXT'),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  _showExportDialog('Exportar TXT', _exportToTextString());
+                },
+              ),
+              ListTile(
+                title: const Text('PDF'),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  _showExportPdfDialog();
+                },
+              ),
+              ListTile(
+                title: const Text('Excel'),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  _showExportExcelDialog();
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _downloadPdf() async {
+    try {
+      final pdfData = await exportToPdf(_transacciones);
+      final dir = await getApplicationDocumentsDirectory();
+      final fileName = 'control_gastos_${DateTime.now().toIso8601String().replaceAll(':', '-')}.pdf';
+      final filePath = p.join(dir.path, fileName);
+      final file = File(filePath);
+      await file.writeAsBytes(pdfData);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('PDF descargado: $fileName')),
+        );
+      }
+    } catch (e) {
+      print('Error al descargar PDF: $e');
+    }
+  }
+
+  Future<void> _downloadExcel() async {
+    try {
+      final excelData = await exportToExcel(_transacciones);
+      final dir = await getApplicationDocumentsDirectory();
+      final fileName = 'control_gastos_${DateTime.now().toIso8601String().replaceAll(':', '-')}.xlsx';
+      final filePath = p.join(dir.path, fileName);
+      final file = File(filePath);
+      await file.writeAsBytes(excelData);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Excel descargado: $fileName')),
+        );
+      }
+    } catch (e) {
+      print('Error al descargar Excel: $e');
+    }
+  }
+
+  Future<void> _showExportPdfDialog() async {
+    try {
+      final pdfData = await exportToPdf(_transacciones);
+      final dir = await getTemporaryDirectory();
+      final filePath = p.join(dir.path, 'control_gastos.pdf');
+      final file = File(filePath);
+      await file.writeAsBytes(pdfData);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('PDF generado')),
+        );
+      }
+    } catch (e) {
+      print('Error al generar PDF: $e');
+    }
+  }
+
+  Future<void> _showExportExcelDialog() async {
+    try {
+      final excelData = await exportToExcel(_transacciones);
+      final dir = await getTemporaryDirectory();
+      final filePath = p.join(dir.path, 'control_gastos.xlsx');
+      final file = File(filePath);
+      await file.writeAsBytes(excelData);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Excel generado')),
+        );
+      }
+    } catch (e) {
+      print('Error al generar Excel: $e');
+    }
+  }
+
+  void _showShareDialog() {
+    showDialog(
+      context: context,
+      builder: (_) {
+        return AlertDialog(
+          title: const Text('Compartir PDF mediante:'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                title: const Text('WhatsApp'),
+                onTap: () async {
+                  Navigator.of(context).pop();
+                  await _sharePdfVia('whatsapp');
+                },
+              ),
+              ListTile(
+                title: const Text('Email'),
+                onTap: () async {
+                  Navigator.of(context).pop();
+                  await _sharePdfVia('email');
+                },
+              ),
+              ListTile(
+                title: const Text('Telegram'),
+                onTap: () async {
+                  Navigator.of(context).pop();
+                  await _sharePdfVia('telegram');
+                },
+              ),
+              ListTile(
+                title: const Text('Más opciones'),
+                onTap: () async {
+                  Navigator.of(context).pop();
+                  await _sharePdfVia('share');
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _sharePdfVia(String method) async {
+    try {
+      final pdfData = await exportToPdf(_transacciones);
+      final dir = await getTemporaryDirectory();
+      final filePath = p.join(dir.path, 'control_gastos.pdf');
+      final file = File(filePath);
+      await file.writeAsBytes(pdfData);
+
+      final xfile = XFile(file.path);
+
+      if (method == 'share') {
+        await Share.shareXFiles([xfile], text: 'Exportación Control de Gastos');
+      } else {
+        // Para métodos específicos, Share.shareXFiles ya intenta abrirlos con la app correspondiente
+        await Share.shareXFiles([xfile], text: 'Exportación Control de Gastos');
+      }
+    } catch (e) {
+      print('Error al compartir PDF: $e');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     double ingresos = _calcularIngresos();
@@ -475,75 +822,27 @@ class _HomePageState extends State<HomePage> {
         centerTitle: true,
         actions: [
           PopupMenuButton<String>(
+            icon: const Icon(Icons.more_vert),
             onSelected: (value) async {
-              if (value == 'json') {
-                _showExportDialog('Exportar JSON', _exportToJsonString());
-              } else if (value == 'csv') {
-                _showExportDialog('Exportar CSV', _exportToCsvString());
-              } else if (value == 'txt') {
-                _showExportDialog('Exportar Texto', _exportToTextString());
-              } else if (value == 'json_share') {
-                await _exportAndShare('json');
-              } else if (value == 'csv_share') {
-                await _exportAndShare('csv');
-              } else if (value == 'txt_share') {
-                await _exportAndShare('txt');
-              } else if (value == 'json_save') {
-                await _exportToFolder('json');
-              } else if (value == 'csv_save') {
-                await _exportToFolder('csv');
-              } else if (value == 'txt_save') {
-                await _exportToFolder('txt');
-              } else if (value == 'json_save_docs') {
-                await _exportToDocuments('json');
-              } else if (value == 'csv_save_docs') {
-                await _exportToDocuments('csv');
-              } else if (value == 'txt_save_docs') {
-                await _exportToDocuments('txt');
-              } else if (value == 'json_save_default') {
-                if (_exportDefault == 'documents') {
-                  await _exportToDocuments('json');
-                } else {
-                  await _exportToFolder('json');
-                }
-              } else if (value == 'csv_save_default') {
-                if (_exportDefault == 'documents') {
-                  await _exportToDocuments('csv');
-                } else {
-                  await _exportToFolder('csv');
-                }
-              } else if (value == 'txt_save_default') {
-                if (_exportDefault == 'documents') {
-                  await _exportToDocuments('txt');
-                } else {
-                  await _exportToFolder('txt');
-                }
-              } else if (value == 'export_prefs') {
+              if (value == 'exportar') {
+                _showExportFormatDialog();
+              } else if (value == 'guardar') {
+                _showSaveAsDialog();
+              } else if (value == 'descargar') {
+                _showDownloadDialog();
+              } else if (value == 'compartir') {
+                _showShareDialog();
+              } else if (value == 'prefs') {
                 _showExportPreferencesDialog();
               }
             },
             itemBuilder: (ctx) => [
-              const PopupMenuItem(value: 'json', child: Text('Exportar JSON')),
-              const PopupMenuItem(value: 'csv', child: Text('Exportar CSV')),
-              const PopupMenuItem(value: 'txt', child: Text('Exportar Texto')),
+              const PopupMenuItem(value: 'exportar', child: Text('Exportar')),
+              const PopupMenuItem(value: 'guardar', child: Text('Guardar como')),
+              const PopupMenuItem(value: 'descargar', child: Text('Descargar')),
+              const PopupMenuItem(value: 'compartir', child: Text('Compartir')),
               const PopupMenuDivider(),
-              const PopupMenuItem(value: 'json_share', child: Text('Exportar y compartir JSON')),
-              const PopupMenuItem(value: 'csv_share', child: Text('Exportar y compartir CSV')),
-              const PopupMenuItem(value: 'txt_share', child: Text('Exportar y compartir Texto')),
-              const PopupMenuDivider(),
-              const PopupMenuItem(value: 'json_save', child: Text('Guardar JSON (elegir carpeta)')),
-              const PopupMenuItem(value: 'csv_save', child: Text('Guardar CSV (elegir carpeta)')),
-              const PopupMenuItem(value: 'txt_save', child: Text('Guardar Texto (elegir carpeta)')),
-              const PopupMenuDivider(),
-              const PopupMenuItem(value: 'json_save_docs', child: Text('Guardar JSON en Documents')),
-              const PopupMenuItem(value: 'csv_save_docs', child: Text('Guardar CSV en Documents')),
-              const PopupMenuItem(value: 'txt_save_docs', child: Text('Guardar Texto en Documents')),
-              const PopupMenuDivider(),
-              const PopupMenuItem(value: 'json_save_default', child: Text('Guardar JSON (usar preferencia)')),
-              const PopupMenuItem(value: 'csv_save_default', child: Text('Guardar CSV (usar preferencia)')),
-              const PopupMenuItem(value: 'txt_save_default', child: Text('Guardar Texto (usar preferencia)')),
-              const PopupMenuDivider(),
-              const PopupMenuItem(value: 'export_prefs', child: Text('Preferencias de exportación')),
+              const PopupMenuItem(value: 'prefs', child: Text('Preferencias')),
             ],
           ),
         ],
@@ -696,37 +995,56 @@ class _HomePageState extends State<HomePage> {
                     itemCount: _transacciones.length,
                     itemBuilder: (ctx, i) {
                       final t = _transacciones[i];
-                      return ListTile(
-                        leading: CircleAvatar(
-                          backgroundColor: t['tipo'] == 'Ingreso' ? Colors.green : Colors.red,
-                          child: Icon(t['tipo'] == 'Ingreso' ? Icons.add : Icons.remove, color: Colors.white),
+                      return Dismissible(
+                        key: Key('transaccion_$i'),
+                        direction: DismissDirection.endToStart,
+                        background: Container(
+                          color: Colors.red,
+                          alignment: Alignment.centerRight,
+                          padding: const EdgeInsets.only(right: 20),
+                          child: const Icon(Icons.delete, color: Colors.white, size: 30),
                         ),
-                        title: Text(t['titulo'], style: const TextStyle(fontWeight: FontWeight.bold)),
-                        subtitle: Text(t['justificacion']),
-                        trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text('\$${t['monto']}', style: const TextStyle(fontSize: 16)),
-                            IconButton(
-                              icon: const Icon(Icons.share, size: 20),
-                              onPressed: () async {
-                                try {
-                                  // Compartir solo este movimiento como texto
-                                  final content = exportToText([t]);
-                                  final dir = await getTemporaryDirectory();
-                                  final filePath = p.join(dir.path, 'mov_${i + 1}.txt');
-                                  final file = File(filePath);
-                                  await file.writeAsString(content);
-                                  final xfile = XFile(file.path);
-                                  await Share.shareXFiles([xfile], text: 'Movimiento ${i + 1}');
-                                } catch (e) {
-                                  print('Error compartiendo movimiento: $e');
-                                }
-                              },
-                            ),
-                          ],
+                        onDismissed: (direction) {
+                          setState(() {
+                            _transacciones.removeAt(i);
+                          });
+                          _guardarTransacciones();
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Movimiento eliminado')),
+                          );
+                        },
+                        child: ListTile(
+                          leading: CircleAvatar(
+                            backgroundColor: t['tipo'] == 'Ingreso' ? Colors.green : Colors.red,
+                            child: Icon(t['tipo'] == 'Ingreso' ? Icons.add : Icons.remove, color: Colors.white),
+                          ),
+                          title: Text(t['titulo'], style: const TextStyle(fontWeight: FontWeight.bold)),
+                          subtitle: Text(t['justificacion']),
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text('\$${t['monto']}', style: const TextStyle(fontSize: 16)),
+                              IconButton(
+                                icon: const Icon(Icons.share, size: 20),
+                                onPressed: () async {
+                                  try {
+                                    // Compartir solo este movimiento como texto
+                                    final content = exportToText([t]);
+                                    final dir = await getTemporaryDirectory();
+                                    final filePath = p.join(dir.path, 'mov_${i + 1}.txt');
+                                    final file = File(filePath);
+                                    await file.writeAsString(content);
+                                    final xfile = XFile(file.path);
+                                    await Share.shareXFiles([xfile], text: 'Movimiento ${i + 1}');
+                                  } catch (e) {
+                                    print('Error compartiendo movimiento: $e');
+                                  }
+                                },
+                              ),
+                            ],
+                          ),
+                          onTap: () => _mostrarFormularioConIndice(context, t['tipo'], index: i),
                         ),
-                        onTap: () => _mostrarFormularioConIndice(context, t['tipo'], index: i),
                       );
                     },
                   ),
