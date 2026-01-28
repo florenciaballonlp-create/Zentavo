@@ -1214,6 +1214,38 @@ class _HomePageState extends State<HomePage> {
                                   }
                                 },
                               ),
+                              IconButton(
+                                icon: const Icon(Icons.delete, size: 20, color: Colors.red),
+                                onPressed: () {
+                                  // Confirmar eliminación
+                                  showDialog(
+                                    context: context,
+                                    builder: (ctx) => AlertDialog(
+                                      title: const Text('Eliminar movimiento'),
+                                      content: Text('¿Estás seguro de que deseas eliminar "${t['titulo']}"?'),
+                                      actions: [
+                                        TextButton(
+                                          onPressed: () => Navigator.pop(ctx),
+                                          child: const Text('Cancelar'),
+                                        ),
+                                        TextButton(
+                                          onPressed: () {
+                                            setState(() {
+                                              _transacciones.removeAt(indexOriginal);
+                                            });
+                                            _guardarTransacciones();
+                                            Navigator.pop(ctx);
+                                            ScaffoldMessenger.of(context).showSnackBar(
+                                              const SnackBar(content: Text('Movimiento eliminado')),
+                                            );
+                                          },
+                                          child: const Text('Eliminar', style: TextStyle(color: Colors.red)),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                },
+                              ),
                             ],
                           ),
                           onTap: () => _mostrarFormularioConIndice(context, t['tipo'], index: i),
