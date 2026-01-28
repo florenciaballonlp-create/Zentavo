@@ -12,37 +12,107 @@ import 'package:file_picker/file_picker.dart';
 
 void main() => runApp(const ExpenseApp());
 
-class ExpenseApp extends StatelessWidget {
+class ExpenseApp extends StatefulWidget {
   const ExpenseApp({super.key});
 
   @override
+  State<ExpenseApp> createState() => _ExpenseAppState();
+}
+
+class _ExpenseAppState extends State<ExpenseApp> {
+  late Future<ThemeMode> _themeModeFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _themeModeFuture = _loadThemeMode();
+  }
+
+  Future<ThemeMode> _loadThemeMode() async {
+    final prefs = await SharedPreferences.getInstance();
+    final themeModeString = prefs.getString('themeMode') ?? 'system';
+    switch (themeModeString) {
+      case 'light':
+        return ThemeMode.light;
+      case 'dark':
+        return ThemeMode.dark;
+      default:
+        return ThemeMode.system;
+    }
+  }
+
+  Future<void> _setThemeMode(ThemeMode mode) async {
+    final prefs = await SharedPreferences.getInstance();
+    String modeString;
+    switch (mode) {
+      case ThemeMode.light:
+        modeString = 'light';
+        break;
+      case ThemeMode.dark:
+        modeString = 'dark';
+        break;
+      case ThemeMode.system:
+        modeString = 'system';
+    }
+    await prefs.setString('themeMode', modeString);
+    setState(() {});
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      title: 'Control de Gastos',
-      theme: ThemeData(
-        colorSchemeSeed: const Color(0xFF10B981),
-        useMaterial3: true,
-        brightness: Brightness.light,
-        cardTheme: CardThemeData(
-          elevation: 2,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          clipBehavior: Clip.antiAlias,
-        ),
-        appBarTheme: AppBarTheme(
-          elevation: 0,
-          centerTitle: true,
-          backgroundColor: const Color(0xFF10B981),
-          foregroundColor: Colors.white,
-        ),
-      ),
-      home: const HomePage(),
+    return FutureBuilder<ThemeMode>(
+      future: _themeModeFuture,
+      builder: (context, snapshot) {
+        final themeMode = snapshot.data ?? ThemeMode.system;
+        return MaterialApp(
+          debugShowCheckedModeBanner: false,
+          title: 'Control de Gastos',
+          themeMode: themeMode,
+          theme: ThemeData(
+            colorSchemeSeed: const Color(0xFF10B981),
+            useMaterial3: true,
+            brightness: Brightness.light,
+            cardTheme: CardThemeData(
+              elevation: 2,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              clipBehavior: Clip.antiAlias,
+            ),
+            appBarTheme: AppBarTheme(
+              elevation: 0,
+              centerTitle: true,
+              backgroundColor: const Color(0xFF10B981),
+              foregroundColor: Colors.white,
+            ),
+          ),
+          darkTheme: ThemeData(
+            colorSchemeSeed: const Color(0xFF10B981),
+            useMaterial3: true,
+            brightness: Brightness.dark,
+            cardTheme: CardThemeData(
+              elevation: 2,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              clipBehavior: Clip.antiAlias,
+              color: const Color(0xFF1E1E1E),
+            ),
+            appBarTheme: AppBarTheme(
+              elevation: 0,
+              centerTitle: true,
+              backgroundColor: const Color(0xFF10B981),
+              foregroundColor: Colors.white,
+            ),
+            scaffoldBackgroundColor: const Color(0xFF121212),
+          ),
+          home: HomePage(onThemeModeChanged: _setThemeMode),
+        );
+      },
     );
   }
 }
 
 class HomePage extends StatefulWidget {
-  const HomePage({super.key});
+  final Function(ThemeMode)? onThemeModeChanged;
+
+  const HomePage({super.key, this.onThemeModeChanged});
 
   @override
   State<HomePage> createState() => _HomePageState();
@@ -142,6 +212,59 @@ class _HomePageState extends State<HomePage> {
                 value: 'documents',
                 groupValue: _exportDefault,
                 onChanged: (v) { if (v != null) { _setExportDefault(v); Navigator.of(context).pop(); } },
+              ),
+            ],
+          ),
+          actions: [TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Cerrar'))],
+        );
+      },
+    );
+  }
+
+  void _showThemeDialog() {
+    showDialog(
+      context: context,
+      builder: (_) {
+        return AlertDialog(
+          title: const Text('Tema de la aplicación'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              RadioListTile<String>(
+                title: const Text('Seguir configuración del sistema'),
+                secondary: const Icon(Icons.brightness_auto),
+                value: 'system',
+                groupValue: 'system', // Se actualiza desde ExpenseApp
+                onChanged: (v) {
+                  Navigator.of(context).pop();
+                  if (widget.onThemeModeChanged != null) {
+                    widget.onThemeModeChanged!(ThemeMode.system);
+                  }
+                },
+              ),
+              RadioListTile<String>(
+                title: const Text('Modo claro'),
+                secondary: const Icon(Icons.light_mode),
+                value: 'light',
+                groupValue: 'light',
+                onChanged: (v) {
+                  Navigator.of(context).pop();
+                  if (widget.onThemeModeChanged != null) {
+                    widget.onThemeModeChanged!(ThemeMode.light);
+                  }
+                },
+              ),
+              RadioListTile<String>(
+                title: const Text('Modo oscuro'),
+                secondary: const Icon(Icons.dark_mode),
+                value: 'dark',
+                groupValue: 'dark',
+                onChanged: (v) {
+                  Navigator.of(context).pop();
+                  if (widget.onThemeModeChanged != null) {
+                    widget.onThemeModeChanged!(ThemeMode.dark);
+                  }
+                },
               ),
             ],
           ),
@@ -980,6 +1103,8 @@ class _HomePageState extends State<HomePage> {
                 _showShareDialog();
               } else if (value == 'prefs') {
                 _showExportPreferencesDialog();
+              } else if (value == 'tema') {
+                _showThemeDialog();
               }
             },
             itemBuilder: (ctx) => [
@@ -989,6 +1114,7 @@ class _HomePageState extends State<HomePage> {
               const PopupMenuItem(value: 'compartir', child: Text('Compartir')),
               const PopupMenuDivider(),
               const PopupMenuItem(value: 'prefs', child: Text('Preferencias')),
+              const PopupMenuItem(value: 'tema', child: Text('Tema')),
             ],
           ),
         ],
