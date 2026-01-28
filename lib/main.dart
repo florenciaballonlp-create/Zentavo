@@ -1106,6 +1106,91 @@ class _HomePageState extends State<HomePage> {
                 ),
               ),
             ),
+            // Botones de reportes mensuales
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      icon: const Icon(Icons.picture_as_pdf, size: 20),
+                      label: const Text('Reporte PDF', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFEF4444),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      onPressed: () async {
+                        try {
+                          final transaccionesMes = _obtenerTransaccionesMes();
+                          final pdfBytes = await exportMonthlyReportPdf(
+                            month: _mesSeleccionado,
+                            transactions: transaccionesMes,
+                            ingresos: _calcularIngresos(),
+                            egresos: _calcularEgresos(),
+                          );
+                          
+                          final dir = await getTemporaryDirectory();
+                          final monthStr = '${_mesSeleccionado.month.toString().padLeft(2, '0')}-${_mesSeleccionado.year}';
+                          final filePath = p.join(dir.path, 'Reporte_$monthStr.pdf');
+                          final file = File(filePath);
+                          await file.writeAsBytes(pdfBytes);
+                          
+                          await Share.shareXFiles([XFile(file.path)], text: 'Reporte Mensual $monthStr');
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Reporte PDF generado y compartido')),
+                          );
+                        } catch (e) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Error al generar PDF: $e')),
+                          );
+                        }
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      icon: const Icon(Icons.table_chart, size: 20),
+                      label: const Text('Reporte Excel', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF10B981),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      onPressed: () async {
+                        try {
+                          final transaccionesMes = _obtenerTransaccionesMes();
+                          final excelBytes = await exportMonthlyReportExcel(
+                            month: _mesSeleccionado,
+                            transactions: transaccionesMes,
+                            ingresos: _calcularIngresos(),
+                            egresos: _calcularEgresos(),
+                          );
+                          
+                          final dir = await getTemporaryDirectory();
+                          final monthStr = '${_mesSeleccionado.month.toString().padLeft(2, '0')}-${_mesSeleccionado.year}';
+                          final filePath = p.join(dir.path, 'Reporte_$monthStr.xlsx');
+                          final file = File(filePath);
+                          await file.writeAsBytes(excelBytes);
+                          
+                          await Share.shareXFiles([XFile(file.path)], text: 'Reporte Mensual $monthStr');
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Reporte Excel generado y compartido')),
+                          );
+                        } catch (e) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Error al generar Excel: $e')),
+                          );
+                        }
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ),
             // Selector de mes
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
