@@ -11,7 +11,7 @@ void main() {
       await tester.pumpWidget(const ExpenseApp());
 
       // Verificar que se muestra el mensaje inicial
-      expect(find.text('No hay movimientos aún. ¡Usa el botón +!'), findsOneWidget);
+      expect(find.text('No hay movimientos en este mes. ¡Usa el botón +!'), findsOneWidget);
       expect(find.text('💰 Control de Gastos'), findsOneWidget);
     });
 

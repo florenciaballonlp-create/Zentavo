@@ -60,6 +60,9 @@ class _HomePageState extends State<HomePage> {
   late String _categoriaSeleccionada;
   late SharedPreferences _prefs;
   String _exportDefault = 'ask'; // 'ask' or 'documents'
+  
+  // Control de mes seleccionado
+  late DateTime _mesSeleccionado;
 
   // Mapa de categorías con iconos
   static const Map<String, String> _categorias = {
@@ -77,6 +80,7 @@ class _HomePageState extends State<HomePage> {
   @override
   void initState() {
     super.initState();
+    _mesSeleccionado = DateTime(DateTime.now().year, DateTime.now().month);
     _cargarTransacciones();
   }
 
@@ -169,14 +173,42 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  // Obtener transacciones filtradas por mes
+  List<Map<String, dynamic>> _obtenerTransaccionesMes() {
+    return _transacciones.where((t) {
+      DateTime? fecha;
+      if (t['fecha'] != null) {
+        try {
+          fecha = DateTime.parse(t['fecha']);
+        } catch (e) {
+          // Si no hay fecha válida, usar fecha actual
+          fecha = DateTime.now();
+        }
+      } else {
+        // Asignar fecha actual si no existe
+        fecha = DateTime.now();
+      }
+      return fecha.year == _mesSeleccionado.year && fecha.month == _mesSeleccionado.month;
+    }).toList();
+  }
+
+  // Obtener nombre del mes en español
+  String _obtenerNombreMes(DateTime fecha) {
+    const meses = [
+      'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+      'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+    ];
+    return '${meses[fecha.month - 1]} ${fecha.year}';
+  }
+
   double _calcularIngresos() {
-    return _transacciones
+    return _obtenerTransaccionesMes()
         .where((t) => t['tipo'] == 'Ingreso')
         .fold(0, (sum, item) => sum + item['monto']);
   }
 
   double _calcularEgresos() {
-    return _transacciones
+    return _obtenerTransaccionesMes()
         .where((t) => t['tipo'] == 'Egreso')
         .fold(0, (sum, item) => sum + item['monto'].abs());
   }
@@ -265,9 +297,9 @@ class _HomePageState extends State<HomePage> {
   ];
 
   List<PieChartSectionData> _obtenerDatosEgresosPorCategoria() {
-    // Agrupar egresos por categoría
+    // Agrupar egresos por categoría (del mes seleccionado)
     Map<String, double> egresosPorCategoria = {};
-    for (var t in _transacciones) {
+    for (var t in _obtenerTransaccionesMes()) {
       if (t['tipo'] == 'Egreso') {
         String cat = t['categoria'] ?? 'Otro';
         egresosPorCategoria[cat] = (egresosPorCategoria[cat] ?? 0) + (t['monto'].abs() as double);
@@ -315,6 +347,7 @@ class _HomePageState extends State<HomePage> {
         'tipo': _tipoSeleccionado,
         'categoria': _categoriaSeleccionada,
         'justificacion': razon,
+        'fecha': DateTime.now().toIso8601String(),
       });
     });
 
@@ -434,6 +467,7 @@ class _HomePageState extends State<HomePage> {
         'tipo': _tipoSeleccionado,
         'categoria': _categoriaSeleccionada,
         'justificacion': razon,
+        'fecha': _transacciones[index]['fecha'] ?? DateTime.now().toIso8601String(),
       };
     });
 
@@ -1072,20 +1106,67 @@ class _HomePageState extends State<HomePage> {
                 ),
               ),
             ),
+            // Selector de mes
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.chevron_left, size: 28),
+                    onPressed: () {
+                      setState(() {
+                        _mesSeleccionado = DateTime(_mesSeleccionado.year, _mesSeleccionado.month - 1);
+                      });
+                    },
+                  ),
+                  GestureDetector(
+                    onTap: () async {
+                      final DateTime? pickedDate = await showDatePicker(
+                        context: context,
+                        initialDate: _mesSeleccionado,
+                        firstDate: DateTime(2020),
+                        lastDate: DateTime(2030),
+                      );
+                      if (pickedDate != null) {
+                        setState(() {
+                          _mesSeleccionado = DateTime(pickedDate.year, pickedDate.month);
+                        });
+                      }
+                    },
+                    child: Text(
+                      _obtenerNombreMes(_mesSeleccionado),
+                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: Color(0xFF4B5563)),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.chevron_right, size: 28),
+                    onPressed: () {
+                      setState(() {
+                        _mesSeleccionado = DateTime(_mesSeleccionado.year, _mesSeleccionado.month + 1);
+                      });
+                    },
+                  ),
+                ],
+              ),
+            ),
             // Lista de movimientos
-            _transacciones.isEmpty 
+            _obtenerTransaccionesMes().isEmpty 
               ? const Padding(
                   padding: EdgeInsets.all(32),
-                  child: Text('No hay movimientos aún. ¡Usa el botón +!'),
+                  child: Text('No hay movimientos en este mes. ¡Usa el botón +!'),
                 )
               : SizedBox(
                   height: 300,
                   child: ListView.builder(
-                    itemCount: _transacciones.length,
+                    itemCount: _obtenerTransaccionesMes().length,
                     itemBuilder: (ctx, i) {
-                      final t = _transacciones[i];
+                      final transaccionesMes = _obtenerTransaccionesMes();
+                      final t = transaccionesMes[i];
+                      // Encontrar el índice en la lista original
+                      final indexOriginal = _transacciones.indexOf(t);
                       return Dismissible(
-                        key: Key('transaccion_$i'),
+                        key: Key('transaccion_${indexOriginal}_$i'),
                         direction: DismissDirection.endToStart,
                         background: Container(
                           color: Colors.red,
@@ -1095,7 +1176,7 @@ class _HomePageState extends State<HomePage> {
                         ),
                         onDismissed: (direction) {
                           setState(() {
-                            _transacciones.removeAt(i);
+                            _transacciones.removeAt(indexOriginal);
                           });
                           _guardarTransacciones();
                           ScaffoldMessenger.of(context).showSnackBar(
