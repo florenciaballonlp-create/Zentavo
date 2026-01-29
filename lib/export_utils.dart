@@ -40,7 +40,7 @@ Future<List<int>> exportToPdf(List<Map<String, dynamic>> items) async {
         return pw.Column(
           crossAxisAlignment: pw.CrossAxisAlignment.start,
           children: [
-            pw.Text('Control de Gastos', style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold)),
+            pw.Text('Zentavo', style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold)),
             pw.SizedBox(height: 20),
             pw.Table(
               border: pw.TableBorder.all(),
@@ -120,7 +120,7 @@ Future<List<int>> exportMonthlyReportPdf({
       build: (pw.Context context) {
         return [
           // Encabezado
-          pw.Text('REPORTE MENSUAL - CONTROL DE GASTOS', 
+          pw.Text('REPORTE MENSUAL - ZENTAVO', 
             style: pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold)),
           pw.Text('$monthName ${month.year}',
             style: pw.TextStyle(fontSize: 16, color: PdfColors.grey700)),
@@ -350,7 +350,7 @@ Future<List<int>> exportMonthlyReportExcel({
   final summarySheet = excel['Resumen'];
   final monthName = _getSpanishMonthName(month.month);
   
-  summarySheet.appendRow(['REPORTE MENSUAL - CONTROL DE GASTOS']);
+  summarySheet.appendRow(['REPORTE MENSUAL - ZENTAVO']);
   summarySheet.appendRow(['$monthName ${month.year}']);
   summarySheet.appendRow([]);
   summarySheet.appendRow(['RESUMEN DEL MES']);

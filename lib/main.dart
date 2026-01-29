@@ -8,8 +8,8 @@ import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:path/path.dart' as p;
 import 'export_utils.dart';
-import 'package:file_picker/file_picker.dart';
 import 'localization.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 void main() => runApp(const ExpenseApp());
 
@@ -56,7 +56,9 @@ class _ExpenseAppState extends State<ExpenseApp> {
         modeString = 'system';
     }
     await prefs.setString('themeMode', modeString);
-    setState(() {});
+    setState(() {
+      _themeModeFuture = _loadThemeMode();
+    });
   }
 
   @override
@@ -67,7 +69,7 @@ class _ExpenseAppState extends State<ExpenseApp> {
         final themeMode = snapshot.data ?? ThemeMode.system;
         return MaterialApp(
           debugShowCheckedModeBanner: false,
-          title: 'Control de Gastos',
+          title: 'Zentavo',
           themeMode: themeMode,
           theme: ThemeData(
             colorSchemeSeed: const Color(0xFF10B981),
@@ -130,13 +132,18 @@ class _HomePageState extends State<HomePage> {
   late String _tipoSeleccionado;
   late String _categoriaSeleccionada;
   late SharedPreferences _prefs;
-  String _exportDefault = 'ask'; // 'ask' or 'documents'
   late AppLanguage _appLanguage = AppLanguage.spanish;
   late AppCurrency _appCurrency = AppCurrency.usd;
   late AppStrings _strings = AppStrings(language: AppLanguage.spanish);
+  late String _currentThemeMode = 'system';
   
   // Control de mes seleccionado
   late DateTime _mesSeleccionado;
+  
+  // Presupuesto mensual
+  double _presupuestoMensual = 0;
+  bool _notificacionEnviada = false;
+  late FlutterLocalNotificationsPlugin _notificaciones;
 
   // Mapa de categorías con iconos
   static const Map<String, String> _categorias = {
@@ -155,6 +162,7 @@ class _HomePageState extends State<HomePage> {
   void initState() {
     super.initState();
     _mesSeleccionado = DateTime(DateTime.now().year, DateTime.now().month);
+    _inicializarNotificaciones();
     _cargarTransacciones();
   }
 
@@ -169,7 +177,6 @@ class _HomePageState extends State<HomePage> {
   Future<void> _cargarTransacciones() async {
     _prefs = await SharedPreferences.getInstance();
     final String? datosGuardados = _prefs.getString('transacciones');
-    _exportDefault = _prefs.getString('export_default') ?? 'ask';
     
     // Cargar idioma y moneda
     final String languageCode = _prefs.getString('app_language') ?? 'spanish';
@@ -186,6 +193,14 @@ class _HomePageState extends State<HomePage> {
     
     _strings = AppStrings(language: _appLanguage);
     
+    // Cargar tema actual
+    final themeModeString = _prefs.getString('themeMode') ?? 'system';
+    _currentThemeMode = themeModeString;
+    
+    // Cargar presupuesto mensual
+    _presupuestoMensual = _prefs.getDouble('presupuesto_mensual') ?? 0.0;
+    _notificacionEnviada = false;
+    
     if (datosGuardados != null) {
       try {
         final List<dynamic> decoded = jsonDecode(datosGuardados);
@@ -195,49 +210,11 @@ class _HomePageState extends State<HomePage> {
             decoded.map((item) => Map<String, dynamic>.from(item)).toList(),
           );
         });
+        _verificarPresupuesto();
       } catch (e) {
         print('Error al cargar transacciones: $e');
       }
     }
-  }
-
-  Future<void> _setExportDefault(String value) async {
-    _exportDefault = value;
-    try {
-      await _prefs.setString('export_default', value);
-    } catch (e) {
-      print('Error al guardar preferencia de exportación: $e');
-    }
-    setState(() {});
-  }
-
-  void _showExportPreferencesDialog() {
-    showDialog(
-      context: context,
-      builder: (_) {
-        return AlertDialog(
-          title: const Text('Preferencia de guardado'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              RadioListTile<String>(
-                title: const Text('Preguntar carpeta (por defecto)'),
-                value: 'ask',
-                groupValue: _exportDefault,
-                onChanged: (v) { if (v != null) { _setExportDefault(v); Navigator.of(context).pop(); } },
-              ),
-              RadioListTile<String>(
-                title: const Text('Guardar en Documents automáticamente'),
-                value: 'documents',
-                groupValue: _exportDefault,
-                onChanged: (v) { if (v != null) { _setExportDefault(v); Navigator.of(context).pop(); } },
-              ),
-            ],
-          ),
-          actions: [TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Cerrar'))],
-        );
-      },
-    );
   }
 
   void _showThemeDialog() {
@@ -245,41 +222,50 @@ class _HomePageState extends State<HomePage> {
       context: context,
       builder: (_) {
         return AlertDialog(
-          title: const Text('Tema de la aplicación'),
+          title: Text(_strings.temaDialogo),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               RadioListTile<String>(
-                title: const Text('Seguir configuración del sistema'),
+                title: Text(_strings.seguirSistema),
                 secondary: const Icon(Icons.brightness_auto),
                 value: 'system',
-                groupValue: 'system', // Se actualiza desde ExpenseApp
-                onChanged: (v) {
+                groupValue: _currentThemeMode,
+                onChanged: (v) async {
                   Navigator.of(context).pop();
+                  setState(() {
+                    _currentThemeMode = 'system';
+                  });
                   if (widget.onThemeModeChanged != null) {
                     widget.onThemeModeChanged!(ThemeMode.system);
                   }
                 },
               ),
               RadioListTile<String>(
-                title: const Text('Modo claro'),
+                title: Text(_strings.modoClaro),
                 secondary: const Icon(Icons.light_mode),
                 value: 'light',
-                groupValue: 'light',
-                onChanged: (v) {
+                groupValue: _currentThemeMode,
+                onChanged: (v) async {
                   Navigator.of(context).pop();
+                  setState(() {
+                    _currentThemeMode = 'light';
+                  });
                   if (widget.onThemeModeChanged != null) {
                     widget.onThemeModeChanged!(ThemeMode.light);
                   }
                 },
               ),
               RadioListTile<String>(
-                title: const Text('Modo oscuro'),
+                title: Text(_strings.modoOscuro),
                 secondary: const Icon(Icons.dark_mode),
                 value: 'dark',
-                groupValue: 'dark',
-                onChanged: (v) {
+                groupValue: _currentThemeMode,
+                onChanged: (v) async {
                   Navigator.of(context).pop();
+                  setState(() {
+                    _currentThemeMode = 'dark';
+                  });
                   if (widget.onThemeModeChanged != null) {
                     widget.onThemeModeChanged!(ThemeMode.dark);
                   }
@@ -287,7 +273,7 @@ class _HomePageState extends State<HomePage> {
               ),
             ],
           ),
-          actions: [TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Cerrar'))],
+          actions: [TextButton(onPressed: () => Navigator.of(context).pop(), child: Text(_strings.cerrar))],
         );
       },
     );
@@ -350,6 +336,22 @@ class _HomePageState extends State<HomePage> {
                   }
                 },
               ),
+              RadioListTile<AppLanguage>(
+                title: const Text('Italiano'),
+                secondary: const Text('🇮🇹'),
+                value: AppLanguage.italian,
+                groupValue: _appLanguage,
+                onChanged: (v) async {
+                  Navigator.of(context).pop();
+                  if (v != null) {
+                    await _prefs.setString('app_language', v.toString().split('.').last);
+                    setState(() {
+                      _appLanguage = v;
+                      _strings = AppStrings(language: _appLanguage);
+                    });
+                  }
+                },
+              ),
             ],
           ),
           actions: [TextButton(onPressed: () => Navigator.of(context).pop(), child: Text(_strings.cerrar))],
@@ -399,13 +401,13 @@ class _HomePageState extends State<HomePage> {
       context: context,
       builder: (_) {
         return AlertDialog(
-          title: const Text('Configuración'),
+          title: Text(_strings.configuracion),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               ListTile(
                 leading: const Icon(Icons.brightness_6),
-                title: const Text('Tema'),
+                title: Text(_strings.tema),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () {
                   Navigator.of(context).pop();
@@ -414,7 +416,7 @@ class _HomePageState extends State<HomePage> {
               ),
               ListTile(
                 leading: const Icon(Icons.language),
-                title: const Text('Idioma'),
+                title: Text(_strings.idioma),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () {
                   Navigator.of(context).pop();
@@ -423,7 +425,7 @@ class _HomePageState extends State<HomePage> {
               ),
               ListTile(
                 leading: const Icon(Icons.currency_exchange),
-                title: const Text('Moneda'),
+                title: Text(_strings.moneda),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () {
                   Navigator.of(context).pop();
@@ -436,6 +438,240 @@ class _HomePageState extends State<HomePage> {
         );
       },
     );
+  }
+
+  void _inicializarNotificaciones() {
+    _notificaciones = FlutterLocalNotificationsPlugin();
+    const AndroidInitializationSettings androidSettings =
+        AndroidInitializationSettings('@mipmap/ic_launcher');
+    const InitializationSettings initSettings =
+        InitializationSettings(android: androidSettings);
+    _notificaciones.initialize(
+      settings: initSettings,
+      onDidReceiveNotificationResponse: (NotificationResponse response) {},
+    ).then((_) {
+      print('Notificaciones inicializadas correctamente');
+    }).catchError((e) {
+      print('Error al inicializar notificaciones: $e');
+    });
+  }
+
+  void _verificarPresupuesto() {
+    if (_presupuestoMensual <= 0) return;
+
+    final DateTime ahora = DateTime.now();
+    final List<Map<String, dynamic>> egresosDelMes = _transacciones
+        .where((t) {
+          final String? fechaStr = t['fecha'];
+          if (fechaStr == null) return false;
+          final DateTime fechaTransaccion = DateTime.parse(fechaStr);
+          return t['tipo'] == 'egreso' &&
+              fechaTransaccion.year == ahora.year &&
+              fechaTransaccion.month == ahora.month;
+        })
+        .toList();
+
+    double totalEgresos = 0;
+    for (var egreso in egresosDelMes) {
+      totalEgresos += (egreso['monto'] as num).toDouble();
+    }
+
+    if (totalEgresos > _presupuestoMensual && !_notificacionEnviada) {
+      _notificacionEnviada = true;
+      final double excedente = totalEgresos - _presupuestoMensual;
+      _enviarNotificacion(excedente);
+    } else if (totalEgresos <= _presupuestoMensual) {
+      _notificacionEnviada = false;
+    }
+  }
+
+  Future<void> _enviarNotificacion(double excedente) async {
+    const AndroidNotificationDetails androidDetails =
+        AndroidNotificationDetails(
+      'presupuesto_channel',
+      'Presupuesto',
+      channelDescription: 'Notificaciones de presupuesto excedido',
+      importance: Importance.max,
+      priority: Priority.high,
+    );
+
+    const NotificationDetails notificationDetails =
+        NotificationDetails(android: androidDetails);
+
+    final String mensaje = _strings.presupuestoExcedidoMsg(
+      _appCurrency.formatAmount(excedente),
+    );
+
+    try {
+      await _notificaciones.show(
+        id: 0,
+        title: _strings.presupuestoExcedido,
+        body: mensaje,
+        notificationDetails: notificationDetails,
+      );
+    } catch (e) {
+      print('Error al enviar notificación: $e');
+    }
+  }
+
+  void _showPresupuestoDialog() {
+    final TextEditingController presupuestoController =
+        TextEditingController(text: _presupuestoMensual.toString());
+
+    showDialog(
+      context: context,
+      builder: (_) {
+        return AlertDialog(
+          title: Text(_strings.definirPresupuesto),
+          content: TextField(
+            controller: presupuestoController,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            decoration: InputDecoration(
+              labelText: _strings.montoPresupuesto,
+              border: const OutlineInputBorder(),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text(_strings.cerrar),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                final double nuevoPresupuesto =
+                    double.tryParse(presupuestoController.text) ?? 0;
+                _setPresupuesto(nuevoPresupuesto);
+                Navigator.of(context).pop();
+              },
+              child: Text(_strings.presupuestoOk),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _setPresupuesto(double monto) async {
+    setState(() {
+      _presupuestoMensual = monto;
+      _notificacionEnviada = false;
+    });
+    await _prefs.setDouble('presupuesto_mensual', monto);
+    _verificarPresupuesto();
+  }
+
+  void _showReportesDialog() {
+    showDialog(
+      context: context,
+      builder: (_) {
+        return AlertDialog(
+          title: const Text('Reportes'),
+          content: const Text('Selecciona el formato de reporte'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text(_strings.cerrar),
+            ),
+            ElevatedButton.icon(
+              icon: const Icon(Icons.picture_as_pdf),
+              label: Text(_strings.reportePDF),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFEF4444),
+                foregroundColor: Colors.white,
+              ),
+              onPressed: () async {
+                Navigator.of(context).pop();
+                try {
+                  final transaccionesMes = _obtenerTransaccionesMes();
+                  final pdfBytes = await exportMonthlyReportPdf(
+                    month: _mesSeleccionado,
+                    transactions: transaccionesMes,
+                    ingresos: _calcularIngresos(),
+                    egresos: _calcularEgresos(),
+                  );
+                  
+                  final dir = await getTemporaryDirectory();
+                  final monthStr = '${_mesSeleccionado.month.toString().padLeft(2, '0')}-${_mesSeleccionado.year}';
+                  final filePath = p.join(dir.path, 'Reporte_$monthStr.pdf');
+                  final file = File(filePath);
+                  await file.writeAsBytes(pdfBytes);
+                  
+                  await Share.shareXFiles([XFile(file.path)], text: 'Reporte Mensual $monthStr');
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text(_strings.generandoReporte)),
+                  );
+                } catch (e) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Error al generar PDF: $e')),
+                  );
+                }
+              },
+            ),
+            ElevatedButton.icon(
+              icon: const Icon(Icons.table_chart),
+              label: Text(_strings.reporteExcel),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF10B981),
+                foregroundColor: Colors.white,
+              ),
+              onPressed: () async {
+                Navigator.of(context).pop();
+                try {
+                  final transaccionesMes = _obtenerTransaccionesMes();
+                  final excelBytes = await exportMonthlyReportExcel(
+                    month: _mesSeleccionado,
+                    transactions: transaccionesMes,
+                    ingresos: _calcularIngresos(),
+                    egresos: _calcularEgresos(),
+                  );
+                  
+                  final dir = await getTemporaryDirectory();
+                  final monthStr = '${_mesSeleccionado.month.toString().padLeft(2, '0')}-${_mesSeleccionado.year}';
+                  final filePath = p.join(dir.path, 'Reporte_$monthStr.xlsx');
+                  final file = File(filePath);
+                  await file.writeAsBytes(excelBytes);
+                  
+                  await Share.shareXFiles([XFile(file.path)], text: 'Reporte Mensual $monthStr');
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text(_strings.generandoReporte)),
+                  );
+                } catch (e) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Error al generar Excel: $e')),
+                  );
+                }
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Color _getBalanceCardColor(double balance, List<Map<String, dynamic>> egresosDelMes) {
+    if (_presupuestoMensual > 0) {
+      double totalEgresos = 0;
+      for (var egreso in egresosDelMes) {
+        totalEgresos += (egreso['monto'] as num).toDouble();
+      }
+      if (totalEgresos > _presupuestoMensual) {
+        return const Color(0xFFFFEBEE); // Rojo muy claro si se excede presupuesto
+      }
+    }
+    return balance >= 0 ? const Color(0xFFECFDF5) : const Color(0xFFFEF2F2);
+  }
+
+  Color _getBalanceTextColor(double balance, List<Map<String, dynamic>> egresosDelMes) {
+    if (_presupuestoMensual > 0) {
+      double totalEgresos = 0;
+      for (var egreso in egresosDelMes) {
+        totalEgresos += (egreso['monto'] as num).toDouble();
+      }
+      if (totalEgresos > _presupuestoMensual) {
+        return const Color(0xFFC62828); // Rojo intenso si se excede presupuesto
+      }
+    }
+    return balance >= 0 ? const Color(0xFF10B981) : const Color(0xFFEF4444);
   }
 
   Future<void> _guardarTransacciones() async {
@@ -716,7 +952,7 @@ class _HomePageState extends State<HomePage> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: [
-                        TextButton(onPressed: () { Navigator.of(context).pop(); }, child: const Text('Cancelar')),
+                        TextButton(onPressed: () { Navigator.of(context).pop(); }, child: Text(_strings.cancelar)),
                         const SizedBox(width: 8),
                         ElevatedButton(
                           onPressed: () {
@@ -726,7 +962,7 @@ class _HomePageState extends State<HomePage> {
                               _guardarEdicion(index);
                             }
                           },
-                          child: const Text('Guardar'),
+                          child: Text(_strings.guardar),
                         ),
                       ],
                     ),
@@ -784,218 +1020,10 @@ class _HomePageState extends State<HomePage> {
                 await Clipboard.setData(ClipboardData(text: content));
                 Navigator.of(context).pop();
               },
-              child: const Text('Copiar'),
+              child: Text(_strings.copiar),
             ),
-            TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Cerrar')),
+            TextButton(onPressed: () => Navigator.of(context).pop(), child: Text(_strings.cerrar)),
           ],
-        );
-      },
-    );
-  }
-
-  Future<void> _exportAndShare(String format) async {
-    String content;
-    String ext;
-    if (format == 'json') {
-      content = _exportToJsonString();
-      ext = 'json';
-    } else if (format == 'csv') {
-      content = _exportToCsvString();
-      ext = 'csv';
-    } else {
-      content = _exportToTextString();
-      ext = 'txt';
-    }
-
-    try {
-      final dir = await getTemporaryDirectory();
-      final filePath = p.join(dir.path, 'control_gastos_export.$ext');
-      final file = File(filePath);
-      await file.writeAsString(content);
-
-      // Usar share_plus para compartir el archivo
-      final xfile = XFile(file.path);
-      await Share.shareXFiles([xfile], text: 'Exportación $ext de Control de Gastos');
-    } catch (e) {
-      print('Error al exportar y compartir: $e');
-    }
-  }
-
-  Future<void> _exportToFolder(String format) async {
-    String content;
-    String ext;
-    if (format == 'json') {
-      content = _exportToJsonString();
-      ext = 'json';
-    } else if (format == 'csv') {
-      content = _exportToCsvString();
-      ext = 'csv';
-    } else {
-      content = _exportToTextString();
-      ext = 'txt';
-    }
-
-    try {
-      final directoryPath = await FilePicker.platform.getDirectoryPath();
-      if (directoryPath == null) return; // usuario canceló
-
-      final fileName = 'control_gastos_export_${DateTime.now().toIso8601String().replaceAll(':', '-')}.${ext}';
-      final filePath = p.join(directoryPath, fileName);
-      final file = File(filePath);
-      await file.writeAsString(content);
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Archivo guardado: $fileName')),
-        );
-      }
-    } catch (e) {
-      print('Error al guardar en carpeta: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Error al guardar el archivo')),
-        );
-      }
-    }
-  }
-
-  Future<void> _exportToDocuments(String format) async {
-    String content;
-    String ext;
-    if (format == 'json') {
-      content = _exportToJsonString();
-      ext = 'json';
-    } else if (format == 'csv') {
-      content = _exportToCsvString();
-      ext = 'csv';
-    } else {
-      content = _exportToTextString();
-      ext = 'txt';
-    }
-
-    try {
-      final dir = await getApplicationDocumentsDirectory();
-      final fileName = 'control_gastos_export_${DateTime.now().toIso8601String().replaceAll(':', '-')}.${ext}';
-      final filePath = p.join(dir.path, fileName);
-      final file = File(filePath);
-      await file.writeAsString(content);
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Archivo guardado en Documents: $fileName')),
-        );
-      }
-    } catch (e) {
-      print('Error al guardar en Documents: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Error al guardar el archivo en Documents')),
-        );
-      }
-    }
-  }
-
-  void _showSaveAsDialog() {
-    showDialog(
-      context: context,
-      builder: (_) {
-        return AlertDialog(
-          title: const Text('Guardar en:'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ListTile(
-                title: const Text('Carpeta elegida'),
-                subtitle: const Text('JSON'),
-                onTap: () {
-                  Navigator.of(context).pop();
-                  _showSaveFormatDialog('folder');
-                },
-              ),
-              ListTile(
-                title: const Text('Documents'),
-                subtitle: const Text('JSON'),
-                onTap: () {
-                  Navigator.of(context).pop();
-                  _showSaveFormatDialog('documents');
-                },
-              ),
-              ListTile(
-                title: const Text('Usar preferencia'),
-                onTap: () {
-                  Navigator.of(context).pop();
-                  _showSaveFormatDialog('default');
-                },
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  void _showSaveFormatDialog(String saveType) {
-    showDialog(
-      context: context,
-      builder: (_) {
-        return AlertDialog(
-          title: const Text('Formato:'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ListTile(
-                title: const Text('JSON'),
-                onTap: () async {
-                  Navigator.of(context).pop();
-                  if (saveType == 'folder') {
-                    await _exportToFolder('json');
-                  } else if (saveType == 'documents') {
-                    await _exportToDocuments('json');
-                  } else {
-                    if (_exportDefault == 'documents') {
-                      await _exportToDocuments('json');
-                    } else {
-                      await _exportToFolder('json');
-                    }
-                  }
-                },
-              ),
-              ListTile(
-                title: const Text('CSV'),
-                onTap: () async {
-                  Navigator.of(context).pop();
-                  if (saveType == 'folder') {
-                    await _exportToFolder('csv');
-                  } else if (saveType == 'documents') {
-                    await _exportToDocuments('csv');
-                  } else {
-                    if (_exportDefault == 'documents') {
-                      await _exportToDocuments('csv');
-                    } else {
-                      await _exportToFolder('csv');
-                    }
-                  }
-                },
-              ),
-              ListTile(
-                title: const Text('TXT'),
-                onTap: () async {
-                  Navigator.of(context).pop();
-                  if (saveType == 'folder') {
-                    await _exportToFolder('txt');
-                  } else if (saveType == 'documents') {
-                    await _exportToDocuments('txt');
-                  } else {
-                    if (_exportDefault == 'documents') {
-                      await _exportToDocuments('txt');
-                    } else {
-                      await _exportToFolder('txt');
-                    }
-                  }
-                },
-              ),
-            ],
-          ),
         );
       },
     );
@@ -1006,94 +1034,43 @@ class _HomePageState extends State<HomePage> {
       context: context,
       builder: (_) {
         return AlertDialog(
-          title: const Text('Descargar como:'),
+          title: Text(_strings.descargarComo),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               ListTile(
-                title: const Text('JSON'),
+                title: Text(_strings.json),
                 onTap: () {
                   Navigator.of(context).pop();
-                  _showExportDialog('Descargar JSON', _exportToJsonString());
+                  _showExportDialog('${_strings.descargar} JSON', _exportToJsonString());
                 },
               ),
               ListTile(
-                title: const Text('CSV'),
+                title: Text(_strings.csv),
                 onTap: () {
                   Navigator.of(context).pop();
-                  _showExportDialog('Descargar CSV', _exportToCsvString());
+                  _showExportDialog('${_strings.descargar} CSV', _exportToCsvString());
                 },
               ),
               ListTile(
-                title: const Text('TXT'),
+                title: Text(_strings.txt),
                 onTap: () {
                   Navigator.of(context).pop();
-                  _showExportDialog('Descargar TXT', _exportToTextString());
+                  _showExportDialog('${_strings.descargar} TXT', _exportToTextString());
                 },
               ),
               ListTile(
-                title: const Text('PDF'),
+                title: Text(_strings.pdf),
                 onTap: () {
                   Navigator.of(context).pop();
                   _downloadPdf();
                 },
               ),
               ListTile(
-                title: const Text('Excel'),
+                title: Text(_strings.excel),
                 onTap: () {
                   Navigator.of(context).pop();
                   _downloadExcel();
-                },
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  void _showExportFormatDialog() {
-    showDialog(
-      context: context,
-      builder: (_) {
-        return AlertDialog(
-          title: const Text('Exportar como:'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ListTile(
-                title: const Text('JSON'),
-                onTap: () {
-                  Navigator.of(context).pop();
-                  _showExportDialog('Exportar JSON', _exportToJsonString());
-                },
-              ),
-              ListTile(
-                title: const Text('CSV'),
-                onTap: () {
-                  Navigator.of(context).pop();
-                  _showExportDialog('Exportar CSV', _exportToCsvString());
-                },
-              ),
-              ListTile(
-                title: const Text('TXT'),
-                onTap: () {
-                  Navigator.of(context).pop();
-                  _showExportDialog('Exportar TXT', _exportToTextString());
-                },
-              ),
-              ListTile(
-                title: const Text('PDF'),
-                onTap: () {
-                  Navigator.of(context).pop();
-                  _showExportPdfDialog();
-                },
-              ),
-              ListTile(
-                title: const Text('Excel'),
-                onTap: () {
-                  Navigator.of(context).pop();
-                  _showExportExcelDialog();
                 },
               ),
             ],
@@ -1107,7 +1084,7 @@ class _HomePageState extends State<HomePage> {
     try {
       final pdfData = await exportToPdf(_transacciones);
       final dir = await getApplicationDocumentsDirectory();
-      final fileName = 'control_gastos_${DateTime.now().toIso8601String().replaceAll(':', '-')}.pdf';
+      final fileName = 'zentavo_${DateTime.now().toIso8601String().replaceAll(':', '-')}.pdf';
       final filePath = p.join(dir.path, fileName);
       final file = File(filePath);
       await file.writeAsBytes(pdfData);
@@ -1126,7 +1103,7 @@ class _HomePageState extends State<HomePage> {
     try {
       final excelData = await exportToExcel(_transacciones);
       final dir = await getApplicationDocumentsDirectory();
-      final fileName = 'control_gastos_${DateTime.now().toIso8601String().replaceAll(':', '-')}.xlsx';
+      final fileName = 'zentavo_${DateTime.now().toIso8601String().replaceAll(':', '-')}.xlsx';
       final filePath = p.join(dir.path, fileName);
       final file = File(filePath);
       await file.writeAsBytes(excelData);
@@ -1141,112 +1118,23 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  Future<void> _showExportPdfDialog() async {
-    try {
-      final pdfData = await exportToPdf(_transacciones);
-      final dir = await getTemporaryDirectory();
-      final filePath = p.join(dir.path, 'control_gastos.pdf');
-      final file = File(filePath);
-      await file.writeAsBytes(pdfData);
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('PDF generado')),
-        );
-      }
-    } catch (e) {
-      print('Error al generar PDF: $e');
-    }
-  }
-
-  Future<void> _showExportExcelDialog() async {
-    try {
-      final excelData = await exportToExcel(_transacciones);
-      final dir = await getTemporaryDirectory();
-      final filePath = p.join(dir.path, 'control_gastos.xlsx');
-      final file = File(filePath);
-      await file.writeAsBytes(excelData);
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Excel generado')),
-        );
-      }
-    } catch (e) {
-      print('Error al generar Excel: $e');
-    }
-  }
-
-  void _showShareDialog() {
-    showDialog(
-      context: context,
-      builder: (_) {
-        return AlertDialog(
-          title: const Text('Compartir PDF mediante:'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ListTile(
-                title: const Text('WhatsApp'),
-                onTap: () async {
-                  Navigator.of(context).pop();
-                  await _sharePdfVia('whatsapp');
-                },
-              ),
-              ListTile(
-                title: const Text('Email'),
-                onTap: () async {
-                  Navigator.of(context).pop();
-                  await _sharePdfVia('email');
-                },
-              ),
-              ListTile(
-                title: const Text('Telegram'),
-                onTap: () async {
-                  Navigator.of(context).pop();
-                  await _sharePdfVia('telegram');
-                },
-              ),
-              ListTile(
-                title: const Text('Más opciones'),
-                onTap: () async {
-                  Navigator.of(context).pop();
-                  await _sharePdfVia('share');
-                },
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  Future<void> _sharePdfVia(String method) async {
-    try {
-      final pdfData = await exportToPdf(_transacciones);
-      final dir = await getTemporaryDirectory();
-      final filePath = p.join(dir.path, 'control_gastos.pdf');
-      final file = File(filePath);
-      await file.writeAsBytes(pdfData);
-
-      final xfile = XFile(file.path);
-
-      if (method == 'share') {
-        await Share.shareXFiles([xfile], text: 'Exportación Control de Gastos');
-      } else {
-        // Para métodos específicos, Share.shareXFiles ya intenta abrirlos con la app correspondiente
-        await Share.shareXFiles([xfile], text: 'Exportación Control de Gastos');
-      }
-    } catch (e) {
-      print('Error al compartir PDF: $e');
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     double ingresos = _calcularIngresos();
     double egresos = _calcularEgresos();
     double balance = ingresos - egresos;
+    
+    // Calcular egresos del mes seleccionado para verificar presupuesto
+    final List<Map<String, dynamic>> egresosDelMes = _transacciones
+        .where((t) {
+          final String? fechaStr = t['fecha'];
+          if (fechaStr == null) return false;
+          final DateTime fechaTransaccion = DateTime.parse(fechaStr);
+          return t['tipo'] == 'egreso' &&
+              fechaTransaccion.year == _mesSeleccionado.year &&
+              fechaTransaccion.month == _mesSeleccionado.month;
+        })
+        .toList();
 
     return Scaffold(
       appBar: AppBar(
@@ -1257,22 +1145,34 @@ class _HomePageState extends State<HomePage> {
           PopupMenuButton<String>(
             icon: const Icon(Icons.more_vert),
             onSelected: (value) async {
-              if (value == 'descargar') {
+              if (value == 'presupuesto') {
+                _showPresupuestoDialog();
+              } else if (value == 'graficos') {
+                Navigator.of(context).push(MaterialPageRoute(
+                  builder: (_) => ChartsPage(
+                    transacciones: _transacciones,
+                    obtenerDatosGraficoMensual: _obtenerDatosGraficoMensual,
+                    obtenerDatosGraficoAnual: _obtenerDatosGraficoAnual,
+                    obtenerDatosEgresosPorCategoria: _obtenerDatosEgresosPorCategoria,
+                    strings: _strings,
+                  ),
+                ));
+              } else if (value == 'reportes') {
+                _showReportesDialog();
+              } else if (value == 'descargar') {
                 _showDownloadDialog();
-              } else if (value == 'compartir') {
-                _showShareDialog();
-              } else if (value == 'prefs') {
-                _showExportPreferencesDialog();
               } else if (value == 'configuracion') {
                 _showConfigurationDialog();
               }
             },
             itemBuilder: (ctx) => [
-              const PopupMenuItem(value: 'descargar', child: Text('Descargar')),
-              const PopupMenuItem(value: 'compartir', child: Text('Compartir')),
+              PopupMenuItem(value: 'presupuesto', child: Text(_strings.presupuestoMensual)),
+              PopupMenuItem(value: 'graficos', child: Text('📊 ${_strings.verGraficos}')),
+              PopupMenuItem(value: 'reportes', child: Text('📋 Reportes')),
               const PopupMenuDivider(),
-              const PopupMenuItem(value: 'prefs', child: Text('Preferencias')),
-              const PopupMenuItem(value: 'configuracion', child: Text('Configuración')),
+              PopupMenuItem(value: 'descargar', child: Text(_strings.descargar)),
+              const PopupMenuDivider(),
+              PopupMenuItem(value: 'configuracion', child: Text(_strings.configuracion)),
             ],
           ),
         ],
@@ -1350,7 +1250,7 @@ class _HomePageState extends State<HomePage> {
               elevation: 0,
               margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-              color: balance >= 0 ? const Color(0xFFECFDF5) : const Color(0xFFFEF2F2),
+              color: _getBalanceCardColor(balance, egresosDelMes),
               child: Padding(
                 padding: const EdgeInsets.all(24),
                 child: Row(
@@ -1358,121 +1258,9 @@ class _HomePageState extends State<HomePage> {
                   children: [
                     Text(_strings.balanceTotal, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: Color(0xFF4B5563))),
                     Text(_appCurrency.formatAmount(balance), 
-                      style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800, color: balance >= 0 ? const Color(0xFF10B981) : const Color(0xFFEF4444))),
+                      style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800, color: _getBalanceTextColor(balance, egresosDelMes))),
                   ],
                 ),
-              ),
-            ),
-            // Botón de gráficos
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              child: SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  icon: const Icon(Icons.pie_chart, size: 24),
-                  label: const Text('Ver Gráficos', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF10B981),
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                  ),
-                  onPressed: () {
-                    Navigator.of(context).push(MaterialPageRoute(
-                      builder: (_) => ChartsPage(
-                        transacciones: _transacciones,
-                        obtenerDatosGraficoMensual: _obtenerDatosGraficoMensual,
-                        obtenerDatosGraficoAnual: _obtenerDatosGraficoAnual,
-                        obtenerDatosEgresosPorCategoria: _obtenerDatosEgresosPorCategoria,
-                      ),
-                    ));
-                  },
-                ),
-              ),
-            ),
-            // Botones de reportes mensuales
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      icon: const Icon(Icons.picture_as_pdf, size: 20),
-                      label: const Text('Reporte PDF', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFFEF4444),
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      ),
-                      onPressed: () async {
-                        try {
-                          final transaccionesMes = _obtenerTransaccionesMes();
-                          final pdfBytes = await exportMonthlyReportPdf(
-                            month: _mesSeleccionado,
-                            transactions: transaccionesMes,
-                            ingresos: _calcularIngresos(),
-                            egresos: _calcularEgresos(),
-                          );
-                          
-                          final dir = await getTemporaryDirectory();
-                          final monthStr = '${_mesSeleccionado.month.toString().padLeft(2, '0')}-${_mesSeleccionado.year}';
-                          final filePath = p.join(dir.path, 'Reporte_$monthStr.pdf');
-                          final file = File(filePath);
-                          await file.writeAsBytes(pdfBytes);
-                          
-                          await Share.shareXFiles([XFile(file.path)], text: 'Reporte Mensual $monthStr');
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Reporte PDF generado y compartido')),
-                          );
-                        } catch (e) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Error al generar PDF: $e')),
-                          );
-                        }
-                      },
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      icon: const Icon(Icons.table_chart, size: 20),
-                      label: const Text('Reporte Excel', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF10B981),
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      ),
-                      onPressed: () async {
-                        try {
-                          final transaccionesMes = _obtenerTransaccionesMes();
-                          final excelBytes = await exportMonthlyReportExcel(
-                            month: _mesSeleccionado,
-                            transactions: transaccionesMes,
-                            ingresos: _calcularIngresos(),
-                            egresos: _calcularEgresos(),
-                          );
-                          
-                          final dir = await getTemporaryDirectory();
-                          final monthStr = '${_mesSeleccionado.month.toString().padLeft(2, '0')}-${_mesSeleccionado.year}';
-                          final filePath = p.join(dir.path, 'Reporte_$monthStr.xlsx');
-                          final file = File(filePath);
-                          await file.writeAsBytes(excelBytes);
-                          
-                          await Share.shareXFiles([XFile(file.path)], text: 'Reporte Mensual $monthStr');
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Reporte Excel generado y compartido')),
-                          );
-                        } catch (e) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Error al generar Excel: $e')),
-                          );
-                        }
-                      },
-                    ),
-                  ),
-                ],
               ),
             ),
             // Selector de mes
@@ -1634,7 +1422,7 @@ class _HomePageState extends State<HomePage> {
             backgroundColor: const Color(0xFF10B981),
             onPressed: () => _mostrarFormulario(context, 'Ingreso'),
             icon: const Icon(Icons.add),
-            label: const Text('Ingreso', style: TextStyle(fontWeight: FontWeight.w600)),
+            label: Text(_strings.ingresos, style: const TextStyle(fontWeight: FontWeight.w600)),
           ),
           const SizedBox(width: 12),
           FloatingActionButton.extended(
@@ -1642,7 +1430,7 @@ class _HomePageState extends State<HomePage> {
             backgroundColor: const Color(0xFFEF4444),
             onPressed: () => _mostrarFormulario(context, 'Egreso'),
             icon: const Icon(Icons.remove),
-            label: const Text('Egreso', style: TextStyle(fontWeight: FontWeight.w600)),
+            label: Text(_strings.egresos, style: const TextStyle(fontWeight: FontWeight.w600)),
           ),
         ],
       ),
@@ -1656,12 +1444,14 @@ class ChartsPage extends StatelessWidget {
   final Function obtenerDatosGraficoMensual;
   final Function obtenerDatosGraficoAnual;
   final Function obtenerDatosEgresosPorCategoria;
+  final AppStrings strings;
 
   const ChartsPage({
     required this.transacciones,
     required this.obtenerDatosGraficoMensual,
     required this.obtenerDatosGraficoAnual,
     required this.obtenerDatosEgresosPorCategoria,
+    required this.strings,
     super.key,
   });
 
@@ -1669,7 +1459,7 @@ class ChartsPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('📊 Gráficos', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 22)),
+        title: Text('📊 ${strings.verGraficos}', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 22)),
         centerTitle: true,
         elevation: 0,
       ),
