@@ -8,6 +8,9 @@ void main() {
     testWidgets('La aplicación muestra el mensaje inicial cuando no hay movimientos',
         (WidgetTester tester) async {
       await tester.pumpWidget(const ExpenseApp());
+      
+      // Esperar a que termine el splash screen (3 segundos + animación)
+      await tester.pumpAndSettle(const Duration(seconds: 4));
 
       // Verificar que se muestra el mensaje inicial
       expect(find.text('No hay movimientos en este mes. ¡Usa el botón +!'), findsOneWidget);
@@ -17,6 +20,9 @@ void main() {
     testWidgets('Se puede ver los Cards de Ingresos y Egresos',
         (WidgetTester tester) async {
       await tester.pumpWidget(const ExpenseApp());
+      
+      // Esperar a que termine el splash screen
+      await tester.pumpAndSettle(const Duration(seconds: 4));
 
       // Verificar que aparecen los cards de totales
       expect(find.text('Ingresos'), findsWidgets);
@@ -27,6 +33,9 @@ void main() {
     testWidgets('Se ve el AppBar con emoji',
         (WidgetTester tester) async {
       await tester.pumpWidget(const ExpenseApp());
+      
+      // Esperar a que termine el splash screen
+      await tester.pumpAndSettle(const Duration(seconds: 4));
 
       // Verificar que el AppBar tiene el emoji 💰
       expect(find.text('💰 Zentavo'), findsOneWidget);

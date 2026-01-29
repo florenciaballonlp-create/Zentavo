@@ -520,6 +520,19 @@ class AppStrings {
     }
   }
 
+  String get gastado {
+    switch (language) {
+      case AppLanguage.english:
+        return 'Spent';
+      case AppLanguage.portuguese:
+        return 'Gasto';
+      case AppLanguage.italian:
+        return 'Speso';
+      default:
+        return 'Gastado';
+    }
+  }
+
   String get definirPresupuesto {
     switch (language) {
       case AppLanguage.english:
