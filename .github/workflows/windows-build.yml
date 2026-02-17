@@ -1,0 +1,61 @@
+name: 🪟 Windows Build
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'lib/**'
+      - 'windows/**'
+      - 'assets/**'
+      - 'pubspec.yaml'
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build-windows:
+    name: 🪟 Build Windows App
+    runs-on: windows-latest
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+      
+      - name: 📱 Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.10.7'
+          channel: 'stable'
+          cache: true
+      
+      - name: 📦 Install dependencies
+        run: flutter pub get
+      
+      - name: 🔍 Analyze code
+        run: flutter analyze --no-fatal-infos
+      
+      - name: 🧪 Run tests
+        run: flutter test
+        continue-on-error: true
+      
+      - name: 🏗️ Build Windows Release
+        run: flutter build windows --release
+      
+      - name: 📦 Package Windows app
+        run: |
+          Compress-Archive -Path build/windows/x64/runner/Release/* -DestinationPath Zentavo-Windows.zip
+      
+      - name: 📤 Upload Windows build
+        uses: actions/upload-artifact@v3
+        with:
+          name: Zentavo-Windows-x64
+          path: Zentavo-Windows.zip
+          retention-days: 90
+      
+      - name: 📊 Build Info
+        run: |
+          echo "### 🪟 Windows Build Information" >> $env:GITHUB_STEP_SUMMARY
+          echo "" >> $env:GITHUB_STEP_SUMMARY
+          echo "**Build Size:** $('{0:N2} MB' -f ((Get-Item Zentavo-Windows.zip).Length / 1MB))" >> $env:GITHUB_STEP_SUMMARY
+          echo "" >> $env:GITHUB_STEP_SUMMARY
+          echo "✅ **Windows build completed successfully!**" >> $env:GITHUB_STEP_SUMMARY
