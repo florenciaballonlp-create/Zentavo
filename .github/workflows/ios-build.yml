@@ -79,95 +79,79 @@ jobs:
           path: build/ios/iphoneos/Runner.app
           retention-days: 30
 
-  # Job para compilar con firma (requiere certificados de Apple Developer)
-  build-ios-signed:
-    name: 🍎 Build iOS App (Signed)
-    runs-on: macos-latest
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    # Este job solo se ejecuta si tienes los secretos configurados
-    
-    steps:
-      - name: 📥 Checkout code
-        uses: actions/checkout@v4
-      
-      - name: 🔧 Setup Java
-        uses: actions/setup-java@v3
-        with:
-          distribution: 'zulu'
-          java-version: '17'
-      
-      - name: 📱 Setup Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          flutter-version: '3.10.7'
-          channel: 'stable'
-          cache: true
-      
-      - name: 📦 Install dependencies
-        run: flutter pub get
-      
-      - name: 🔧 Setup iOS dependencies
-        run: |
-          cd ios
-          if [ -f "Podfile" ]; then
-            pod install --repo-update
-          else
-            echo "No Podfile found, Flutter will handle iOS dependencies"
-          fi
-      
-      # Instalar certificados de Apple (cuando los tengas)
-      - name: 📜 Install Apple Certificate
-        if: ${{ secrets.IOS_CERTIFICATE_BASE64 != '' }}
-        env:
-          IOS_CERTIFICATE_BASE64: ${{ secrets.IOS_CERTIFICATE_BASE64 }}
-          IOS_CERTIFICATE_PASSWORD: ${{ secrets.IOS_CERTIFICATE_PASSWORD }}
-          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
-        run: |
-          # Crear keychain temporal
-          security create-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
-          security default-keychain -s build.keychain
-          security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
-          security set-keychain-settings -t 3600 -u build.keychain
-          
-          # Decodificar e instalar certificado
-          echo $IOS_CERTIFICATE_BASE64 | base64 --decode > certificate.p12
-          security import certificate.p12 -k build.keychain -P "$IOS_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
-          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" build.keychain
-          
-          # Limpiar
-          rm certificate.p12
-      
-      # Instalar provisioning profile (cuando lo tengas)
-      - name: 📋 Install Provisioning Profile
-        if: ${{ secrets.IOS_PROVISIONING_PROFILE_BASE64 != '' }}
-        env:
-          IOS_PROVISIONING_PROFILE_BASE64: ${{ secrets.IOS_PROVISIONING_PROFILE_BASE64 }}
-        run: |
-          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
-          echo $IOS_PROVISIONING_PROFILE_BASE64 | base64 --decode > ~/Library/MobileDevice/Provisioning\ Profiles/profile.mobileprovision
-      
-      - name: 🏗️ Build iOS (Signed)
-        if: ${{ secrets.IOS_CERTIFICATE_BASE64 != '' }}
-        run: |
-          flutter build ios --release
-      
-      - name: 📦 Create signed IPA
-        if: ${{ secrets.IOS_CERTIFICATE_BASE64 != '' }}
-        run: |
-          cd build/ios/iphoneos
-          mkdir Payload
-          cp -r Runner.app Payload/
-          zip -r Zentavo-signed.ipa Payload
-      
-      - name: 📤 Upload signed IPA
-        if: ${{ secrets.IOS_CERTIFICATE_BASE64 != '' }}
-        uses: actions/upload-artifact@v3
-        with:
-          name: Zentavo-iOS-signed
-          path: build/ios/iphoneos/Zentavo-signed.ipa
-          retention-days: 90
-      
-      - name: 🧹 Cleanup keychain
-        if: always()
-        run: |
-          security delete-keychain build.keychain || true
+# ========================================
+# BUILD FIRMADO (COMENTADO)
+# ========================================
+# Descomenta este job cuando tengas configurados los certificados de Apple Developer
+# Requiere:
+#   - Apple Developer Account ($99/año)
+#   - Certificados y provisioning profiles
+#   - Secretos configurados en GitHub (ver CONFIGURAR_GITHUB_ACTIONS.md)
+# 
+# build-ios-signed:
+#   name: 🍎 Build iOS App (Signed)
+#   runs-on: macos-latest
+#   needs: build-ios
+#   
+#   steps:
+#     - name: 📥 Checkout code
+#       uses: actions/checkout@v4
+#     
+#     - name: 📱 Setup Flutter
+#       uses: subosito/flutter-action@v2
+#       with:
+#         flutter-version: '3.10.7'
+#         channel: 'stable'
+#     
+#     - name: 📦 Install dependencies
+#       run: flutter pub get
+#     
+#     - name: 🔧 Setup iOS dependencies
+#       run: |
+#         cd ios
+#         if [ -f "Podfile" ]; then
+#           pod install --repo-update
+#         fi
+#     
+#     - name: 📜 Install Apple Certificate
+#       env:
+#         IOS_CERTIFICATE_BASE64: ${{ secrets.IOS_CERTIFICATE_BASE64 }}
+#         IOS_CERTIFICATE_PASSWORD: ${{ secrets.IOS_CERTIFICATE_PASSWORD }}
+#         KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+#       run: |
+#         security create-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
+#         security default-keychain -s build.keychain
+#         security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
+#         
+#         echo $IOS_CERTIFICATE_BASE64 | base64 --decode > certificate.p12
+#         security import certificate.p12 -k build.keychain -P "$IOS_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+#         security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" build.keychain
+#         rm certificate.p12
+#     
+#     - name: 📋 Install Provisioning Profile
+#       env:
+#         IOS_PROVISIONING_PROFILE_BASE64: ${{ secrets.IOS_PROVISIONING_PROFILE_BASE64 }}
+#       run: |
+#         mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+#         echo $IOS_PROVISIONING_PROFILE_BASE64 | base64 --decode > ~/Library/MobileDevice/Provisioning\ Profiles/profile.mobileprovision
+#     
+#     - name: 🏗️ Build iOS (Signed)
+#       run: flutter build ios --release
+#     
+#     - name: 📦 Create signed IPA
+#       run: |
+#         cd build/ios/iphoneos
+#         mkdir Payload
+#         cp -r Runner.app Payload/
+#         zip -r Zentavo-signed.ipa Payload
+#     
+#     - name: 📤 Upload signed IPA
+#       uses: actions/upload-artifact@v3
+#       with:
+#         name: Zentavo-iOS-signed
+#         path: build/ios/iphoneos/Zentavo-signed.ipa
+#         retention-days: 90
+#     
+#     - name: 🧹 Cleanup
+#       if: always()
+#       run: security delete-keychain build.keychain || true
