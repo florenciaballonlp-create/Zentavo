@@ -9,6 +9,9 @@
 [![Flutter](https://img.shields.io/badge/Flutter-3.10.7+-02569B?logo=flutter)](https://flutter.dev)
 [![Platform](https://img.shields.io/badge/Platform-Android%20%7C%20iOS%20%7C%20Windows-blue)]()
 [![License](https://img.shields.io/badge/License-Proprietary-red)]()
+[![Build Status](https://github.com/florenciaballonlp-create/Zentavo/workflows/📱%20iOS%20Build/badge.svg)](https://github.com/florenciaballonlp-create/Zentavo/actions)
+[![Android Build](https://github.com/florenciaballonlp-create/Zentavo/workflows/🤖%20Android%20Build/badge.svg)](https://github.com/florenciaballonlp-create/Zentavo/actions)
+[![Windows Build](https://github.com/florenciaballonlp-create/Zentavo/workflows/🪟%20Windows%20Build/badge.svg)](https://github.com/florenciaballonlp-create/Zentavo/actions)
 
 [🚀 Características](#-características-principales) •
 [📱 Instalación](#-instalación) •
