@@ -52,14 +52,14 @@ jobs:
         run: flutter build appbundle --release
       
       - name: 📤 Upload APK
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: Zentavo-Android-APK
           path: build/app/outputs/flutter-apk/app-release.apk
           retention-days: 90
       
       - name: 📤 Upload App Bundle
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: Zentavo-Android-AAB
           path: build/app/outputs/bundle/release/app-release.aab
@@ -124,14 +124,14 @@ jobs:
 #       run: flutter build appbundle --release
 #     
 #     - name: 📤 Upload signed APKs
-#       uses: actions/upload-artifact@v3
+#       uses: actions/upload-artifact@v4
 #       with:
 #         name: Zentavo-Android-APKs-Signed
 #         path: build/app/outputs/flutter-apk/*.apk
 #         retention-days: 90
 #     
 #     - name: 📤 Upload signed App Bundle
-#       uses: actions/upload-artifact@v3
+#       uses: actions/upload-artifact@v4
 #       with:
 #         name: Zentavo-Android-AAB-Signed
 #         path: build/app/outputs/bundle/release/app-release.aab

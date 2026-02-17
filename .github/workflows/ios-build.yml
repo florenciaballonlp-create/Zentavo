@@ -66,14 +66,14 @@ jobs:
           zip -r Zentavo-unsigned.ipa Payload
       
       - name: 📤 Upload IPA artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: Zentavo-iOS-unsigned
           path: build/ios/iphoneos/Zentavo-unsigned.ipa
           retention-days: 30
       
       - name: 📤 Upload Runner.app
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: Zentavo-iOS-app
           path: build/ios/iphoneos/Runner.app
@@ -146,7 +146,7 @@ jobs:
 #         zip -r Zentavo-signed.ipa Payload
 #     
 #     - name: 📤 Upload signed IPA
-#       uses: actions/upload-artifact@v3
+#       uses: actions/upload-artifact@v4
 #       with:
 #         name: Zentavo-iOS-signed
 #         path: build/ios/iphoneos/Zentavo-signed.ipa

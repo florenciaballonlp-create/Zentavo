@@ -47,7 +47,7 @@ jobs:
           Compress-Archive -Path build/windows/x64/runner/Release/* -DestinationPath Zentavo-Windows.zip
       
       - name: 📤 Upload Windows build
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: Zentavo-Windows-x64
           path: Zentavo-Windows.zip
