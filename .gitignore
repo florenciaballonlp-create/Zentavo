@@ -43,3 +43,12 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Android signing files (NO SUBIR A GITHUB)
+*.jks
+*.keystore
+key.properties
+android-signing-config.txt
+setup-android-signing.ps1
+upload-keystore.jks
+
