@@ -93,7 +93,7 @@ Future<List<int>> exportToExcel(List<Map<String, dynamic>> items) async {
   return excel.encode() ?? [];
 }
 
-// Funciones para reportes mensuales
+// Funciones para informes mensuales
 Future<List<int>> exportMonthlyReportPdf({
   required DateTime month,
   required List<Map<String, dynamic>> transactions,
@@ -120,7 +120,7 @@ Future<List<int>> exportMonthlyReportPdf({
       build: (pw.Context context) {
         return [
           // Encabezado
-          pw.Text('REPORTE MENSUAL - ZENTAVO', 
+          pw.Text('INFORME MENSUAL - ZENTAVO', 
             style: pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold)),
           pw.Text('$monthName ${month.year}',
             style: pw.TextStyle(fontSize: 16, color: PdfColors.grey700)),
@@ -350,7 +350,7 @@ Future<List<int>> exportMonthlyReportExcel({
   final summarySheet = excel['Resumen'];
   final monthName = _getSpanishMonthName(month.month);
   
-  summarySheet.appendRow(['REPORTE MENSUAL - ZENTAVO']);
+  summarySheet.appendRow(['INFORME MENSUAL - ZENTAVO']);
   summarySheet.appendRow(['$monthName ${month.year}']);
   summarySheet.appendRow([]);
   summarySheet.appendRow(['RESUMEN DEL MES']);

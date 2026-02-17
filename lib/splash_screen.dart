@@ -1,10 +1,15 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'localization.dart';
 
 class SplashScreen extends StatefulWidget {
   final Widget nextScreen;
   
-  const SplashScreen({super.key, required this.nextScreen});
+  const SplashScreen({
+    super.key, 
+    required this.nextScreen,
+  });
 
   @override
   State<SplashScreen> createState() => _SplashScreenState();
@@ -14,10 +19,14 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
   late AnimationController _controller;
   late Animation<double> _fadeAnimation;
   late Animation<double> _scaleAnimation;
+  late AppStrings _strings;
 
   @override
   void initState() {
     super.initState();
+    // Inicializar _strings con valor por defecto
+    _strings = AppStrings(language: AppLanguage.spanish);
+    _loadLanguage();
     
     _controller = AnimationController(
       duration: const Duration(milliseconds: 1500),
@@ -41,6 +50,38 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
         );
       }
     });
+  }
+
+  Future<void> _loadLanguage() async {
+    final prefs = await SharedPreferences.getInstance();
+    final languageCode = prefs.getString('app_language') ?? 'es';
+    
+    AppLanguage language = AppLanguage.spanish;
+    switch (languageCode) {
+      case 'en':
+        language = AppLanguage.english;
+        break;
+      case 'pt':
+        language = AppLanguage.portuguese;
+        break;
+      case 'it':
+        language = AppLanguage.italian;
+        break;
+      case 'zh':
+        language = AppLanguage.chinese;
+        break;
+      case 'ja':
+        language = AppLanguage.japanese;
+        break;
+      default:
+        language = AppLanguage.spanish;
+    }
+    
+    if (mounted) {
+      setState(() {
+        _strings = AppStrings(language: language);
+      });
+    }
   }
 
   @override
@@ -76,7 +117,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                   ClipRRect(
                     borderRadius: BorderRadius.circular(16),
                     child: Image.asset(
-                      'images/logo.png',
+                      'assets/images/logo.png',
                       width: 130,
                       height: 130,
                       fit: BoxFit.cover,
@@ -111,7 +152,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                   const SizedBox(height: 16),
                   // Subtítulo
                   Text(
-                    'Tu control financiero',
+                    _strings.tuControlFinanciero,
                     style: TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.w400,

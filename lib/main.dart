@@ -1,9 +1,8 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:flutter/services.dart';
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
@@ -13,6 +12,15 @@ import 'localization.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:local_auth/local_auth.dart';
 import 'splash_screen.dart';
+import 'package:google_mobile_ads/google_mobile_ads.dart';
+import 'premium_screen.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'shared_events_screen.dart';
+import 'analytics_service.dart';
+import 'onboarding_screen.dart';
+import 'notifications_service.dart';
+import 'social_share_service.dart';
+import 'profile_screen.dart';
 
 void main() => runApp(const ExpenseApp());
 
@@ -25,6 +33,12 @@ class ExpenseApp extends StatefulWidget {
 
 class _ExpenseAppState extends State<ExpenseApp> {
   late Future<ThemeMode> _themeModeFuture;
+  static const Color _primaryColor = Color(0xFF0EA5A4);
+  static const Color _secondaryColor = Color(0xFF22C55E);
+  static const Color _tertiaryColor = Color(0xFFF59E0B);
+  static const Color _lightBackground = Color(0xFFF5FBFA);
+  static const Color _darkBackground = Color(0xFF0B1416);
+  static const Color _darkSurface = Color(0xFF111D1F);
 
   @override
   void initState() {
@@ -75,7 +89,15 @@ class _ExpenseAppState extends State<ExpenseApp> {
           title: 'Zentavo',
           themeMode: themeMode,
           theme: ThemeData(
-            colorSchemeSeed: const Color(0xFF10B981),
+            colorScheme: ColorScheme.fromSeed(
+              seedColor: _primaryColor,
+              primary: _primaryColor,
+              secondary: _secondaryColor,
+              tertiary: _tertiaryColor,
+              brightness: Brightness.light,
+              surface: Colors.white,
+              background: _lightBackground,
+            ),
             useMaterial3: true,
             brightness: Brightness.light,
             cardTheme: CardThemeData(
@@ -86,27 +108,36 @@ class _ExpenseAppState extends State<ExpenseApp> {
             appBarTheme: AppBarTheme(
               elevation: 0,
               centerTitle: true,
-              backgroundColor: const Color(0xFF10B981),
+              backgroundColor: _primaryColor,
               foregroundColor: Colors.white,
             ),
+            scaffoldBackgroundColor: _lightBackground,
           ),
           darkTheme: ThemeData(
-            colorSchemeSeed: const Color(0xFF10B981),
+            colorScheme: ColorScheme.fromSeed(
+              seedColor: _primaryColor,
+              primary: _primaryColor,
+              secondary: _secondaryColor,
+              tertiary: _tertiaryColor,
+              brightness: Brightness.dark,
+              surface: _darkSurface,
+              background: _darkBackground,
+            ),
             useMaterial3: true,
             brightness: Brightness.dark,
             cardTheme: CardThemeData(
               elevation: 2,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
               clipBehavior: Clip.antiAlias,
-              color: const Color(0xFF1E1E1E),
+              color: _darkSurface,
             ),
             appBarTheme: AppBarTheme(
               elevation: 0,
               centerTitle: true,
-              backgroundColor: const Color(0xFF10B981),
+              backgroundColor: _primaryColor,
               foregroundColor: Colors.white,
             ),
-            scaffoldBackgroundColor: const Color(0xFF121212),
+            scaffoldBackgroundColor: _darkBackground,
           ),
           home: SplashScreen(
             nextScreen: HomePage(onThemeModeChanged: _setThemeMode),
@@ -148,6 +179,9 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   late AppStrings _strings = AppStrings(language: AppLanguage.spanish);
   late String _currentThemeMode = 'system';
   
+  // Monedas adicionales (Premium)
+  List<AppCurrency> _monedasDisponibles = [];
+  
   // Control de mes seleccionado
   late DateTime _mesSeleccionado;
   
@@ -171,6 +205,29 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   final _montoGastoFijoController = TextEditingController();
   late int _diaVencimientoSeleccionado;
 
+  // Banner ads
+  BannerAd? _bannerAdTransacciones;
+  BannerAd? _bannerAdAhorros;
+  bool _isBannerTransaccionesLoaded = false;
+  bool _isBannerAhorrosLoaded = false;
+
+  // Estado Premium
+  bool _isPremium = false;
+  
+  // Contador de transacciones para conversión a Premium
+  int _transaccionesCreadas = 0;
+  bool _mostroPopupConversion = false;
+  
+  // Performance timing
+  late DateTime _appStartTime;
+  final Map<String, DateTime> _timingMarkers = {};
+
+  void _recordTiming(String marker) {
+    _timingMarkers[marker] = DateTime.now();
+    final elapsed = DateTime.now().difference(_appStartTime).inMilliseconds;
+    print('[TIMING] $marker - ${elapsed}ms desde inicio');
+  }
+
   // Mapa de categorías con iconos
   static const Map<String, String> _categorias = {
     'Comida': '🍔',
@@ -183,6 +240,23 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     'Educación': '📚',
     'Otro': '❓',
   };
+
+  // Categorías personalizadas (Premium)
+  Map<String, String> _categoriasPersonalizadas = {};
+
+  Future<void> _checkPremiumStatus() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final isPremium = prefs.getBool('is_premium') ?? false;
+      if (mounted) {
+        setState(() {
+          _isPremium = isPremium;
+        });
+      }
+    } catch (e) {
+      print('Error al verificar estado premium: $e');
+    }
+  }
 
   Future<void> _autenticarConBiometria() async {
     if (kIsWeb) {
@@ -232,7 +306,9 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _appStartTime = DateTime.now();
+    _recordTiming('initState START');
+    _tabController = TabController(length: 3, vsync: this);
     _tabController.addListener(() {
       if (mounted) {
         setState(() {});
@@ -241,9 +317,111 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     _autenticarConBiometria();
     _mesSeleccionado = DateTime(DateTime.now().year, DateTime.now().month);
     _diaVencimientoSeleccionado = 1;
+    _recordTiming('Vars initialized');
     _inicializarNotificaciones();
-    _cargarTransacciones();
-    _verificarYEnviarRecordatorios();
+    _recordTiming('Notifications initialized');
+    // Inicializar Analytics
+    _initializeAnalytics();
+    // Verificar onboarding
+    _checkOnboarding();
+    // Cargar datos de forma asincrónica para no bloquear la UI
+    _cargarTransaccionesAsync();
+    // No bloquear esperando _checkPremiumStatus()
+    _checkPremiumStatus();
+    // Solo inicializar AdMob en plataformas soportadas (Android/iOS)
+    if (!kIsWeb) {
+      _initializeMobileAds();
+    }
+    _recordTiming('initState COMPLETE');
+  }
+
+  Future<void> _initializeAnalytics() async {
+    await AnalyticsService().initialize();
+    await AnalyticsService().trackAppOpen();
+  }
+
+  Future<void> _checkOnboarding() async {
+    final hasCompleted = await OnboardingService().hasCompletedOnboarding();
+    if (!hasCompleted && mounted) {
+      // Esperar un poco para que la UI esté lista
+      Future.delayed(const Duration(milliseconds: 500), () {
+        if (mounted) {
+          Navigator.of(context).push(
+            MaterialPageRoute(builder: (context) => const OnboardingScreen()),
+          );
+        }
+      });
+    }
+  }
+
+  void _initializeMobileAds() {
+    if (kIsWeb || Platform.isWindows) {
+      // AdMob no soportado en Web ni Windows
+      print('[TIMING] AdMob skipped - platform not supported');
+      return;
+    }
+    _recordTiming('MobileAds initialize START');
+    MobileAds.instance.initialize();
+    _recordTiming('MobileAds initialize COMPLETE');
+    _createBannerAds();
+  }
+
+  void _createBannerAds() {
+    if (kIsWeb || Platform.isWindows) {
+      print('[TIMING] Banner ads skipped - platform not supported');
+      return;
+    }
+    _recordTiming('Creating banner ads');
+    // Determinar el Ad Unit ID según la plataforma
+    String adUnitId;
+    if (kIsWeb) {
+      // En web usamos el ID de Android por defecto
+      adUnitId = 'ca-app-pub-3940256099942544/6300978111';
+    } else if (Platform.isAndroid) {
+      adUnitId = 'ca-app-pub-3940256099942544/6300978111'; // Test ID Android
+    } else {
+      adUnitId = 'ca-app-pub-3940256099942544/2934735716'; // Test ID iOS
+    }
+
+    // Banner para pestaña de Transacciones
+    _bannerAdTransacciones = BannerAd(
+      adUnitId: adUnitId,
+      size: AdSize.banner,
+      request: const AdRequest(),
+      listener: BannerAdListener(
+        onAdLoaded: (_) {
+          setState(() {
+            _isBannerTransaccionesLoaded = true;
+          });
+        },
+        onAdFailedToLoad: (ad, error) {
+          ad.dispose();
+          setState(() {
+            _isBannerTransaccionesLoaded = false;
+          });
+        },
+      ),
+    )..load();
+
+    // Banner para pestaña de Ahorros
+    _bannerAdAhorros = BannerAd(
+      adUnitId: adUnitId,
+      size: AdSize.banner,
+      request: const AdRequest(),
+      listener: BannerAdListener(
+        onAdLoaded: (_) {
+          setState(() {
+            _isBannerAhorrosLoaded = true;
+          });
+        },
+        onAdFailedToLoad: (ad, error) {
+          ad.dispose();
+          setState(() {
+            _isBannerAhorrosLoaded = false;
+          });
+        },
+      ),
+    )..load();
   }
 
   @override
@@ -258,12 +436,27 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     _montoFocus.dispose();
     _justificacionFocus.dispose();
     _tabController.dispose();
+    _bannerAdTransacciones?.dispose();
+    _bannerAdAhorros?.dispose();
     super.dispose();
   }
 
+  Future<void> _cargarTransaccionesAsync() async {
+    // Cargar datos de forma asincrónica sin bloquear la UI
+    Future.delayed(Duration.zero, () async {
+      _recordTiming('_cargarTransaccionesAsync START (non-blocking)');
+      await _cargarTransacciones();
+      _verificarYEnviarRecordatorios();
+      _recordTiming('_cargarTransaccionesAsync COMPLETE');
+    });
+  }
+
   Future<void> _cargarTransacciones() async {
+    _recordTiming('_cargarTransacciones START');
     _prefs = await SharedPreferences.getInstance();
+    _recordTiming('SharedPreferences inicializado');
     final String? datosGuardados = _prefs.getString('transacciones');
+    _recordTiming('Transacciones cargadas de prefs');
     
     // Cargar idioma y moneda
     final String languageCode = _prefs.getString('app_language') ?? 'spanish';
@@ -271,14 +464,22 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
       (lang) => lang.toString().split('.').last == languageCode,
       orElse: () => AppLanguage.spanish,
     );
+    _recordTiming('Idioma cargado');
     
     final String currencyCode = _prefs.getString('app_currency') ?? 'usd';
     _appCurrency = AppCurrency.values.firstWhere(
       (curr) => curr.toString().split('.').last == currencyCode,
       orElse: () => AppCurrency.usd,
     );
+    _recordTiming('Moneda cargada');
     
-    _strings = AppStrings(language: _appLanguage);
+    // Solo recrear AppStrings si el idioma cambió
+    if (_strings.language != _appLanguage) {
+      _strings = AppStrings(language: _appLanguage);
+      _recordTiming('Strings inicializados (new language)');
+    } else {
+      _recordTiming('Strings cached (same language)');
+    }
     
     // Cargar tema actual
     final themeModeString = _prefs.getString('themeMode') ?? 'system';
@@ -287,6 +488,10 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     // Cargar presupuesto mensual
     _presupuestoMensual = _prefs.getDouble('presupuesto_mensual') ?? 0.0;
     _notificacionEnviada = false;
+    
+    // Cargar contador de transacciones para conversión
+    _transaccionesCreadas = _prefs.getInt('transacciones_creadas') ?? 0;
+    _mostroPopupConversion = _prefs.getBool('mostro_popup_conversion') ?? false;
     
     // Cargar registros de ahorros
     final String? ahorrosGuardados = _prefs.getString('ahorros_historicos');
@@ -300,6 +505,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
         print('Error al cargar ahorros: $e');
       }
     }
+    _recordTiming('Ahorros cargados');
 
     // Cargar gastos fijos
     final String? gastosFijosGuardados = _prefs.getString('gastos_fijos');
@@ -311,6 +517,39 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
         });
       } catch (e) {
         print('Error al cargar gastos fijos: $e');
+      }
+    }
+    _recordTiming('Gastos fijos cargados');
+
+    // Cargar categorías personalizadas (Premium)
+    final String? categoriasGuardadas = _prefs.getString('categorias_personalizadas');
+    if (categoriasGuardadas != null) {
+      try {
+        final Map<String, dynamic> decoded = jsonDecode(categoriasGuardadas);
+        setState(() {
+          _categoriasPersonalizadas = decoded.map((key, value) => MapEntry(key, value.toString()));
+        });
+      } catch (e) {
+        print('Error al cargar categorías personalizadas: $e');
+      }
+    }
+    _recordTiming('Categorías cargadas');
+
+    // Cargar monedas adicionales (Premium)
+    final String? monedasGuardadas = _prefs.getString('monedas_adicionales');
+    if (monedasGuardadas != null && _isPremium) {
+      try {
+        final List<dynamic> decoded = jsonDecode(monedasGuardadas);
+        setState(() {
+          _monedasDisponibles = decoded
+              .map((item) => AppCurrency.values.firstWhere(
+                    (c) => c.toString() == item,
+                    orElse: () => AppCurrency.usd,
+                  ))
+              .toList();
+        });
+      } catch (e) {
+        print('Error al cargar monedas adicionales: $e');
       }
     }
     
@@ -465,6 +704,38 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                   }
                 },
               ),
+              RadioListTile<AppLanguage>(
+                title: const Text('中文'),
+                secondary: const Text('🇨🇳'),
+                value: AppLanguage.chinese,
+                groupValue: _appLanguage,
+                onChanged: (v) async {
+                  Navigator.of(context).pop();
+                  if (v != null) {
+                    await _prefs.setString('app_language', v.toString().split('.').last);
+                    setState(() {
+                      _appLanguage = v;
+                      _strings = AppStrings(language: _appLanguage);
+                    });
+                  }
+                },
+              ),
+              RadioListTile<AppLanguage>(
+                title: const Text('日本語'),
+                secondary: const Text('🇯🇵'),
+                value: AppLanguage.japanese,
+                groupValue: _appLanguage,
+                onChanged: (v) async {
+                  Navigator.of(context).pop();
+                  if (v != null) {
+                    await _prefs.setString('app_language', v.toString().split('.').last);
+                    setState(() {
+                      _appLanguage = v;
+                      _strings = AppStrings(language: _appLanguage);
+                    });
+                  }
+                },
+              ),
             ],
           ),
           actions: [TextButton(onPressed: () => Navigator.of(context).pop(), child: Text(_strings.cerrar))],
@@ -515,56 +786,96 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
       builder: (_) {
         return AlertDialog(
           title: Text(_strings.configuracion),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ListTile(
-                leading: const Icon(Icons.menu_book),
-                title: const Text('Manual de uso'),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () {
-                  Navigator.of(context).pop();
-                  _showManualScreen();
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.brightness_6),
-                title: Text(_strings.tema),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () {
-                  Navigator.of(context).pop();
-                  _showThemeDialog();
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.language),
-                title: Text(_strings.idioma),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () {
-                  Navigator.of(context).pop();
-                  _showLanguageDialog();
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.currency_exchange),
-                title: Text(_strings.moneda),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () {
-                  Navigator.of(context).pop();
-                  _showCurrencyDialog();
-                },
-              ),
-              const Divider(),
-              ListTile(
-                leading: const Icon(Icons.share),
-                title: const Text('Compartir App'),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () {
-                  Navigator.of(context).pop();
-                  _compartirApp();
-                },
-              ),
-            ],
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.menu_book),
+                  title: Text(_strings.manualDeUso),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    _showManualScreen();
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.brightness_6),
+                  title: Text(_strings.tema),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    _showThemeDialog();
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.language),
+                  title: Text(_strings.idioma),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    _showLanguageDialog();
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.currency_exchange),
+                  title: Text(_strings.moneda),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    _showCurrencyDialog();
+                  },
+                ),
+                const Divider(),
+                ListTile(
+                  leading: const Icon(Icons.analytics, color: Color(0xFF0EA5A4)),
+                  title: const Text('Analytics'),
+                  subtitle: const Text('Ver estadísticas de uso'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const AnalyticsScreen()),
+                    );
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.notifications, color: Color(0xFFF59E0B)),
+                  title: const Text('Notificaciones'),
+                  subtitle: const Text('Configurar recordatorios'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const NotificationsSettingsScreen()),
+                    );
+                  },
+                ),
+                const Divider(),
+                ListTile(
+                  leading: const Icon(Icons.school, color: Color(0xFF6366F1)),
+                  title: const Text('Tutorial'),
+                  subtitle: const Text('Ver tutorial de nuevo'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const OnboardingScreen()),
+                    );
+                  },
+                ),
+                const Divider(),
+                ListTile(
+                  leading: const Icon(Icons.share),
+                  title: Text(_strings.compartirApp),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    _compartirApp();
+                  },
+                ),
+              ],
+            ),
           ),
           actions: [TextButton(onPressed: () => Navigator.of(context).pop(), child: Text(_strings.cerrar))],
         );
@@ -580,7 +891,7 @@ Una app completa para controlar tus gastos y ahorros:
 
 ✅ Registra ingresos y egresos fácilmente
 💰 Presupuesto mensual con alertas
-📊 Gráficos y reportes detallados
+📊 Gráficos e informes detallados
 💳 Control de gastos fijos
 🔐 Protección con biometría
 📈 Seguimiento automático de ahorros
@@ -725,8 +1036,21 @@ Una app completa para controlar tus gastos y ahorros:
       context: context,
       builder: (_) {
         return AlertDialog(
-          title: const Text('Reportes'),
-          content: const Text('Selecciona el formato de reporte'),
+          title: Text(_strings.reportes),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(_strings.seleccionaFormatoReporte),
+              if (_isPremium)
+                const Padding(
+                  padding: EdgeInsets.only(top: 8),
+                  child: Text(
+                    '✨ Exportación anual disponible',
+                    style: TextStyle(fontSize: 12, color: Color(0xFFF59E0B)),
+                  ),
+                ),
+            ],
+          ),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
@@ -741,29 +1065,10 @@ Una app completa para controlar tus gastos y ahorros:
               ),
               onPressed: () async {
                 Navigator.of(context).pop();
-                try {
-                  final transaccionesMes = _obtenerTransaccionesMes();
-                  final pdfBytes = await exportMonthlyReportPdf(
-                    month: _mesSeleccionado,
-                    transactions: transaccionesMes,
-                    ingresos: _calcularIngresos(),
-                    egresos: _calcularEgresos(),
-                  );
-                  
-                  final dir = await getTemporaryDirectory();
-                  final monthStr = '${_mesSeleccionado.month.toString().padLeft(2, '0')}-${_mesSeleccionado.year}';
-                  final filePath = p.join(dir.path, 'Reporte_$monthStr.pdf');
-                  final file = File(filePath);
-                  await file.writeAsBytes(pdfBytes);
-                  
-                  await Share.shareXFiles([XFile(file.path)], text: 'Reporte Mensual $monthStr');
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(_strings.generandoReporte)),
-                  );
-                } catch (e) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Error al generar PDF: $e')),
-                  );
+                if (_isPremium) {
+                  _mostrarOpcionesExportacion('pdf');
+                } else {
+                  _exportarMesActual('pdf');
                 }
               },
             ),
@@ -771,34 +1076,15 @@ Una app completa para controlar tus gastos y ahorros:
               icon: const Icon(Icons.table_chart),
               label: Text(_strings.reporteExcel),
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF10B981),
+                backgroundColor: const Color(0xFF0EA5A4),
                 foregroundColor: Colors.white,
               ),
               onPressed: () async {
                 Navigator.of(context).pop();
-                try {
-                  final transaccionesMes = _obtenerTransaccionesMes();
-                  final excelBytes = await exportMonthlyReportExcel(
-                    month: _mesSeleccionado,
-                    transactions: transaccionesMes,
-                    ingresos: _calcularIngresos(),
-                    egresos: _calcularEgresos(),
-                  );
-                  
-                  final dir = await getTemporaryDirectory();
-                  final monthStr = '${_mesSeleccionado.month.toString().padLeft(2, '0')}-${_mesSeleccionado.year}';
-                  final filePath = p.join(dir.path, 'Reporte_$monthStr.xlsx');
-                  final file = File(filePath);
-                  await file.writeAsBytes(excelBytes);
-                  
-                  await Share.shareXFiles([XFile(file.path)], text: 'Reporte Mensual $monthStr');
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(_strings.generandoReporte)),
-                  );
-                } catch (e) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Error al generar Excel: $e')),
-                  );
+                if (_isPremium) {
+                  _mostrarOpcionesExportacion('excel');
+                } else {
+                  _exportarMesActual('excel');
                 }
               },
             ),
@@ -806,6 +1092,349 @@ Una app completa para controlar tus gastos y ahorros:
         );
       },
     );
+  }
+
+  void _mostrarOpcionesExportacion(String formato) {
+    showDialog(
+      context: context,
+      builder: (_) {
+        return AlertDialog(
+          title: Text('${_strings.exportar2} ${formato.toUpperCase()}'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.calendar_today),
+                title: Text(_strings.mesActual),
+                subtitle: Text(_obtenerNombreMes(_mesSeleccionado)),
+                onTap: () {
+                  Navigator.pop(context);
+                  _exportarMesActual(formato);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.calendar_view_month),
+                title: Text(_strings.todoElAnio),
+                subtitle: Text('${_mesSeleccionado.year}'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _exportarAnual(formato);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.all_inclusive),
+                title: Text(_strings.todosLosDatos),
+                subtitle: Text(_strings.historiaiCompleto),
+                onTap: () {
+                  Navigator.pop(context);
+                  _exportarTodoHistorial(formato);
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _exportarMesActual(String formato) async {
+    try {
+      final transaccionesMes = _obtenerTransaccionesMes();
+      Directory dir;
+      
+      // Usar directorio de documentos de la app (accesible y permanente)
+      if (Platform.isAndroid) {
+        dir = await getApplicationDocumentsDirectory();
+      } else {
+        dir = await getApplicationDocumentsDirectory();
+      }
+      
+      final monthStr = '${_mesSeleccionado.month.toString().padLeft(2, '0')}-${_mesSeleccionado.year}';
+      final extension = formato == 'pdf' ? 'pdf' : 'xlsx';
+      final fileName = 'Informe_$monthStr.$extension';
+      final filePath = p.join(dir.path, fileName);
+      
+      if (formato == 'pdf') {
+        final pdfBytes = await exportMonthlyReportPdf(
+          month: _mesSeleccionado,
+          transactions: transaccionesMes,
+          ingresos: _calcularIngresos(),
+          egresos: _calcularEgresos(),
+        );
+        final file = File(filePath);
+        await file.writeAsBytes(pdfBytes);
+      } else {
+        final excelBytes = await exportMonthlyReportExcel(
+          month: _mesSeleccionado,
+          transactions: transaccionesMes,
+          ingresos: _calcularIngresos(),
+          egresos: _calcularEgresos(),
+        );
+        final file = File(filePath);
+        await file.writeAsBytes(excelBytes);
+      }
+      
+      // Mostrar diálogo con opciones
+      if (mounted) {
+        _mostrarDialogoArchivoGuardado(filePath, fileName, 'Informe Mensual $monthStr');
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error al generar informe: $e')),
+        );
+      }
+    }
+  }
+
+  void _mostrarDialogoArchivoGuardado(String filePath, String fileName, String descripcion) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.check_circle, color: Colors.green, size: 28),
+            SizedBox(width: 8),
+            Text('Informe guardado'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'El informe se guard\u00f3 correctamente:',
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF3F4F6),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.insert_drive_file, size: 20, color: Color(0xFF0EA5A4)),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          fileName,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Ubicaci\u00f3n: Documentos de la app',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              '\u00bfQu\u00e9 deseas hacer?',
+              style: TextStyle(
+                fontSize: 13,
+                color: Colors.grey[700],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cerrar'),
+          ),
+          TextButton.icon(
+            onPressed: () async {
+              Navigator.pop(context);
+              await Share.shareXFiles([XFile(filePath)], text: descripcion);
+            },
+            icon: const Icon(Icons.share),
+            label: const Text('Compartir'),
+          ),
+          ElevatedButton.icon(
+            onPressed: () async {
+              Navigator.pop(context);
+              // Intentar abrir el archivo con la aplicaci\u00f3n predeterminada
+              try {
+                if (Platform.isAndroid || Platform.isIOS) {
+                  await Share.shareXFiles([XFile(filePath)], text: 'Abrir con...');
+                } else {
+                  // En escritorio, intentar abrir directamente
+                  final uri = Uri.file(filePath);
+                  if (await canLaunchUrl(uri)) {
+                    await launchUrl(uri);
+                  }
+                }
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('No se pudo abrir el archivo: $e')),
+                  );
+                }
+              }
+            },
+            icon: const Icon(Icons.open_in_new),
+            label: const Text('Abrir'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF0EA5A4),
+              foregroundColor: Colors.white,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _exportarAnual(String formato) async {
+    try {
+      // Filtrar transacciones del año seleccionado
+      final transaccionesAnio = _transacciones.where((t) {
+        if (t['fecha'] == null) return false;
+        try {
+          final fecha = DateTime.parse(t['fecha']);
+          return fecha.year == _mesSeleccionado.year;
+        } catch (e) {
+          return false;
+        }
+      }).toList();
+
+      if (transaccionesAnio.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(_strings.noHayDatos)),
+        );
+        return;
+      }
+
+      double ingresosAnuales = 0;
+      double egresosAnuales = 0;
+      
+      for (var t in transaccionesAnio) {
+        if (t['tipo'] == 'Ingreso') {
+          ingresosAnuales += (t['monto'] as num).toDouble();
+        } else {
+          egresosAnuales += (t['monto'].abs() as num).toDouble();
+        }
+      }
+
+      Directory dir;
+      if (Platform.isAndroid) {
+        dir = await getApplicationDocumentsDirectory();
+      } else {
+        dir = await getApplicationDocumentsDirectory();
+      }
+      
+      final yearStr = '${_mesSeleccionado.year}';
+      final extension = formato == 'pdf' ? 'pdf' : 'xlsx';
+      final fileName = 'Informe_Anual_$yearStr.$extension';
+      final filePath = p.join(dir.path, fileName);
+      
+      if (formato == 'pdf') {
+        final pdfBytes = await exportMonthlyReportPdf(
+          month: DateTime(_mesSeleccionado.year, 1),
+          transactions: transaccionesAnio,
+          ingresos: ingresosAnuales,
+          egresos: egresosAnuales,
+        );
+        final file = File(filePath);
+        await file.writeAsBytes(pdfBytes);
+      } else {
+        final excelBytes = await exportMonthlyReportExcel(
+          month: DateTime(_mesSeleccionado.year, 1),
+          transactions: transaccionesAnio,
+          ingresos: ingresosAnuales,
+          egresos: egresosAnuales,
+        );
+        final file = File(filePath);
+        await file.writeAsBytes(excelBytes);
+      }
+      
+      if (mounted) {
+        _mostrarDialogoArchivoGuardado(filePath, fileName, 'Informe Anual $yearStr');
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error al generar informe: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _exportarTodoHistorial(String formato) async {
+    try {
+      if (_transacciones.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(_strings.noHayDatosExportar)),
+        );
+        return;
+      }
+
+      double ingresosTotal = 0;
+      double egresosTotal = 0;
+      
+      for (var t in _transacciones) {
+        if (t['tipo'] == 'Ingreso') {
+          ingresosTotal += (t['monto'] as num).toDouble();
+        } else {
+          egresosTotal += (t['monto'].abs() as num).toDouble();
+        }
+      }
+
+      Directory dir;
+      if (Platform.isAndroid) {
+        dir = await getApplicationDocumentsDirectory();
+      } else {
+        dir = await getApplicationDocumentsDirectory();
+      }
+      
+      final extension = formato == 'pdf' ? 'pdf' : 'xlsx';
+      final fileName = 'Informe_Completo.$extension';
+      final filePath = p.join(dir.path, fileName);
+      
+      if (formato == 'pdf') {
+        final pdfBytes = await exportMonthlyReportPdf(
+          month: DateTime.now(),
+          transactions: _transacciones,
+          ingresos: ingresosTotal,
+          egresos: egresosTotal,
+        );
+        final file = File(filePath);
+        await file.writeAsBytes(pdfBytes);
+      } else {
+        final excelBytes = await exportMonthlyReportExcel(
+          month: DateTime.now(),
+          transactions: _transacciones,
+          ingresos: ingresosTotal,
+          egresos: egresosTotal,
+        );
+        final file = File(filePath);
+        await file.writeAsBytes(excelBytes);
+      }
+      
+      if (mounted) {
+        _mostrarDialogoArchivoGuardado(filePath, fileName, 'Informe Completo');
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error al generar informe: $e')),
+        );
+      }
+    }
   }
 
   Color _getBalanceCardColor(double balance, List<Map<String, dynamic>> egresosDelMes) {
@@ -818,7 +1447,7 @@ Una app completa para controlar tus gastos y ahorros:
         return const Color(0xFFFFEBEE); // Rojo muy claro si se excede presupuesto
       }
     }
-    return balance >= 0 ? const Color(0xFFECFDF5) : const Color(0xFFFEF2F2);
+    return balance >= 0 ? const Color(0xFFE7F8F7) : const Color(0xFFFEF2F2);
   }
 
   Color _getBalanceTextColor(double balance, List<Map<String, dynamic>> egresosDelMes) {
@@ -831,7 +1460,7 @@ Una app completa para controlar tus gastos y ahorros:
         return const Color(0xFFC62828); // Rojo intenso si se excede presupuesto
       }
     }
-    return balance >= 0 ? const Color(0xFF10B981) : const Color(0xFFEF4444);
+    return balance >= 0 ? const Color(0xFF0EA5A4) : const Color(0xFFEF4444);
   }
 
   // Obtener egresos del mes seleccionado
@@ -844,7 +1473,7 @@ Una app completa para controlar tus gastos y ahorros:
   // Obtener color de la barra de progreso según el porcentaje gastado
   Color _getProgressBarColor(double porcentajeGastado) {
     if (porcentajeGastado <= 50) {
-      return const Color(0xFF10B981); // Verde
+      return const Color(0xFF0EA5A4); // Verde
     } else if (porcentajeGastado <= 85) {
       return const Color(0xFFF59E0B); // Naranja
     } else {
@@ -939,7 +1568,7 @@ Una app completa para controlar tus gastos y ahorros:
     final monto = double.tryParse(_ahorroController.text) ?? 0.0;
     if (monto <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Ingresa un monto válido para extraer')),
+        SnackBar(content: Text(_strings.ingresaMontoValido)),
       );
       return;
     }
@@ -965,7 +1594,7 @@ Una app completa para controlar tus gastos y ahorros:
       context: context,
       builder: (_) {
         return AlertDialog(
-          title: const Text('Extracción de ahorro'),
+          title: Text(_strings.extraccionDeAhorro),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -999,7 +1628,7 @@ Una app completa para controlar tus gastos y ahorros:
                 backgroundColor: const Color(0xFFEF4444),
                 foregroundColor: Colors.white,
               ),
-              child: const Text('Extraer'),
+              child: Text(_strings.extraer),
             ),
           ],
         );
@@ -1037,7 +1666,7 @@ Una app completa para controlar tus gastos y ahorros:
 
     _guardarGastosFijos();
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Gasto fijo "$nombre" agregado correctamente')),
+      SnackBar(content: Text('${_strings.gastoFijoAgregado}: "$nombre"')),
     );
   }
 
@@ -1047,7 +1676,7 @@ Una app completa para controlar tus gastos y ahorros:
     
     if (nombre.isEmpty || monto <= 0 || _diaVencimientoSeleccionado < 1 || _diaVencimientoSeleccionado > 31) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Por favor completa todos los campos correctamente')),
+        SnackBar(content: Text(_strings.completaTodosCampos)),
       );
       return;
     }
@@ -1071,7 +1700,7 @@ Una app completa para controlar tus gastos y ahorros:
     Navigator.of(context).pop();
     
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Gasto fijo "$nombre" agregado correctamente')),
+      SnackBar(content: Text('${_strings.gastoFijoAgregado}: "$nombre"')),
     );
   }
 
@@ -1096,7 +1725,7 @@ Una app completa para controlar tus gastos y ahorros:
     Navigator.of(context).pop();
     
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Gasto fijo "$nombre" actualizado')),
+      SnackBar(content: Text('${_strings.gastoFijoActualizado}: "$nombre"')),
     );
   }
 
@@ -1108,8 +1737,508 @@ Una app completa para controlar tus gastos y ahorros:
     _guardarGastosFijos();
     
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Gasto fijo "$nombreEliminado" eliminado')),
+      SnackBar(content: Text('${_strings.gastoFijoEliminado}: "$nombreEliminado"')),
     );
+  }
+
+  // ===== MÉTODOS PARA CATEGORÍAS PERSONALIZADAS (PREMIUM) =====
+
+  Future<void> _guardarCategoriasPersonalizadas() async {
+    try {
+      final String datosJSON = jsonEncode(_categoriasPersonalizadas);
+      await _prefs.setString('categorias_personalizadas', datosJSON);
+    } catch (e) {
+      print('Error al guardar categorías personalizadas: $e');
+    }
+  }
+
+  Map<String, String> _obtenerTodasLasCategorias() {
+    return {..._categorias, ..._categoriasPersonalizadas};
+  }
+
+  void _agregarCategoriaPersonalizada(String nombre, String emoji) {
+    if (nombre.isEmpty || emoji.isEmpty) return;
+    
+    setState(() {
+      _categoriasPersonalizadas[nombre] = emoji;
+    });
+    _guardarCategoriasPersonalizadas();
+    
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('${_strings.categoriaAgregada}: "$nombre"')),
+    );
+  }
+
+  void _eliminarCategoriaPersonalizada(String nombre) {
+    setState(() {
+      _categoriasPersonalizadas.remove(nombre);
+    });
+    _guardarCategoriasPersonalizadas();
+    
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('${_strings.categoriaEliminada}: "$nombre"')),
+    );
+  }
+
+  void _mostrarDialogoCategoriasPersonalizadas() {
+    if (!_isPremium) {
+      _mostrarDialogoPremiumRequerido('Categorías personalizadas');
+      return;
+    }
+
+    showDialog(
+      context: context,
+      builder: (_) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return Dialog(
+              child: Container(
+                width: MediaQuery.of(context).size.width * 0.9,
+                constraints: const BoxConstraints(maxHeight: 600),
+                child: Column(
+                  children: [
+                    AppBar(
+                      title: const Text('Mis Categorías'),
+                      automaticallyImplyLeading: true,
+                      actions: [
+                        IconButton(
+                          icon: const Icon(Icons.add),
+                          onPressed: () {
+                            _mostrarDialogoNuevaCategoria();
+                          },
+                        ),
+                      ],
+                    ),
+                    Expanded(
+                      child: _categoriasPersonalizadas.isEmpty
+                          ? const Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.category, size: 64, color: Color(0xFFD1D5DB)),
+                                  const SizedBox(height: 16),
+                                  Text(
+                                    'No tienes categorías personalizadas',
+                                    style: TextStyle(fontSize: 16, color: Color(0xFF6B7280)),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    'Toca + para agregar una nueva',
+                                    style: TextStyle(fontSize: 14, color: Color(0xFF9CA3AF)),
+                                  ),
+                                ],
+                              ),
+                            )
+                          : ListView.builder(
+                              itemCount: _categoriasPersonalizadas.length,
+                              itemBuilder: (ctx, index) {
+                                final entry = _categoriasPersonalizadas.entries.elementAt(index);
+                                return Card(
+                                  margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                  child: ListTile(
+                                    leading: Text(
+                                      entry.value,
+                                      style: const TextStyle(fontSize: 32),
+                                    ),
+                                    title: Text(entry.key),
+                                    trailing: IconButton(
+                                      icon: const Icon(Icons.delete, color: Color(0xFFEF4444)),
+                                      onPressed: () {
+                                        Navigator.pop(context);
+                                        _eliminarCategoriaPersonalizada(entry.key);
+                                      },
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _mostrarDialogoNuevaCategoria() {
+    final nombreController = TextEditingController();
+    final emojiController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (_) {
+        return AlertDialog(
+          title: Text(_strings.nuevaCategoria),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: nombreController,
+                decoration: const InputDecoration(
+                  labelText: 'Nombre',
+                  border: OutlineInputBorder(),
+                  hintText: 'ej. Mascotas, Ropa, etc.',
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: emojiController,
+                decoration: const InputDecoration(
+                  labelText: 'Emoji',
+                  border: OutlineInputBorder(),
+                  hintText: '🐶',
+                ),
+                maxLength: 2,
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text(_strings.cancelar),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                final nombre = nombreController.text.trim();
+                final emoji = emojiController.text.trim();
+                if (nombre.isNotEmpty && emoji.isNotEmpty) {
+                  _agregarCategoriaPersonalizada(nombre, emoji);
+                  Navigator.pop(context);
+                }
+              },
+              child: Text(_strings.agregar),
+            ),
+          ],
+        );
+      },
+    ).then((_) {
+      nombreController.dispose();
+      emojiController.dispose();
+    });
+  }
+
+  void _mostrarDialogoPremiumRequerido(String funcionalidad) {
+    showDialog(
+      context: context,
+      builder: (_) {
+        return AlertDialog(
+          title: Row(
+            children: [
+              const Icon(Icons.workspace_premium, color: Color(0xFFF59E0B)),
+              const SizedBox(width: 8),
+              const Text('Premium Requerido'),
+            ],
+          ),
+          content: Text(
+            '$funcionalidad es una función exclusiva de Premium.\n\n'
+            '¿Deseas actualizar a Premium?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text(_strings.cancelar),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                Navigator.pop(context);
+                final result = await Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => PremiumScreen(strings: _strings)),
+                );
+                if (result == true) {
+                  _checkPremiumStatus();
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFF59E0B),
+              ),
+              child: const Text('Ver Premium'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // ===== MÉTODOS PARA MONEDAS MÚLTIPLES (PREMIUM) =====
+
+  Future<void> _guardarMonedasAdicionales() async {
+    try {
+      final List<String> monedasString = _monedasDisponibles.map((m) => m.toString()).toList();
+      final String datosJSON = jsonEncode(monedasString);
+      await _prefs.setString('monedas_adicionales', datosJSON);
+    } catch (e) {
+      print('Error al guardar monedas adicionales: $e');
+    }
+  }
+
+  void _agregarMoneda(AppCurrency moneda) {
+    if (!_monedasDisponibles.contains(moneda)) {
+      setState(() {
+        _monedasDisponibles.add(moneda);
+      });
+      _guardarMonedasAdicionales();
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Moneda ${moneda.name.toUpperCase()} agregada')),
+      );
+    }
+  }
+
+  void _eliminarMoneda(AppCurrency moneda) {
+    if (moneda == _appCurrency) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(_strings.noObtieneMonedasActiva)),
+      );
+      return;
+    }
+
+    setState(() {
+      _monedasDisponibles.remove(moneda);
+    });
+    _guardarMonedasAdicionales();
+    
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('${_strings.monedaEliminada}: ${moneda.name.toUpperCase()}')),
+    );
+  }
+
+  void _cambiarMonedaActiva(AppCurrency moneda) {
+    setState(() {
+      _appCurrency = moneda;
+    });
+    _prefs.setString('currency', moneda.name);
+    
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('${_strings.monedaCambiada} ${moneda.symbol} ${moneda.name.toUpperCase()}')),
+    );
+  }
+
+  void _mostrarDialogoMonedas() {
+    if (!_isPremium) {
+      _mostrarDialogoPremiumRequerido('Monedas múltiples');
+      return;
+    }
+
+    showDialog(
+      context: context,
+      builder: (_) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return Dialog(
+              child: Container(
+                width: MediaQuery.of(context).size.width * 0.9,
+                constraints: const BoxConstraints(maxHeight: 600),
+                child: Column(
+                  children: [
+                    AppBar(
+                      title: Text(_strings.monedaTitle),
+                      automaticallyImplyLeading: true,
+                      actions: [
+                        IconButton(
+                          icon: const Icon(Icons.add),
+                          onPressed: () {
+                            _mostrarDialogoAgregarMoneda();
+                          },
+                        ),
+                      ],
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '${_strings.moneda} ${_strings.activa}:',
+                            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                          ),
+                          const SizedBox(height: 8),
+                          Card(
+                            color: const Color(0xFFE7F8F7),
+                            child: ListTile(
+                              leading: Text(
+                                _appCurrency.symbol,
+                                style: const TextStyle(fontSize: 24),
+                              ),
+                              title: Text(
+                                _appCurrency.name.toUpperCase(),
+                                style: const TextStyle(fontWeight: FontWeight.bold),
+                              ),
+                              subtitle: Text(_getNombreMoneda(_appCurrency)),
+                              trailing: const Icon(Icons.check_circle, color: Color(0xFF0EA5A4)),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Divider(),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      child: Text(
+                        'Monedas disponibles (${_monedasDisponibles.length}):',
+                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                    Expanded(
+                      child: _monedasDisponibles.isEmpty
+                          ? const Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.currency_exchange, size: 64, color: Color(0xFFD1D5DB)),
+                                  const SizedBox(height: 16),
+                                  Text(
+                                    'No tienes monedas adicionales',
+                                    style: TextStyle(fontSize: 16, color: Color(0xFF6B7280)),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    'Toca + para agregar una nueva',
+                                    style: TextStyle(fontSize: 14, color: Color(0xFF9CA3AF)),
+                                  ),
+                                ],
+                              ),
+                            )
+                          : ListView.builder(
+                              itemCount: _monedasDisponibles.length,
+                              itemBuilder: (ctx, index) {
+                                final moneda = _monedasDisponibles[index];
+                                final esActiva = moneda == _appCurrency;
+                                return Card(
+                                  margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                                  child: ListTile(
+                                    leading: Text(
+                                      moneda.symbol,
+                                      style: const TextStyle(fontSize: 24),
+                                    ),
+                                    title: Text(moneda.name.toUpperCase()),
+                                    subtitle: Text(_getNombreMoneda(moneda)),
+                                    trailing: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        if (!esActiva)
+                                          IconButton(
+                                            icon: const Icon(Icons.swap_horiz, color: Color(0xFF0EA5A4)),
+                                            onPressed: () {
+                                              Navigator.pop(context);
+                                              _cambiarMonedaActiva(moneda);
+                                            },
+                                          ),
+                                        if (!esActiva)
+                                          IconButton(
+                                            icon: const Icon(Icons.delete, color: Color(0xFFEF4444)),
+                                            onPressed: () {
+                                              setState(() {
+                                                _eliminarMoneda(moneda);
+                                              });
+                                            },
+                                          ),
+                                        if (esActiva)
+                                          const Icon(Icons.check_circle, color: Color(0xFF0EA5A4)),
+                                      ],
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _mostrarDialogoAgregarMoneda() {
+    final monedasNoAgregadas = AppCurrency.values
+        .where((m) => !_monedasDisponibles.contains(m) && m != _appCurrency)
+        .toList();
+
+    if (monedasNoAgregadas.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(_strings.noObtieneMonedasDisponibles)),
+      );
+      return;
+    }
+
+    showDialog(
+      context: context,
+      builder: (_) {
+        return AlertDialog(
+          title: Text(_strings.agregarMoneda),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: ListView.builder(
+              shrinkWrap: true,
+              itemCount: monedasNoAgregadas.length,
+              itemBuilder: (ctx, index) {
+                final moneda = monedasNoAgregadas[index];
+                return ListTile(
+                  leading: Text(
+                    moneda.symbol,
+                    style: const TextStyle(fontSize: 24),
+                  ),
+                  title: Text(moneda.name.toUpperCase()),
+                  subtitle: Text(_getNombreMoneda(moneda)),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _agregarMoneda(moneda);
+                  },
+                );
+              },
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text(_strings.cancelar),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  String _getNombreMoneda(AppCurrency moneda) {
+    switch (moneda) {
+      case AppCurrency.usd:
+        return 'Dólar estadounidense';
+      case AppCurrency.eur:
+        return 'Euro';
+      case AppCurrency.mxn:
+        return 'Peso mexicano';
+      case AppCurrency.ars:
+        return 'Peso argentino';
+      case AppCurrency.clp:
+        return 'Peso chileno';
+      case AppCurrency.brl:
+        return 'Real brasileño';
+      case AppCurrency.gbp:
+        return 'Libra esterlina';
+      case AppCurrency.inr:
+        return 'Rupia india';
+      case AppCurrency.jpy:
+        return 'Yen japonés';
+      case AppCurrency.cad:
+        return 'Dólar canadiense';
+      case AppCurrency.aud:
+        return 'Dólar australiano';
+      case AppCurrency.chf:
+        return 'Franco suizo';
+      case AppCurrency.cny:
+        return 'Yuan chino';
+      case AppCurrency.sek:
+        return 'Corona sueca';
+      case AppCurrency.nok:
+        return 'Corona noruega';
+      case AppCurrency.zar:
+        return 'Rand sudafricano';
+    }
   }
 
   void _mostrarDialogoGastoFijo({int? index}) {
@@ -1285,12 +2414,9 @@ Una app completa para controlar tus gastos y ahorros:
     }).toList();
   }
 
-  // Obtener nombre del mes en español
+  // Obtener nombre del mes según el idioma seleccionado
   String _obtenerNombreMes(DateTime fecha) {
-    const meses = [
-      'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
-      'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
-    ];
+    final meses = _strings.nombresMeses;
     return '${meses[fecha.month - 1]} ${fecha.year}';
   }
 
@@ -1328,7 +2454,7 @@ Una app completa para controlar tus gastos y ahorros:
         PieChartSectionData(
           value: 100,
           color: Colors.grey[300],
-          title: 'Sin datos',
+          title: _strings.sinDatos,
           radius: 60,
           titleStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
         ),
@@ -1341,7 +2467,7 @@ Una app completa para controlar tus gastos y ahorros:
         PieChartSectionData(
           value: ingresos,
           color: Colors.green,
-          title: 'Ingresos\n${_appCurrency.formatAmount(ingresos)}',
+          title: '${_strings.ingresoLabel}\n${_appCurrency.formatAmount(ingresos)}',
           radius: 60,
           titleStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
         ),
@@ -1352,7 +2478,8 @@ Una app completa para controlar tus gastos y ahorros:
     egresosPorCategoria.forEach((cat, value) {
       final color = _coloresCategorias[colorIndex % _coloresCategorias.length];
       colorIndex++;
-      final emoji = _categorias[cat] ?? '❓';
+      final todasCategorias = _obtenerTodasLasCategorias();
+      final emoji = todasCategorias[cat] ?? '❓';
       sections.add(
         PieChartSectionData(
           value: value,
@@ -1397,7 +2524,7 @@ Una app completa para controlar tus gastos y ahorros:
         PieChartSectionData(
           value: 100,
           color: Colors.grey[300],
-          title: 'Sin datos',
+          title: _strings.sinDatos,
           radius: 60,
           titleStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
         ),
@@ -1410,7 +2537,7 @@ Una app completa para controlar tus gastos y ahorros:
         PieChartSectionData(
           value: ingresos,
           color: Colors.green,
-          title: 'Ingresos\n${_appCurrency.formatAmount(ingresos)}',
+          title: '${_strings.ingresoLabel}\n${_appCurrency.formatAmount(ingresos)}',
           radius: 60,
           titleStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
         ),
@@ -1421,7 +2548,8 @@ Una app completa para controlar tus gastos y ahorros:
     egresosPorCategoria.forEach((cat, value) {
       final color = _coloresCategorias[colorIndex % _coloresCategorias.length];
       colorIndex++;
-      final emoji = _categorias[cat] ?? '❓';
+      final todasCategorias = _obtenerTodasLasCategorias();
+      final emoji = todasCategorias[cat] ?? '❓';
       sections.add(
         PieChartSectionData(
           value: value,
@@ -1502,10 +2630,28 @@ Una app completa para controlar tus gastos y ahorros:
         'justificacion': razon,
         'fecha': DateTime.now().toIso8601String(),
       });
+      
+      // Incrementar contador de transacciones
+      _transaccionesCreadas++;
+      
+      // Cambiar al mes actual para mostrar la transacción recién creada
+      final ahora = DateTime.now();
+      _mesSeleccionado = DateTime(ahora.year, ahora.month);
     });
 
     // Guardar en SharedPreferences
     _guardarTransacciones();
+    _prefs.setInt('transacciones_creadas', _transaccionesCreadas);
+    
+    // Track analytics
+    AnalyticsService().trackEvent(
+      AnalyticsService.eventTransactionCreated,
+      properties: {
+        AnalyticsService.propTransactionType: _tipoSeleccionado,
+        AnalyticsService.propCategory: _categoriaSeleccionada,
+        AnalyticsService.propAmount: monto,
+      },
+    );
     
     // Actualizar ahorros automáticamente
     _actualizarAhorrosDelMes();
@@ -1515,6 +2661,293 @@ Una app completa para controlar tus gastos y ahorros:
     _montoController.clear();
     _justificacionController.clear();
     Navigator.of(context).pop();
+    
+    // Verificar si debe mostrar popup de conversión a Premium
+    _verificarPopupConversion();
+  }
+  
+  void _verificarPopupConversion() {
+    // No mostrar si ya es Premium o si ya se mostró el popup
+    if (_isPremium || _mostroPopupConversion) return;
+    
+    // Mostrar después de la 5ta transacción
+    if (_transaccionesCreadas == 5) {
+      Future.delayed(const Duration(seconds: 1), () {
+        _mostrarPopupConversionPremium();
+      });
+    }
+    
+    // Mostrar recordatorio después de 15 transacciones
+    if (_transaccionesCreadas == 15 && !_mostroPopupConversion) {
+      Future.delayed(const Duration(seconds: 1), () {
+        _mostrarPopupAhorro();
+      });
+    }
+  }
+  
+  void _mostrarPopupConversionPremium() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: const Color(0xFF0EA5A4).withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.celebration,
+                size: 48,
+                color: Color(0xFF0EA5A4),
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              '¡Felicidades!',
+              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'Has registrado 5 transacciones',
+              style: TextStyle(fontSize: 16),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Estás aprendiendo a controlar tus finanzas 💪',
+              style: TextStyle(fontSize: 14, color: Colors.grey),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFFFFF7ED), Color(0xFFFEF2F2)],
+                ),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: const Color(0xFFF59E0B), width: 2),
+              ),
+              child: Column(
+                children: [
+                  const Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.auto_awesome, color: Color(0xFFF59E0B), size: 20),
+                      SizedBox(width: 8),
+                      Text(
+                        'Desbloquea más con Premium',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                          color: Color(0xFFF59E0B),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  _buildPopupFeature('Análisis con IA de tus gastos'),
+                  _buildPopupFeature('Eventos compartidos ilimitados'),
+                  _buildPopupFeature('Sin anuncios'),
+                  _buildPopupFeature('16+ monedas'),
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFDCFCE7),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.local_fire_department, color: Color(0xFFEF4444), size: 16),
+                        SizedBox(width: 4),
+                        Text(
+                          '50% OFF solo hoy',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF22C55E),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              setState(() {
+                _mostroPopupConversion = true;
+              });
+              _prefs.setBool('mostro_popup_conversion', true);
+              Navigator.pop(context);
+            },
+            child: const Text('Tal vez después'),
+          ),
+          ElevatedButton.icon(
+            onPressed: () async {
+              setState(() {
+                _mostroPopupConversion = true;
+              });
+              _prefs.setBool('mostro_popup_conversion', true);
+              Navigator.pop(context);
+              final result = await Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => PremiumScreen(
+                    strings: _strings,
+                    source: 'popup_5_transacciones',
+                  ),
+                ),
+              );
+              if (result == true) {
+                _checkPremiumStatus();
+              }
+            },
+            icon: const Icon(Icons.workspace_premium),
+            label: const Text('Ver Premium'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFF59E0B),
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+  
+  Widget _buildPopupFeature(String text) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          const Icon(Icons.check_circle, color: Color(0xFF22C55E), size: 18),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              text,
+              style: const TextStyle(fontSize: 13),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+  
+  void _mostrarPopupAhorro() {
+    // Calcular ahorro total
+    final ingresos = _transacciones
+        .where((t) => t['tipo'] == 'Ingreso')
+        .fold<double>(0, (sum, t) => sum + (t['monto'] ?? 0));
+    final egresos = _transacciones
+        .where((t) => t['tipo'] == 'Egreso')
+        .fold<double>(0, (sum, t) => sum + (t['monto'] ?? 0).abs());
+    final ahorro = ingresos - egresos;
+
+    if (ahorro <= 0) return; // Solo mostrar si hay ahorro positivo
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: const Color(0xFF22C55E).withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.trending_up,
+                size: 48,
+                color: Color(0xFF22C55E),
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              '¡Excelente trabajo!',
+              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'Has logrado ahorrar',
+              style: TextStyle(fontSize: 16, color: Colors.grey),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              _appCurrency.formatAmount(ahorro),
+              style: const TextStyle(
+                fontSize: 42,
+                fontWeight: FontWeight.w900,
+                color: Color(0xFF22C55E),
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Con Premium podrías optimizar aún más tus finanzas',
+              style: TextStyle(fontSize: 14, color: Colors.grey),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              '💡 Usuarios Premium ahorran \$247 más al mes en promedio',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF0EA5A4),
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Continuar gratis'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              final result = await Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => PremiumScreen(
+                    strings: _strings,
+                    source: 'popup_ahorro',
+                  ),
+                ),
+              );
+              if (result == true) {
+                _checkPremiumStatus();
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF0EA5A4),
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            ),
+            child: const Text('Ahorrar más'),
+          ),
+        ],
+      ),
+    );
   }
 
   void _mostrarFormulario(BuildContext ctx, String tipo) {
@@ -1592,20 +3025,33 @@ Una app completa para controlar tus gastos y ahorros:
                     const SizedBox(height: 12),
                     // Mostrar categoría solo para egresos
                     if (tipo == 'Egreso')
-                      DropdownButtonFormField<String>(
-                        initialValue: _categoriaSeleccionada,
-                        decoration: const InputDecoration(labelText: 'Categoría'),
-                        items: _categorias.entries.map((entry) {
-                          return DropdownMenuItem(
-                            value: entry.key,
-                            child: Text('${entry.value} ${entry.key}'),
-                          );
-                        }).toList(),
-                        onChanged: (value) {
-                          setState(() {
-                            _categoriaSeleccionada = value ?? 'Otro';
-                          });
-                        },
+                      Column(
+                        children: [
+                          DropdownButtonFormField<String>(
+                            initialValue: _categoriaSeleccionada,
+                            decoration: const InputDecoration(labelText: 'Categoría'),
+                            items: _obtenerTodasLasCategorias().entries.map((entry) {
+                              return DropdownMenuItem(
+                                value: entry.key,
+                                child: Text('${entry.value} ${entry.key}'),
+                              );
+                            }).toList(),
+                            onChanged: (value) {
+                              setState(() {
+                                _categoriaSeleccionada = value ?? 'Otro';
+                              });
+                            },
+                          ),
+                          if (_isPremium)
+                            TextButton.icon(
+                              onPressed: () {
+                                Navigator.pop(context);
+                                _mostrarDialogoCategoriasPersonalizadas();
+                              },
+                              icon: const Icon(Icons.add_circle_outline, size: 16),
+                              label: const Text('Gestionar categorías'),
+                            ),
+                        ],
                       ),
                     if (tipo == 'Egreso') const SizedBox(height: 12),
                     if (tipo == 'Egreso' && index == null)
@@ -1751,6 +3197,7 @@ Una app completa para controlar tus gastos y ahorros:
       );
     }
 
+    _recordTiming('build HOME SCREEN');
     return Scaffold(
       appBar: AppBar(
         title: Text(_strings.appTitle, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 22)),
@@ -1758,9 +3205,13 @@ Una app completa para controlar tus gastos y ahorros:
         elevation: 0,
         bottom: TabBar(
           controller: _tabController,
-          tabs: const [
-            Tab(text: 'Transacciones', icon: Icon(Icons.swap_horiz)),
-            Tab(text: 'Ahorros', icon: Icon(Icons.savings)),
+          labelColor: Colors.white,
+          unselectedLabelColor: Colors.white70,
+          indicatorColor: Colors.white,
+          tabs: [
+            Tab(text: _strings.transacciones, icon: const Icon(Icons.swap_horiz)),
+            Tab(text: _strings.ahorros, icon: const Icon(Icons.savings)),
+            Tab(text: _strings.eventosCompartidos, icon: const Icon(Icons.group)),
           ],
         ),
         actions: [
@@ -1781,18 +3232,52 @@ Una app completa para controlar tus gastos y ahorros:
                 ));
               } else if (value == 'reportes') {
                 _showReportesDialog();
+              } else if (value == 'recomendaciones') {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => RecomendacionesScreen(
+                      transacciones: _transacciones,
+                      strings: _strings,
+                      isPremium: _isPremium,
+                    ),
+                  ),
+                );
               } else if (value == 'configuracion') {
                 _showConfigurationDialog();
               } else if (value == 'gastos_fijos') {
                 _mostrarDialogoGastosFijos();
+              } else if (value == 'categorias_personalizadas') {
+                _mostrarDialogoCategoriasPersonalizadas();
+              } else if (value == 'monedas_multiples') {
+                _mostrarDialogoMonedas();
+              } else if (value == 'premium') {
+                final result = await Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => PremiumScreen(strings: _strings)),
+                );
+                if (result == true) {
+                  _checkPremiumStatus();
+                }
+              } else if (value == 'perfil') {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const ProfileScreen()),
+                );
               }
             },
             itemBuilder: (ctx) => [
               PopupMenuItem(value: 'presupuesto', child: Text('💰 ${_strings.presupuestoMensual}')),
-              PopupMenuItem(value: 'gastos_fijos', child: const Text('💳 Gastos Fijos')),
+              PopupMenuItem(value: 'gastos_fijos', child: Text('💳 ${_strings.gastosFijos}')),
+              if (_isPremium)
+                PopupMenuItem(value: 'categorias_personalizadas', child: Text('📂 ${_strings.misCategorias}')),
+              if (_isPremium)
+                PopupMenuItem(value: 'monedas_multiples', child: Text('💱 ${_strings.monedasMultiples}')),
               PopupMenuItem(value: 'graficos', child: Text('📊 ${_strings.verGraficos}')),
-              PopupMenuItem(value: 'reportes', child: Text('📋 Reportes')),
+              PopupMenuItem(value: 'reportes', child: Text('📋 ${_strings.reportes}')),
+              if (_isPremium)
+                PopupMenuItem(value: 'recomendaciones', child: Text('🤝 ${_strings.recomendacionesFinancieras}')),
+              if (!_isPremium)
+                PopupMenuItem(value: 'premium', child: Text('⭐ Premium')),
               const PopupMenuDivider(),
+              PopupMenuItem(value: 'perfil', child: Text('👤 ${_strings.miPerfil}')),
               PopupMenuItem(value: 'configuracion', child: Text('⚙️ ${_strings.configuracion}')),
             ],
           ),
@@ -1805,6 +3290,11 @@ Una app completa para controlar tus gastos y ahorros:
           _buildTransaccionesTab(),
           // Pestaña de Ahorros
           _buildAhorrosTab(),
+          // Pestaña de Eventos Compartidos
+          EventosCompartidosScreen(
+            strings: _strings,
+            currency: _appCurrency,
+          ),
         ],
       ),
       floatingActionButton: _tabController.index == 0
@@ -1813,7 +3303,7 @@ Una app completa para controlar tus gastos y ahorros:
               children: [
                 FloatingActionButton.extended(
                   heroTag: 'ingreso',
-                  backgroundColor: const Color(0xFF10B981),
+                  backgroundColor: const Color(0xFF0EA5A4),
                   onPressed: () => _mostrarFormulario(context, 'Ingreso'),
                   icon: const Icon(Icons.add),
                   label: Text(_strings.ingresos, style: const TextStyle(fontWeight: FontWeight.w600)),
@@ -1845,7 +3335,7 @@ Una app completa para controlar tus gastos y ahorros:
                 child: Column(
                   children: [
                     AppBar(
-                      title: const Text('Gastos Fijos'),
+                      title: Text(_strings.gastosFijosTitle),
                       automaticallyImplyLeading: true,
                       actions: [
                         IconButton(
@@ -1865,7 +3355,7 @@ Una app completa para controlar tus gastos y ahorros:
                                 children: [
                                   const Icon(Icons.credit_card, size: 64, color: Color(0xFFD1D5DB)),
                                   const SizedBox(height: 16),
-                                  const Text('Sin gastos fijos registrados'),
+                                  Text(_strings.sinGastosFijos),
                                   const SizedBox(height: 24),
                                   ElevatedButton.icon(
                                     onPressed: () {
@@ -1873,7 +3363,7 @@ Una app completa para controlar tus gastos y ahorros:
                                       _mostrarDialogoGastoFijo();
                                     },
                                     icon: const Icon(Icons.add),
-                                    label: const Text('Agregar Gasto Fijo'),
+                                    label: Text(_strings.agregarGastoFijo),
                                   ),
                                 ],
                               ),
@@ -1887,7 +3377,7 @@ Una app completa para controlar tus gastos y ahorros:
                                   child: ListTile(
                                     leading: Icon(
                                       Icons.credit_card,
-                                      color: gastoFijo['activo'] == true ? const Color(0xFF10B981) : Colors.grey,
+                                      color: gastoFijo['activo'] == true ? const Color(0xFF0EA5A4) : Colors.grey,
                                     ),
                                     title: Text(gastoFijo['nombre'] ?? 'Gasto'),
                                     subtitle: Text(
@@ -1897,27 +3387,14 @@ Una app completa para controlar tus gastos y ahorros:
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
                                         IconButton(
+                                          icon: const Icon(Icons.edit, color: Color(0xFF0EA5A4)),
+                                          onPressed: () => _mostrarDialogoGastoFijo(index: index),
+                                          tooltip: 'Editar',
+                                        ),
+                                        IconButton(
                                           icon: const Icon(Icons.delete, color: Colors.red),
                                           onPressed: () => _eliminarGastoFijo(index),
                                           tooltip: 'Eliminar',
-                                        ),
-                                        PopupMenuButton(
-                                          itemBuilder: (ctx) => [
-                                            PopupMenuItem(
-                                              child: const Text('Editar'),
-                                              onTap: () {
-                                                Navigator.pop(context);
-                                                _mostrarDialogoGastoFijo(index: index);
-                                              },
-                                            ),
-                                            PopupMenuItem(
-                                              child: const Text('Eliminar', style: TextStyle(color: Colors.red)),
-                                              onTap: () {
-                                                _eliminarGastoFijo(index);
-                                                Navigator.pop(context);
-                                              },
-                                            ),
-                                          ],
                                         ),
                                       ],
                                     ),
@@ -1956,6 +3433,95 @@ Una app completa para controlar tus gastos y ahorros:
     return SingleChildScrollView(
       child: Column(
         children: [
+          // Banner Premium - Solo mostrar si NO es premium
+          if (!_isPremium)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              child: GestureDetector(
+                onTap: () async {
+                  final result = await Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => PremiumScreen(strings: _strings)),
+                  );
+                  if (result == true) {
+                    _checkPremiumStatus();
+                  }
+                },
+                child: Container(
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFFF59E0B), Color(0xFFD97706)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFFF59E0B).withOpacity(0.3),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(Icons.workspace_premium, color: Colors.white, size: 28),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              _strings.desbloquearPremium,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 18,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                          Container(
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            child: Text(
+                              _strings.verMas,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                _buildPremiumBenefitRow(_strings.categoriasPersonalizadas),
+                                const SizedBox(height: 6),
+                                _buildPremiumBenefitRow(_strings.monedasMultiplesBanner),
+                                const SizedBox(height: 6),
+                                _buildPremiumBenefitRow(_strings.reportesAvanzados),
+                                const SizedBox(height: 6),
+                                _buildPremiumBenefitRow(_strings.marketingAfiliacion),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          
           // Tarjetas de ingresos y egresos
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
@@ -1965,10 +3531,10 @@ Una app completa para controlar tus gastos y ahorros:
                 Expanded(
                   child: Card(
                     elevation: 0,
-                    color: const Color(0xFFECFDF5),
+                    color: const Color(0xFFE7F8F7),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(20),
-                      side: const BorderSide(color: Color(0xFF10B981), width: 2),
+                      side: const BorderSide(color: Color(0xFF0EA5A4), width: 2),
                     ),
                     child: Padding(
                       padding: const EdgeInsets.all(20),
@@ -1977,13 +3543,13 @@ Una app completa para controlar tus gastos y ahorros:
                         children: [
                           Row(
                             children: [
-                              const Icon(Icons.trending_up, color: Color(0xFF10B981), size: 28),
+                              const Icon(Icons.trending_up, color: Color(0xFF0EA5A4), size: 28),
                               const SizedBox(width: 12),
-                              Text(_strings.ingresos, style: const TextStyle(fontSize: 16, color: Color(0xFF10B981), fontWeight: FontWeight.w600)),
+                              Text(_strings.ingresos, style: const TextStyle(fontSize: 16, color: Color(0xFF0EA5A4), fontWeight: FontWeight.w600)),
                             ],
                           ),
                           const SizedBox(height: 12),
-                          Text(_appCurrency.formatAmount(ingresos), style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w800, color: Color(0xFF10B981))),
+                          Text(_appCurrency.formatAmount(ingresos), style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w800, color: Color(0xFF0EA5A4))),
                         ],
                       ),
                     ),
@@ -2183,7 +3749,7 @@ Una app completa para controlar tus gastos y ahorros:
                         child: ListTile(
                           leading: t['tipo'] == 'Ingreso'
                               ? const CircleAvatar(
-                                  backgroundColor: Color(0xFF10B981),
+                                  backgroundColor: Color(0xFF0EA5A4),
                                   child: Icon(Icons.check_circle, color: Colors.white, size: 20),
                                 )
                               : CircleAvatar(
@@ -2240,6 +3806,15 @@ Una app completa para controlar tus gastos y ahorros:
                     },
                   ),
                 ),
+            // Banner publicitario - Solo mostrar si NO es premium
+            if (!_isPremium && _isBannerTransaccionesLoaded && _bannerAdTransacciones != null)
+              Container(
+                margin: const EdgeInsets.only(top: 16),
+                alignment: Alignment.center,
+                width: _bannerAdTransacciones!.size.width.toDouble(),
+                height: _bannerAdTransacciones!.size.height.toDouble(),
+                child: AdWidget(ad: _bannerAdTransacciones!),
+              ),
           ],
         ),
       );
@@ -2260,10 +3835,10 @@ Una app completa para controlar tus gastos y ahorros:
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
             child: Card(
               elevation: 0,
-              color: const Color(0xFFECFDF5),
+              color: const Color(0xFFE7F8F7),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(20),
-                side: const BorderSide(color: Color(0xFF10B981), width: 2),
+                side: const BorderSide(color: Color(0xFF0EA5A4), width: 2),
               ),
               child: Padding(
                 padding: const EdgeInsets.all(24),
@@ -2272,19 +3847,19 @@ Una app completa para controlar tus gastos y ahorros:
                   children: [
                     Row(
                       children: [
-                        const Icon(Icons.savings, color: Color(0xFF10B981), size: 32),
+                        const Icon(Icons.savings, color: Color(0xFF0EA5A4), size: 32),
                         const SizedBox(width: 16),
-                        Text('Ahorros Acumulados', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: Color(0xFF4B5563))),
+                        Text(_strings.ahorrosAcumulados, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: Color(0xFF4B5563))),
                       ],
                     ),
                     const SizedBox(height: 20),
                     Text(
                       _appCurrency.formatAmount(totalAhorros),
-                      style: const TextStyle(fontSize: 36, fontWeight: FontWeight.w800, color: Color(0xFF10B981)),
+                      style: const TextStyle(fontSize: 36, fontWeight: FontWeight.w800, color: Color(0xFF0EA5A4)),
                     ),
                     const SizedBox(height: 12),
                     Text(
-                      'Total acumulado de todos los meses',
+                      _strings.totalAcumuladoMeses,
                       style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: Color(0xFF6B7280)),
                     ),
                   ],
@@ -2299,7 +3874,7 @@ Una app completa para controlar tus gastos y ahorros:
               child: ElevatedButton.icon(
                 onPressed: _mostrarDialogoExtraccionAhorro,
                 icon: const Icon(Icons.remove_circle_outline),
-                label: const Text('Extracción de dinero'),
+                label: Text(_strings.extraccionDinero),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFFEF4444),
                   foregroundColor: Colors.white,
@@ -2317,14 +3892,14 @@ Una app completa para controlar tus gastos y ahorros:
                 children: [
                   const Icon(Icons.savings, size: 64, color: Color(0xFFD1D5DB)),
                   const SizedBox(height: 16),
-                  const Text(
-                    'Sin registros de ahorros',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Color(0xFF6B7280)),
+                  Text(
+                    _strings.sinRegistrosAhorros,
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Color(0xFF6B7280)),
                   ),
                   const SizedBox(height: 8),
-                  const Text(
-                    'Registra transacciones para generar ahorros por mes',
-                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: Color(0xFF9CA3AF)),
+                  Text(
+                    _strings.registraTransaccionesAhorros,
+                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: Color(0xFF9CA3AF)),
                   ),
                 ],
               ),
@@ -2334,9 +3909,9 @@ Una app completa para controlar tus gastos y ahorros:
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Column(
                 children: [
-                  const Text(
-                    'Historial de Ahorros por Mes',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Color(0xFF4B5563)),
+                  Text(
+                    _strings.historialAhorrosMes,
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Color(0xFF4B5563)),
                   ),
                   const SizedBox(height: 16),
                   ListView.builder(
@@ -2362,10 +3937,7 @@ Una app completa para controlar tus gastos y ahorros:
                       final anio = int.tryParse(partes[0]) ?? 0;
                       final mes = int.tryParse(partes[1]) ?? 1;
 
-                      const meses = [
-                        'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
-                        'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
-                      ];
+                      final meses = _strings.nombresMeses;
 
                       final montoPositivo = monto >= 0;
 
@@ -2384,8 +3956,8 @@ Una app completa para controlar tus gastos y ahorros:
                                 children: [
                                   Text(
                                     tipo == 'extraccion'
-                                        ? 'Extracción de ahorro'
-                                        : (anio > 0 ? '${meses[mes - 1]} $anio' : 'Mes desconocido'),
+                                        ? _strings.extraccionAhorro
+                                        : (anio > 0 ? '${meses[mes - 1]} $anio' : _strings.mesDesconocido),
                                     style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF4B5563)),
                                   ),
                                   const SizedBox(height: 4),
@@ -2393,14 +3965,14 @@ Una app completa para controlar tus gastos y ahorros:
                                     tipo == 'extraccion'
                                         ? (ahorro['nota'] != null && (ahorro['nota'] as String).isNotEmpty
                                             ? ahorro['nota']
-                                            : 'Uso de reservas')
-                                        : (montoPositivo ? 'Balance positivo' : 'Balance negativo'),
+                                            : _strings.usoReservas)
+                                        : (montoPositivo ? _strings.balancePositivo : _strings.balanceNegativo),
                                     style: TextStyle(
                                       fontSize: 12,
                                       fontWeight: FontWeight.w500,
                                       color: tipo == 'extraccion'
                                           ? const Color(0xFFEF4444)
-                                          : (montoPositivo ? const Color(0xFF10B981) : const Color(0xFFEF4444)),
+                                          : (montoPositivo ? const Color(0xFF0EA5A4) : const Color(0xFFEF4444)),
                                     ),
                                   ),
                                 ],
@@ -2412,7 +3984,7 @@ Una app completa para controlar tus gastos y ahorros:
                                   fontWeight: FontWeight.w800,
                                   color: tipo == 'extraccion'
                                       ? const Color(0xFFEF4444)
-                                      : (montoPositivo ? const Color(0xFF10B981) : const Color(0xFFEF4444)),
+                                      : (montoPositivo ? const Color(0xFF0EA5A4) : const Color(0xFFEF4444)),
                                 ),
                               ),
                             ],
@@ -2425,13 +3997,36 @@ Una app completa para controlar tus gastos y ahorros:
                 ],
               ),
             ),
+          // Banner publicitario - Solo mostrar si NO es premium
+          if (!_isPremium && _isBannerAhorrosLoaded && _bannerAdAhorros != null)
+            Container(
+              margin: const EdgeInsets.only(top: 16, bottom: 16),
+              alignment: Alignment.center,
+              width: _bannerAdAhorros!.size.width.toDouble(),
+              height: _bannerAdAhorros!.size.height.toDouble(),
+              child: AdWidget(ad: _bannerAdAhorros!),
+            ),
         ],
       ),
     );
   }
 
-  String _getHoraFormato(DateTime fecha) {
-    return '${fecha.hour.toString().padLeft(2, '0')}:${fecha.minute.toString().padLeft(2, '0')}';
+  Widget _buildPremiumBenefitRow(String benefit) {
+    return Row(
+      children: [
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            benefit,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ),
+      ],
+    );
   }
 }
 
@@ -2474,9 +4069,9 @@ class ChartsPage extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
-                        '📅 Distribución Mensual',
-                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: Color(0xFF4B5563)),
+                      Text(
+                        strings.distribucionMensual,
+                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: Color(0xFF4B5563)),
                       ),
                       const SizedBox(height: 20),
                       SizedBox(
@@ -2490,9 +4085,9 @@ class ChartsPage extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 24),
-                      const Text(
-                        '📆 Distribución Anual',
-                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: Color(0xFF4B5563)),
+                      Text(
+                        strings.distribucionAnual,
+                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: Color(0xFF4B5563)),
                       ),
                       const SizedBox(height: 20),
                       SizedBox(
@@ -2519,6 +4114,335 @@ class ChartsPage extends StatelessWidget {
   }
 }
 
+class RecomendacionesScreen extends StatelessWidget {
+  final List<Map<String, dynamic>> transacciones;
+  final AppStrings strings;
+  final bool isPremium;
+
+  const RecomendacionesScreen({
+    super.key,
+    required this.transacciones,
+    required this.strings,
+    required this.isPremium,
+  });
+
+  // Mapa de URLs de afiliación por tipo de servicio
+  static const Map<String, String> urlsAfiliacion = {
+    'seguros': 'https://afiliados.seguros-medicos.com/ref/zentavo',
+    'tarjetas': 'https://afiliados.tarjetas-credito.com/ref/zentavo',
+    'ahorros': 'https://afiliados.cuentas-ahorro.com/ref/zentavo',
+  };
+
+  Future<void> _abrirURL(String urlKey) async {
+    final url = urlsAfiliacion[urlKey] ?? '';
+    if (url.isEmpty) return;
+
+    try {
+      final Uri uri = Uri.parse(url);
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(
+          uri,
+          mode: LaunchMode.externalApplication,
+        );
+      } else {
+        print('No se pudo abrir la URL: $url');
+      }
+    } catch (e) {
+      print('Error al abrir URL: $e');
+    }
+  }
+
+  Map<String, double> _calcularGastosPorCategoria() {
+    final Map<String, double> gastosPorCategoria = {};
+    final now = DateTime.now();
+    final inicioMes = DateTime(now.year, now.month, 1);
+    
+    for (var transaccion in transacciones) {
+      final tipo = transaccion['tipo'] as String;
+      final fechaStr = transaccion['fecha'] as String;
+      final fecha = DateTime.parse(fechaStr);
+      final categoria = transaccion['categoria'] as String;
+      final monto = transaccion['monto'] as double;
+      
+      if (tipo == 'Egreso' && fecha.isAfter(inicioMes)) {
+        gastosPorCategoria[categoria] = 
+            (gastosPorCategoria[categoria] ?? 0) + monto;
+      }
+    }
+    
+    return gastosPorCategoria;
+  }
+
+  double _calcularCapacidadAhorro() {
+    final now = DateTime.now();
+    final inicioMes = DateTime(now.year, now.month, 1);
+    double ingresos = 0;
+    double egresos = 0;
+    
+    for (var transaccion in transacciones) {
+      final tipo = transaccion['tipo'] as String;
+      final fechaStr = transaccion['fecha'] as String;
+      final fecha = DateTime.parse(fechaStr);
+      final monto = transaccion['monto'] as double;
+      
+      if (fecha.isAfter(inicioMes)) {
+        if (tipo == 'Ingreso') {
+          ingresos += monto;
+        } else if (tipo == 'Egreso') {
+          egresos += monto;
+        }
+      }
+    }
+    
+    return ingresos > 0 ? ((ingresos - egresos) / ingresos) * 100 : 0;
+  }
+
+  List<Widget> _generarRecomendaciones() {
+    final recomendaciones = <Widget>[];
+    final gastosPorCategoria = _calcularGastosPorCategoria();
+    final capacidadAhorro = _calcularCapacidadAhorro();
+    
+    // Recomendación por gastos en salud
+    final salud = gastosPorCategoria.entries.firstWhere(
+      (e) => e.key.toLowerCase().contains('salud'),
+      orElse: () => const MapEntry('', 0),
+    );
+    if (salud.value > 500) {
+      recomendaciones.add(_buildRecomendacionCard(
+        icon: Icons.local_hospital,
+        title: strings.seguros,
+        description: strings.recomendacionSalud,
+        color: const Color(0xFFEF4444),
+        urlKey: 'seguros',
+      ));
+    }
+    
+    // Recomendación por gastos en transporte
+    final transporte = gastosPorCategoria.entries.firstWhere(
+      (e) => e.key.toLowerCase().contains('transporte'),
+      orElse: () => const MapEntry('', 0),
+    );
+    if (transporte.value > 300) {
+      recomendaciones.add(_buildRecomendacionCard(
+        icon: Icons.credit_card,
+        title: strings.tarjetasCredito,
+        description: strings.recomendacionTransporte,
+        color: const Color(0xFFF59E0B),
+        urlKey: 'tarjetas',
+      ));
+    }
+    
+    // Recomendación por alta capacidad de ahorro
+    if (capacidadAhorro > 20) {
+      recomendaciones.add(_buildRecomendacionCard(
+        icon: Icons.savings,
+        title: strings.cuentasAhorro,
+        description: strings.recomendacionAhorro,
+        color: const Color(0xFF10B981),
+        urlKey: 'ahorros',
+      ));
+    }
+    
+    // Si no hay recomendaciones, mostrar mensaje
+    if (recomendaciones.isEmpty) {
+      recomendaciones.add(
+        Card(
+          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              children: [
+                const Icon(Icons.analytics, size: 64, color: Color(0xFF9CA3AF)),
+                const SizedBox(height: 16),
+                Text(
+                  strings.recomendacionesDescripcion,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 16, color: Color(0xFF6B7280)),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+    
+    return recomendaciones;
+  }
+
+  Widget _buildRecomendacionCard({
+    required IconData icon,
+    required String title,
+    required String description,
+    required Color color,
+    required String urlKey,
+  }) {
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      elevation: 3,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: color.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(icon, color: color, size: 28),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Text(
+              description,
+              style: const TextStyle(fontSize: 15, color: Color(0xFF4B5563)),
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () => _abrirURL(urlKey),
+                icon: const Icon(Icons.open_in_new, size: 18),
+                label: Text(strings.verOfertas),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: color,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final recomendaciones = _generarRecomendaciones();
+    
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(
+          strings.recomendacionesFinancieras,
+          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 22),
+        ),
+        centerTitle: true,
+        elevation: 0,
+      ),
+      body: !isPremium
+          ? Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(
+                      Icons.workspace_premium,
+                      size: 80,
+                      color: Color(0xFFF59E0B),
+                    ),
+                    const SizedBox(height: 24),
+                    Text(
+                      strings.desbloquearPremium,
+                      style: const TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.w700,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      strings.recomendacionesDescripcion,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        color: Color(0xFF6B7280),
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 32),
+                    ElevatedButton.icon(
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                        Navigator.of(context).push(
+                          MaterialPageRoute(builder: (_) => PremiumScreen(strings: strings)),
+                        );
+                      },
+                      icon: const Icon(Icons.workspace_premium),
+                      label: Text(strings.verMas),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFF59E0B),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 32,
+                          vertical: 16,
+                        ),
+                        textStyle: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          : SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(height: 16),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          strings.serviciosRecomendados,
+                          style: const TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          strings.recomendacionesDescripcion,
+                          style: const TextStyle(
+                            fontSize: 15,
+                            color: Color(0xFF6B7280),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  ...recomendaciones,
+                  const SizedBox(height: 24),
+                ],
+              ),
+            ),
+    );
+  }
+}
+
 class ManualScreen extends StatelessWidget {
   final AppStrings strings;
 
@@ -2528,50 +4452,62 @@ class ManualScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Manual de uso', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 22)),
+        title: Text(strings.manualDeUso, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 22)),
         centerTitle: true,
         elevation: 0,
       ),
-      body: const SafeArea(
+      body: SafeArea(
         child: SingleChildScrollView(
-          padding: EdgeInsets.all(20),
+          padding: const EdgeInsets.all(20),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Bienvenido a Zentavo. Aquí tienes una guía rápida para usar la app:',
-                style: TextStyle(fontWeight: FontWeight.w600),
+                strings.manualBienvenida,
+                style: const TextStyle(fontWeight: FontWeight.w600),
               ),
-              SizedBox(height: 16),
-              Text('1) Transacciones', style: TextStyle(fontWeight: FontWeight.w700)),
-              SizedBox(height: 8),
-              Text('• Agrega ingresos o egresos con los botones de la parte inferior.'),
-              Text('• Puedes editar tocando un movimiento o eliminarlo con el ícono de basura.'),
-              Text('• Usa el selector de mes para revisar históricos.'),
-              SizedBox(height: 16),
-              Text('2) Ahorros', style: TextStyle(fontWeight: FontWeight.w700)),
-              SizedBox(height: 8),
-              Text('• Los ahorros se calculan automáticamente por mes (ingresos - egresos).'),
-              Text('• Puedes realizar una extracción desde el botón “Extracción de dinero”.'),
-              SizedBox(height: 16),
-              Text('3) Gastos fijos', style: TextStyle(fontWeight: FontWeight.w700)),
-              SizedBox(height: 8),
-              Text('• Al crear un egreso, puedes marcarlo como gasto fijo con el tilde.'),
-              Text('• También puedes gestionarlos desde Configuración > Gastos Fijos.'),
-              Text('• En la lista de gastos fijos puedes editar o eliminarlos.'),
-              SizedBox(height: 16),
-              Text('4) Presupuesto mensual', style: TextStyle(fontWeight: FontWeight.w700)),
-              SizedBox(height: 8),
-              Text('• Define un presupuesto y la app te avisa si lo superas.'),
-              SizedBox(height: 16),
-              Text('5) Reportes y descargas', style: TextStyle(fontWeight: FontWeight.w700)),
-              SizedBox(height: 8),
-              Text('• Genera reportes en PDF o Excel desde el menú de opciones.'),
-              Text('• Puedes exportar JSON, CSV o TXT desde “Descargar”.'),
-              SizedBox(height: 16),
-              Text('6) Seguridad', style: TextStyle(fontWeight: FontWeight.w700)),
-              SizedBox(height: 8),
-              Text('• La app solicita biometría o código del dispositivo al iniciar.'),
+              const SizedBox(height: 16),
+              Text(strings.manualTransaccionesTitulo, style: const TextStyle(fontWeight: FontWeight.w700)),
+              const SizedBox(height: 8),
+              Text(strings.manualTransaccionesP1),
+              Text(strings.manualTransaccionesP2),
+              Text(strings.manualTransaccionesP3),
+              const SizedBox(height: 16),
+              Text(strings.manualAhorrosTitulo, style: const TextStyle(fontWeight: FontWeight.w700)),
+              const SizedBox(height: 8),
+              Text(strings.manualAhorrosP1),
+              Text(strings.manualAhorrosP2),
+              const SizedBox(height: 16),
+              Text(strings.manualGastosFijosTitulo, style: const TextStyle(fontWeight: FontWeight.w700)),
+              const SizedBox(height: 8),
+              Text(strings.manualGastosFijosP1),
+              Text(strings.manualGastosFijosP2),
+              Text(strings.manualGastosFijosP3),
+              const SizedBox(height: 16),
+              Text(strings.manualPresupuestoTitulo, style: const TextStyle(fontWeight: FontWeight.w700)),
+              const SizedBox(height: 8),
+              Text(strings.manualPresupuestoP1),
+              const SizedBox(height: 16),
+              Text(strings.manualReportesTitulo, style: const TextStyle(fontWeight: FontWeight.w700)),
+              const SizedBox(height: 8),
+              Text(strings.manualReportesP1),
+              Text(strings.manualReportesP2),
+              const SizedBox(height: 16),
+              Text(strings.manualSeguridadTitulo, style: const TextStyle(fontWeight: FontWeight.w700)),
+              const SizedBox(height: 8),
+              Text(strings.manualSeguridadP1),
+              const SizedBox(height: 16),
+              Text(strings.manualEventosTitulo, style: const TextStyle(fontWeight: FontWeight.w700)),
+              const SizedBox(height: 8),
+              Text(strings.manualEventosP1),
+              Text(strings.manualEventosP2),
+              Text(strings.manualEventosP3),
+              Text(strings.manualEventosP4),
+              const SizedBox(height: 16),
+              Text(strings.manualAnalyticsTitulo, style: const TextStyle(fontWeight: FontWeight.w700)),
+              const SizedBox(height: 8),
+              Text(strings.manualAnalyticsP1),
+              Text(strings.manualAnalyticsP2),
             ],
           ),
         ),
@@ -2579,3 +4515,6 @@ class ManualScreen extends StatelessWidget {
     );
   }
 }
+
+
+
