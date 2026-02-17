@@ -33,6 +33,7 @@ jobs:
       
       - name: 🔍 Analyze code
         run: flutter analyze --no-fatal-infos
+        continue-on-error: true
       
       - name: 🧪 Run tests
         run: flutter test

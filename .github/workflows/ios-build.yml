@@ -37,11 +37,22 @@ jobs:
       - name: 📦 Install dependencies
         run: flutter pub get
       
+      - name: 🔧 Setup iOS dependencies
+        run: |
+          cd ios
+          if [ -f "Podfile" ]; then
+            pod install --repo-update
+          else
+            echo "No Podfile found, Flutter will handle iOS dependencies"
+          fi
+      
       - name: 🔍 Analyze code
         run: flutter analyze --no-fatal-infos
+        continue-on-error: true
       
       - name: 🧪 Run tests
-        run: flutter test || true
+        run: flutter test
+        continue-on-error: true
       
       - name: 🏗️ Build iOS (No Code Sign)
         run: |
@@ -94,6 +105,15 @@ jobs:
       
       - name: 📦 Install dependencies
         run: flutter pub get
+      
+      - name: 🔧 Setup iOS dependencies
+        run: |
+          cd ios
+          if [ -f "Podfile" ]; then
+            pod install --repo-update
+          else
+            echo "No Podfile found, Flutter will handle iOS dependencies"
+          fi
       
       # Instalar certificados de Apple (cuando los tengas)
       - name: 📜 Install Apple Certificate

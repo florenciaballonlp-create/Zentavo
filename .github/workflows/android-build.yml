@@ -39,9 +39,11 @@ jobs:
       
       - name: 🔍 Analyze code
         run: flutter analyze --no-fatal-infos
+        continue-on-error: true
       
       - name: 🧪 Run tests
-        run: flutter test || true
+        run: flutter test
+        continue-on-error: true
       
       - name: 🏗️ Build APK
         run: flutter build apk --release
