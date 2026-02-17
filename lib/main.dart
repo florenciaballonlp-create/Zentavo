@@ -3151,16 +3151,20 @@ Una app completa para controlar tus gastos y ahorros:
 
   @override
   Widget build(BuildContext context) {
-    if (!_authChecked) {
-      return const Scaffold(
-        body: Center(
-          child: CircularProgressIndicator(),
-        ),
-      );
-    }
+    return AppLocalizations(
+      strings: _strings,
+      child: Builder(
+        builder: (context) {
+          if (!_authChecked) {
+            return const Scaffold(
+              body: Center(
+                child: CircularProgressIndicator(),
+              ),
+            );
+          }
 
-    if (!_isAuthenticated) {
-      return Scaffold(
+          if (!_isAuthenticated) {
+            return Scaffold(
         appBar: AppBar(
           title: Text(_strings.appTitle, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 22)),
           centerTitle: true,
@@ -3319,6 +3323,9 @@ Una app completa para controlar tus gastos y ahorros:
               ],
             )
           : null,
+    );
+        },
+      ),
     );
   }
 

@@ -450,15 +450,7 @@ class _PremiumScreenState extends State<PremiumScreen> with TickerProviderStateM
                   const SizedBox(height: 8),
                   GestureDetector(
                     onTap: () {
-                      // Scroll hacia los planes
-                      final context = navigatorKey.currentContext;
-                      if (context != null) {
-                        Scrollable.ensureVisible(
-                          context,
-                          duration: const Duration(milliseconds: 500),
-                          curve: Curves.easeInOut,
-                        );
-                      }
+                      // El usuario puede scrollear manualmente para ver los planes
                     },
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),

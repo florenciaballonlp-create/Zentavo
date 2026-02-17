@@ -1,3 +1,5 @@
+import 'package:flutter/widgets.dart';
+
 // Localizaciones y preferencias de idioma y moneda
 enum AppLanguage { spanish, english, portuguese, italian, chinese, japanese }
 
@@ -3301,23 +3303,6 @@ class AppStrings {
     }
   }
 
-  String get cerrar {
-    switch (language) {
-      case AppLanguage.english:
-        return 'Close';
-      case AppLanguage.portuguese:
-        return 'Fechar';
-      case AppLanguage.italian:
-        return 'Chiudi';
-      case AppLanguage.chinese:
-        return '关闭';
-      case AppLanguage.japanese:
-        return '閉じる';
-      default:
-        return 'Cerrar';
-    }
-  }
-
   String get escanear {
     switch (language) {
       case AppLanguage.english:
@@ -4247,5 +4232,28 @@ class AppStrings {
       default:
         return 'Hace $anios ${anio(anios)}';
     }
+  }
+}
+
+// InheritedWidget para acceder a AppStrings desde cualquier parte del árbol de widgets
+class AppLocalizations extends InheritedWidget {
+  final AppStrings strings;
+
+  const AppLocalizations({
+    Key? key,
+    required this.strings,
+    required Widget child,
+  }) : super(key: key, child: child);
+
+  static AppStrings of(BuildContext context) {
+    final AppLocalizations? result =
+        context.dependOnInheritedWidgetOfExactType<AppLocalizations>();
+    assert(result != null, 'No AppLocalizations found in context');
+    return result!.strings;
+  }
+
+  @override
+  bool updateShouldNotify(AppLocalizations oldWidget) {
+    return strings.language != oldWidget.strings.language;
   }
 }

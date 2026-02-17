@@ -484,7 +484,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
   
-  String _calcularTiempoRestante(AppLocalizations loc) {
+  String _calcularTiempoRestante(AppStrings loc) {
     if (_fechaExpiracionPremium == null) return 'N/A';
     
     final ahora = DateTime.now();
@@ -502,7 +502,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
   
-  String _formatearFecha(dynamic fechaStr, AppLocalizations loc) {
+  String _formatearFecha(dynamic fechaStr, AppStrings loc) {
     if (fechaStr == null) return loc.fechaDesconocida;
     
     try {
