@@ -21,6 +21,10 @@ import 'onboarding_screen.dart';
 import 'notifications_service.dart';
 import 'social_share_service.dart';
 import 'profile_screen.dart';
+import 'recurring_transactions.dart';
+import 'backup_service.dart';
+import 'package:intl/intl.dart';
+import 'package:file_picker/file_picker.dart';
 
 void main() => runApp(const ExpenseApp());
 
@@ -204,6 +208,9 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   final _nombreGastoController = TextEditingController();
   final _montoGastoFijoController = TextEditingController();
   late int _diaVencimientoSeleccionado;
+
+  // Transacciones recurrentes
+  List<RecurringTransaction> _transaccionesRecurrentes = [];
 
   // Banner ads
   BannerAd? _bannerAdTransacciones;
@@ -552,6 +559,31 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
         print('Error al cargar monedas adicionales: $e');
       }
     }
+    
+    // Cargar transacciones recurrentes
+    final String? recurrentesGuardadas = _prefs.getString('transacciones_recurrentes');
+    if (recurrentesGuardadas != null) {
+      try {
+        final List<dynamic> decoded = jsonDecode(recurrentesGuardadas);
+        setState(() {
+          _transaccionesRecurrentes = decoded
+              .map((item) => RecurringTransaction.fromJson(Map<String, dynamic>.from(item)))
+              .toList();
+        });
+        
+        // Generar transacciones pendientes automáticamente
+        await _generarTransaccionesRecurrentes();
+      } catch (e) {
+        print('Error al cargar recurrencias: $e');
+      }
+    }
+    _recordTiming('Recurrencias cargadas y generadas');
+    
+    // Verificar y crear backup automático
+    BackupService.verificarBackupAutomatico().catchError((e) {
+      print('Error en backup automático: $e');
+    });
+    _recordTiming('Backup automático verificado');
     
     if (datosGuardados != null) {
       try {
@@ -2386,6 +2418,49 @@ Una app completa para controlar tus gastos y ahorros:
     }
   }
 
+  Future<void> _guardarRecurrencias() async {
+    try {
+      if (!_isPrefsInitialized()) {
+        _prefs = await SharedPreferences.getInstance();
+      }
+      final datosJSON = jsonEncode(
+        _transaccionesRecurrentes.map((r) => r.toJson()).toList(),
+      );
+      await _prefs.setString('transacciones_recurrentes', datosJSON);
+    } catch (e) {
+      print('Error al guardar recurrencias: $e');
+    }
+  }
+
+  Future<void> _generarTransaccionesRecurrentes() async {
+    try {
+      final transaccionesPendientes = RecurringTransactionService.generarTransaccionesPendientes(
+        _transaccionesRecurrentes,
+      );
+      
+      if (transaccionesPendientes.isNotEmpty) {
+        setState(() {
+          _transacciones.addAll(transaccionesPendientes);
+        });
+        await _guardarTransacciones();
+        
+        // Actualizar última generación de cada recurrencia procesada
+        for (int i = 0; i < _transaccionesRecurrentes.length; i++) {
+          if (_transaccionesRecurrentes[i].debeGenerar()) {
+            _transaccionesRecurrentes[i] = RecurringTransactionService.marcarComoGenerada(
+              _transaccionesRecurrentes[i],
+            );
+          }
+        }
+        await _guardarRecurrencias();
+        
+        print('[RECURRENTES] ${transaccionesPendientes.length} transacciones generadas automáticamente');
+      }
+    } catch (e) {
+      print('Error al generar transacciones recurrentes: $e');
+    }
+  }
+
   bool _isPrefsInitialized() {
     try {
       _prefs.containsKey('test');
@@ -2950,6 +3025,583 @@ Una app completa para controlar tus gastos y ahorros:
     );
   }
 
+  // ===== MÉTODOS PARA TRANSACCIONES RECURRENTES =====
+
+  void _mostrarDialogoRecurrencias() {
+    showDialog(
+      context: context,
+      builder: (_) {
+        return AlertDialog(
+          title: Row(
+            children: [
+              const Icon(Icons.repeat, color: Color(0xFF0EA5A4)),
+              const SizedBox(width: 8),
+              Text(_strings.language == AppLanguage.spanish 
+                  ? 'Transacciones Recurrentes' 
+                  : 'Recurring Transactions'),
+            ],
+          ),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: _transaccionesRecurrentes.isEmpty
+                ? Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.event_repeat, size: 64, color: Colors.grey[400]),
+                        const SizedBox(height: 16),
+                        Text(
+                          _strings.language == AppLanguage.spanish
+                              ? 'No hay transacciones recurrentes'
+                              : 'No recurring transactions',
+                          style: TextStyle(color: Colors.grey[600]),
+                        ),
+                      ],
+                    ),
+                  )
+                : ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: _transaccionesRecurrentes.length,
+                    itemBuilder: (ctx, i) {
+                      final recurrencia = _transaccionesRecurrentes[i];
+                      return Card(
+                        child: ListTile(
+                          leading: CircleAvatar(
+                            backgroundColor: recurrencia.tipo == 'Ingreso'
+                                ? Colors.green[100]
+                                : Colors.red[100],
+                            child: Text(
+                              recurrencia.tipo == 'Ingreso' ? '↓' : '↑',
+                              style: TextStyle(
+                                color: recurrencia.tipo == 'Ingreso'
+                                    ? Colors.green[700]
+                                    : Colors.red[700],
+                                fontSize: 20,
+                              ),
+                            ),
+                          ),
+                          title: Text(recurrencia.titulo),
+                          subtitle: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('${_getSimboloMoneda(_appCurrency)}${recurrencia.monto.toStringAsFixed(2)}'),
+                              Text(
+                                recurrencia.getFrecuenciaString(
+                                  _strings.language == AppLanguage.spanish ? 'es' : 'en',
+                                ),
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey[600],
+                                ),
+                              ),
+                            ],
+                          ),
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton(
+                                icon: Icon(
+                                  recurrencia.activa ? Icons.pause : Icons.play_arrow,
+                                  color: recurrencia.activa ? Colors.orange : Colors.green,
+                                ),
+                                onPressed: () {
+                                  setState(() {
+                                    _transaccionesRecurrentes[i] = recurrencia.copyWith(
+                                      activa: !recurrencia.activa,
+                                    );
+                                  });
+                                  _guardarRecurrencias();
+                                  Navigator.pop(ctx);
+                                  _mostrarDialogoRecurrencias();
+                                },
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.delete, color: Colors.red),
+                                onPressed: () {
+                                  setState(() {
+                                    _transaccionesRecurrentes.removeAt(i);
+                                  });
+                                  _guardarRecurrencias();
+                                  Navigator.pop(ctx);
+                                  _mostrarDialogoRecurrencias();
+                                },
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text(_strings.cerrar),
+            ),
+            ElevatedButton.icon(
+              onPressed: () {
+                Navigator.pop(context);
+                _mostrarDialogoNuevaRecurrencia();
+              },
+              icon: const Icon(Icons.add),
+              label: Text(_strings.agregar),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _mostrarDialogoNuevaRecurrencia() {
+    final tituloController = TextEditingController();
+    final montoController = TextEditingController();
+    final justificacionController = TextEditingController();
+    String tipoSeleccionado = 'Egreso';
+    String categoriaSeleccionada = 'Otro';
+    RecurringFrequency frecuenciaSeleccionada = RecurringFrequency.monthly;
+    DateTime fechaInicio= DateTime.now();
+    DateTime? fechaFin;
+
+    showDialog(
+      context: context,
+      builder: (_) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: Text(_strings.language == AppLanguage.spanish 
+                  ? 'Nueva Transacción Recurrente' 
+                  : 'New Recurring Transaction'),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Tipo
+                    DropdownButtonFormField<String>(
+                      value: tipoSeleccionado,
+                      decoration: InputDecoration(
+                        labelText: _strings.tipo,
+                        border: const OutlineInputBorder(),
+                      ),
+                      items: [
+                        DropdownMenuItem(value: 'Ingreso', child: Text(_strings.ingreso)),
+                        DropdownMenuItem(value: 'Egreso', child: Text(_strings.egreso)),
+                      ],
+                      onChanged: (v) => setDialogState(() => tipoSeleccionado = v!),
+                    ),
+                    const SizedBox(height: 12),
+                    // Título
+                    TextField(
+                      controller: tituloController,
+                      decoration: InputDecoration(
+                        labelText: _strings.titulo,
+                        border: const OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    // Monto
+                    TextField(
+                      controller: montoController,
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      decoration: InputDecoration(
+                        labelText: _strings.monto,
+                        border: const OutlineInputBorder(),
+                        prefixText: _getSimboloMoneda(_appCurrency),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    // Categoría
+                    DropdownButtonFormField<String>(
+                      value: categoriaSeleccionada,
+                      decoration: InputDecoration(
+                        labelText: _strings.categoria,
+                        border: const OutlineInputBorder(),
+                      ),
+                      items: [
+                        ..._categorias.entries.map((e) => DropdownMenuItem(
+                              value: e.key,
+                              child: Text('${e.value} ${e.key}'),
+                            )),
+                        ..._categoriasPersonalizadas.entries.map((e) => DropdownMenuItem(
+                              value: e.key,
+                              child: Text('${e.value} ${e.key}'),
+                            )),
+                      ],
+                      onChanged: (v) => setDialogState(() => categoriaSeleccionada = v!),
+                    ),
+                    const SizedBox(height: 12),
+                    // Justificación
+                    TextField(
+                      controller: justificacionController,
+                      decoration: InputDecoration(
+                        labelText: _strings.justificacion,
+                        border: const OutlineInputBorder(),
+                      ),
+                      maxLines: 2,
+                    ),
+                    const SizedBox(height: 12),
+                    // Frecuencia
+                    DropdownButtonFormField<RecurringFrequency>(
+                      value: frecuenciaSeleccionada,
+                      decoration: InputDecoration(
+                        labelText: _strings.language == AppLanguage.spanish ? 'Frecuencia' : 'Frequency',
+                        border: const OutlineInputBorder(),
+                      ),
+                      items: [
+                        DropdownMenuItem(
+                          value: RecurringFrequency.daily,
+                          child: Text(_strings.language == AppLanguage.spanish ? 'Diaria' : 'Daily'),
+                        ),
+                        DropdownMenuItem(
+                          value: RecurringFrequency.weekly,
+                          child: Text(_strings.language == AppLanguage.spanish ? 'Semanal' : 'Weekly'),
+                        ),
+                        DropdownMenuItem(
+                          value: RecurringFrequency.biweekly,
+                          child: Text(_strings.language == AppLanguage.spanish ? 'Quincenal' : 'Biweekly'),
+                        ),
+                        DropdownMenuItem(
+                          value: RecurringFrequency.monthly,
+                          child: Text(_strings.language == AppLanguage.spanish ? 'Mensual' : 'Monthly'),
+                        ),
+                        DropdownMenuItem(
+                          value: RecurringFrequency.yearly,
+                          child: Text(_strings.language == AppLanguage.spanish ? 'Anual' : 'Yearly'),
+                        ),
+                      ],
+                      onChanged: (v) => setDialogState(() => frecuenciaSeleccionada = v!),
+                    ),
+                    const SizedBox(height: 12),
+                    // Fecha inicio
+                    ListTile(
+                      title: Text(_strings.language == AppLanguage.spanish ? 'Fecha de inicio' : 'Start date'),
+                      subtitle: Text(DateFormat('dd/MM/yyyy').format(fechaInicio)),
+                      trailing: const Icon(Icons.calendar_today),
+                      onTap: () async {
+                        final picked = await showDatePicker(
+                          context: context,
+                          initialDate: fechaInicio,
+                          firstDate: DateTime(2020),
+                          lastDate: DateTime(2100),
+                        );
+                        if (picked != null) {
+                          setDialogState(() => fechaInicio = picked);
+                        }
+                      },
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: Text(_strings.cancelar),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    if (tituloController.text.trim().isEmpty ||
+                        montoController.text.trim().isEmpty) {
+                      return;
+                    }
+
+                    final nuevaRecurrencia = RecurringTransaction(
+                      id: DateTime.now().millisecondsSinceEpoch.toString(),
+                      titulo: tituloController.text.trim(),
+                      monto: double.tryParse(montoController.text) ?? 0,
+                      tipo: tipoSeleccionado,
+                      categoria: categoriaSeleccionada,
+                      justificacion: justificacionController.text.trim(),
+                      frecuencia: frecuenciaSeleccionada,
+                      fechaInicio: fechaInicio,
+                      fechaFin: fechaFin,
+                      moneda: _appCurrency.toString(),
+                    );
+
+                    setState(() {
+                      _transaccionesRecurrentes.add(nuevaRecurrencia);
+                    });
+                    _guardarRecurrencias();
+                    Navigator.pop(context);
+                    
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(_strings.language == AppLanguage.spanish
+                            ? 'Transacción recurrente creada'
+                            : 'Recurring transaction created'),
+                        backgroundColor: Colors.green,
+                      ),
+                    );
+                  },
+                  child: Text(_strings.guardar),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    ).then((_) {
+      tituloController.dispose();
+      montoController.dispose();
+      justificacionController.dispose();
+    });
+  }
+
+  // ===== MÉTODOS PARA BACKUP Y RESTAURACIÓN =====
+
+  void _mostrarDialogoBackupRestauracion() {
+    showDialog(
+      context: context,
+      builder: (_) {
+        return AlertDialog(
+          title: Row(
+            children: [
+              const Icon(Icons.backup, color: Color(0xFF0EA5A4)),
+              const SizedBox(width: 8),
+              Text(_strings.language == AppLanguage.spanish 
+                  ? 'Backup y Restauración' 
+                  : 'Backup & Restore'),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const CircleAvatar(
+                  backgroundColor: Color(0xFF22C55E),
+                  child: Icon(Icons.save, color: Colors.white),
+                ),
+                title: Text(_strings.language == AppLanguage.spanish 
+                    ? 'Crear Backup' 
+                    : 'Create Backup'),
+                subtitle: Text(_strings.language == AppLanguage.spanish
+                    ? 'Guarda todos tus datos'
+                    : 'Save all your data'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () async {
+                  Navigator.pop(context);
+                  try {
+                    final file = await BackupService.crearBackupCompleto();
+                    await BackupService.limpiarBackupsAntiguos();
+                    
+                    if (!mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          _strings.language == AppLanguage.spanish
+                              ? 'Backup creado exitosamente'
+                              : 'Backup created successfully',
+                        ),
+                        backgroundColor: Colors.green,
+                        action: SnackBarAction(
+                          label: _strings.language == AppLanguage.spanish ? 'Compartir' : 'Share',
+                          onPressed: () async {
+                            await Share.shareXFiles([XFile(file.path)]);
+                          },
+                        ),
+                      ),
+                    );
+                  } catch (e) {
+                    if (!mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Error: $e'),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                  }
+                },
+              ),
+              ListTile(
+                leading: const CircleAvatar(
+                  backgroundColor: Color(0xFFF59E0B),
+                  child: Icon(Icons.restore, color: Colors.white),
+                ),
+                title: Text(_strings.language == AppLanguage.spanish 
+                    ? 'Restaurar Backup' 
+                    : 'Restore Backup'),
+                subtitle: Text(_strings.language == AppLanguage.spanish
+                    ? 'Recupera tus datos guardados'
+                    : 'Recover your saved data'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () async {
+                  Navigator.pop(context);
+                  await _seleccionarYRestaurarBackup();
+                },
+              ),
+              ListTile(
+                leading: const CircleAvatar(
+                  backgroundColor: Color(0xFF3B82F6),
+                  child: Icon(Icons.history, color: Colors.white),
+                ),
+                title: Text(_strings.language == AppLanguage.spanish 
+                    ? 'Ver Backups' 
+                    : 'View Backups'),
+                subtitle: Text(_strings.language == AppLanguage.spanish
+                    ? 'Lista de backups disponibles'
+                    : 'List of available backups'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () {
+                  Navigator.pop(context);
+                  _mostrarListaBackups();
+                },
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text(_strings.cerrar),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _seleccionarYRestaurarBackup() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['json'],
+      );
+
+      if (result != null && result.files.single.path != null) {
+        final file = File(result.files.single.path!);
+        
+        if (!mounted) return;
+        final confirmar = await showDialog<bool>(
+          context: context,
+          builder: (_) => AlertDialog(
+            title: Text(_strings.language == AppLanguage.spanish 
+                ? '¿Restaurar backup?' 
+                : 'Restore backup?'),
+            content: Text(_strings.language == AppLanguage.spanish
+                ? 'Esto reemplazará todos tus datos actuales. ¿Estás seguro?'
+                : 'This will replace all your current data. Are you sure?'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: Text(_strings.cancelar),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(context, true),
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
+                child: Text(_strings.language == AppLanguage.spanish ? 'Restaurar' : 'Restore'),
+              ),
+            ],
+          ),
+        );
+
+        if (confirmar == true) {
+          final exito = await BackupService.restaurarBackup(file);
+          
+          if (!mounted) return;
+          if (exito) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(_strings.language == AppLanguage.spanish
+                    ? 'Backup restaurado. Reinicia la app.'
+                    : 'Backup restored. Restart the app.'),
+                backgroundColor: Colors.green,
+              ),
+            );
+            // Recargar datos
+            await _cargarTransacciones();
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(_strings.language == AppLanguage.spanish
+                    ? 'Error al restaurar backup'
+                    : 'Error restoring backup'),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+        }
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  Future<void> _mostrarListaBackups() async {
+    final backups = await BackupService.listarBackups();
+    
+    if (!mounted) return;
+    showDialog(
+      context: context,
+      builder: (_) {
+        return AlertDialog(
+          title: Text(_strings.language == AppLanguage.spanish 
+              ? 'Backups Disponibles' 
+              : 'Available Backups'),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: backups.isEmpty
+                ? Center(
+                    child: Text(_strings.language == AppLanguage.spanish
+                        ? 'No hay backups disponibles'
+                        : 'No backups available'),
+                  )
+                : ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: backups.length,
+                    itemBuilder: (ctx, i) {
+                      final backup = backups[i];
+                      final nombre = p.basename(backup.path);
+                      return FutureBuilder<Map<String, dynamic>?>(
+                        future: BackupService.obtenerInfoBackup(backup),
+                        builder: (ctx, snapshot) {
+                          return ListTile(
+                            leading: const Icon(Icons.description),
+                            title: Text(nombre),
+                            subtitle: snapshot.hasData
+                                ? Text('${snapshot.data?['transacciones'] ?? 0} transacciones')
+                                : const Text('Cargando...'),
+                            trailing: IconButton(
+                              icon: const Icon(Icons.share),
+                              onPressed: () async {
+                                await Share.shareXFiles([XFile(backup.path)]);
+                              },
+                            ),
+                            onTap: () async {
+                              Navigator.pop(context);
+                              final exito = await BackupService.restaurarBackup(backup);
+                              if (!mounted) return;
+                              if (exito) {
+                                await _cargarTransacciones();
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(_strings.language == AppLanguage.spanish
+                                        ? 'Backup restaurado'
+                                        : 'Backup restored'),
+                                    backgroundColor: Colors.green,
+                                  ),
+                                );
+                              }
+                            },
+                          );
+                        },
+                      );
+                    },
+                  ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text(_strings.cerrar),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   void _mostrarFormulario(BuildContext ctx, String tipo) {
     // Compatibilidad: formulario simple para crear
     _mostrarFormularioConIndice(ctx, tipo);
@@ -3250,6 +3902,10 @@ Una app completa para controlar tus gastos y ahorros:
                 _showConfigurationDialog();
               } else if (value == 'gastos_fijos') {
                 _mostrarDialogoGastosFijos();
+              } else if (value == 'recurrencias') {
+                _mostrarDialogoRecurrencias();
+              } else if (value == 'backup') {
+                _mostrarDialogoBackupRestauracion();
               } else if (value == 'categorias_personalizadas') {
                 _mostrarDialogoCategoriasPersonalizadas();
               } else if (value == 'monedas_multiples') {
@@ -3270,6 +3926,18 @@ Una app completa para controlar tus gastos y ahorros:
             itemBuilder: (ctx) => [
               PopupMenuItem(value: 'presupuesto', child: Text('💰 ${_strings.presupuestoMensual}')),
               PopupMenuItem(value: 'gastos_fijos', child: Text('💳 ${_strings.gastosFijos}')),
+              PopupMenuItem(
+                value: 'recurrencias', 
+                child: Text(_strings.language == AppLanguage.spanish 
+                    ? '🔄 Recurrencias' 
+                    : '🔄 Recurring'),
+              ),
+              PopupMenuItem(
+                value: 'backup', 
+                child: Text(_strings.language == AppLanguage.spanish 
+                    ? '💾 Backup' 
+                    : '💾 Backup'),
+              ),
               if (_isPremium)
                 PopupMenuItem(value: 'categorias_personalizadas', child: Text('📂 ${_strings.misCategorias}')),
               if (_isPremium)
