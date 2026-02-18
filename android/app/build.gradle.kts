@@ -15,6 +15,11 @@ if (keystorePropertiesFile.exists()) {
     keystoreProperties.load(keystorePropertiesFile.inputStream())
 }
 
+// Cargar versión desde version.properties
+val versionPropertiesFile = rootProject.file("version.properties")
+val versionProperties = Properties()
+versionProperties.load(versionPropertiesFile.inputStream())
+
 android {
     namespace = "com.zentavo.control_gastos"
     compileSdk = flutter.compileSdkVersion
@@ -46,8 +51,8 @@ android {
         applicationId = "com.zentavo.control_gastos"
         minSdk = flutter.minSdkVersion
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = versionProperties["versionCode"].toString().toInt()
+        versionName = versionProperties["versionName"].toString()
     }
 
     buildTypes {
