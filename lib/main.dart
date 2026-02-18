@@ -3920,7 +3920,7 @@ Una app completa para controlar tus gastos y ahorros:
                 }
               } else if (value == 'perfil') {
                 Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const ProfileScreen()),
+                  MaterialPageRoute(builder: (_) => ProfileScreen(strings: _strings)),
                 );
               }
             },

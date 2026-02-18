@@ -9,7 +9,9 @@ import 'dart:convert';
 import 'localization.dart';
 
 class ProfileScreen extends StatefulWidget {
-  const ProfileScreen({Key? key}) : super(key: key);
+  final AppStrings strings;
+  
+  const ProfileScreen({Key? key, required this.strings}) : super(key: key);
 
   @override
   State<ProfileScreen> createState() => _ProfileScreenState();
@@ -19,6 +21,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   final TextEditingController _nombreController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _telefonoController = TextEditingController();
+  
+  AppStrings get loc => widget.strings;
   
   String? _avatarPath;
   bool _loading = true;
@@ -100,7 +104,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     await prefs.setString('profile_telefono', _telefonoController.text);
     
     if (mounted) {
-      final loc = AppLocalizations.of(context);
+  
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(loc.perfilActualizadoExito),
@@ -112,7 +116,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
   
   Future<void> _seleccionarAvatar() async {
-    final loc = AppLocalizations.of(context);
+
     // En Windows, la cámara no está soportada por image_picker
     final bool isWindows = !kIsWeb && Platform.isWindows;
     
@@ -186,7 +190,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         });
         
         if (mounted) {
-          final loc = AppLocalizations.of(context);
+      
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(loc.fotoPerfilActualizada),
@@ -197,7 +201,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       }
     } catch (e) {
       if (mounted) {
-        final loc = AppLocalizations.of(context);
+    
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(loc.errorSeleccionarImagen(e.toString())),
@@ -216,7 +220,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     });
     
     if (mounted) {
-      final loc = AppLocalizations.of(context);
+  
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(loc.fotoPerfilEliminada),
@@ -227,7 +231,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
   
   Future<void> _mostrarCodigoQR() async {
-    final loc = AppLocalizations.of(context);
+
     final nombre = _nombreController.text.trim().isEmpty 
         ? loc.usuario 
         : _nombreController.text.trim();
@@ -357,7 +361,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
   
   Future<void> _escanearQR() async {
-    final loc = AppLocalizations.of(context);
+
     // En Windows, el escáner de QR puede no estar disponible
     if (!kIsWeb && Platform.isWindows) {
       if (mounted) {
@@ -375,7 +379,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final result = await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => const QRScannerScreen(),
+        builder: (context) => QRScannerScreen(strings: loc),
       ),
     );
     
@@ -445,7 +449,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
   
   Future<void> _eliminarAmigo(int index) async {
-    final loc = AppLocalizations.of(context);
+
     final amigo = _amigos[index];
     final confirmar = await showDialog<bool>(
       context: context,
@@ -552,7 +556,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   
   @override
   Widget build(BuildContext context) {
-    final loc = AppLocalizations.of(context);
+
     return Scaffold(
       appBar: AppBar(
         title: Text(loc.miPerfil),
@@ -1053,7 +1057,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
 // Pantalla de escaneo de QR
 class QRScannerScreen extends StatefulWidget {
-  const QRScannerScreen({Key? key}) : super(key: key);
+  final AppStrings strings;
+  
+  const QRScannerScreen({Key? key, required this.strings}) : super(key: key);
 
   @override
   State<QRScannerScreen> createState() => _QRScannerScreenState();
@@ -1062,6 +1068,8 @@ class QRScannerScreen extends StatefulWidget {
 class _QRScannerScreenState extends State<QRScannerScreen> {
   MobileScannerController cameraController = MobileScannerController();
   bool _scanCompleted = false;
+  
+  AppStrings get loc => widget.strings;
 
   @override
   void dispose() {
@@ -1084,7 +1092,7 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final loc = AppLocalizations.of(context);
+
     return Scaffold(
       appBar: AppBar(
         title: Text(loc.escanearCodigoQR),
