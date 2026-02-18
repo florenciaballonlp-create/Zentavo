@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:qr_flutter/qr_flutter.dart';
 
 /// Tipo de aplicación de pago
 enum PaymentApp {

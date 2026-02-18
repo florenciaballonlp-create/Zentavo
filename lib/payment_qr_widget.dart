@@ -4,7 +4,6 @@ import 'package:qr_flutter/qr_flutter.dart';
 import 'package:share_plus/share_plus.dart';
 import 'payment_request_service.dart';
 import 'dart:ui' as ui;
-import 'dart:typed_data';
 import 'package:flutter/rendering.dart';
 
 /// Widget para mostrar QR de solicitud de pago (PREMIUM)
@@ -98,7 +97,7 @@ class _PaymentQRWidgetState extends State<PaymentQRWidget> {
       }
       
       // Compartir la imagen
-      final result = await Share.shareXFiles(
+      await Share.shareXFiles(
         [XFile.fromData(pngBytes, mimeType: 'image/png', name: 'zentavo_qr_pago.png')],
         text: 'Solicitud de pago - ${widget.receptor}\nMonto: ${widget.moneda} ${widget.monto.toStringAsFixed(2)}\n${widget.concepto}',
       );
