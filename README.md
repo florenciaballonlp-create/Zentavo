@@ -50,6 +50,10 @@
 - **Gastos grupales**: Organiza viajes, cenas y eventos con amigos
 - **División automática**: Calcula quién debe a quién
 - **Participantes ilimitados**: Agrega tantas personas como necesites
+- **Balance inteligente**: Ve deudas optimizadas entre participantes
+- **Solicitudes de pago** 💎: Envía recordatorios via WhatsApp/SMS
+- **Códigos QR de pago** 💎: Genera QR para pagos rápidos
+- **Deep links de pago** 💎: Abre apps como Mercado Pago, PayPal, Venmo
 - **Notificaciones**: Comparte eventos por WhatsApp o email
 
 ### 🏦 Control de Ahorros
@@ -83,13 +87,31 @@
 - **Estado Premium**: Ve tu plan activo y tiempo restante
 - **Estadísticas**: Transacciones creadas, eventos, ahorros totales
 
+### � Transacciones Recurrentes (v1.1.0)
+- **Automatización**: Crea gastos/ingresos que se repiten automáticamente
+- **Frecuencias**: Diaria, Semanal, Quincenal, Mensual, Anual
+- **Gestión completa**: Pausa, edita o elimina recurrencias
+- **Auto-generación**: Las transacciones se crean automáticamente en las fechas programadas
+
+### 💾 Backup y Restauración (v1.1.0)
+- **Backup automático**: Cada 7 días se crea una copia de seguridad automática
+- **Backup manual**: Crea copias cuando quieras
+- **Compartir**: Envía backups por WhatsApp o email
+- **Restauración**: Recupera todos tus datos desde un archivo de backup
+- **Formato JSON**: Compatible y fácil de usar
+
 ### 💎 Premium
 - **Sin publicidad**: Experiencia limpia y fluida
+- **Solicitudes de pago** 💰: Envía recordatorios personalizados via WhatsApp/SMS
+- **Códigos QR de pago** 📱: Genera QR codes para cobros rápidos
+- **Deep links de pago** 🔗: Abre Mercado Pago, PayPal, Venmo directamente
+- **Eventos compartidos ilimitados**: Sin límite de 5 eventos
+- **Categorías personalizadas ilimitadas**: Organiza a tu manera
 - **Backup en la nube**: Sincroniza entre dispositivos (próximamente)
 - **Análisis IA**: Recomendaciones personalizadas (próximamente)
 - **Exportar PDF**: Informes profesionales
 - **Soporte prioritario**: Respuestas en menos de 24 horas
-- **2 planes disponibles**: Mensual y Anual
+- **2 planes disponibles**: Mensual ($2.99) y Anual ($24.99 - ahorra 30%)
 
 ---
 

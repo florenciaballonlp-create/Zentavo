@@ -6,6 +6,8 @@ import 'dart:convert';
 import 'dart:math';
 import 'localization.dart';
 import 'premium_screen.dart';
+import 'payment_request_service.dart';
+import 'payment_qr_widget.dart';
 
 /// Modelo de datos para un evento compartido
 class EventoCompartido {
@@ -1333,6 +1335,288 @@ class _DetalleEventoScreenState extends State<DetalleEventoScreen> {
     return gastos;
   }
 
+  /// Calcula el balance de cada participante (lo que pagó - lo que debe pagar)
+  Map<String, double> _calcularBalances() {
+    final gastosPorParticipante = _calcularGastosPorParticipante();
+    final totalGastado = widget.evento.totalGastado;
+    final numParticipantes = widget.evento.participantes.length;
+    
+    if (numParticipantes == 0 || totalGastado == 0) {
+      return {};
+    }
+    
+    final montoPorPersona = totalGastado / numParticipantes;
+    final Map<String, double> balances = {};
+    
+    for (var participante in widget.evento.participantes) {
+      final gastado = gastosPorParticipante[participante.id] ?? 0;
+      balances[participante.id] = gastado - montoPorPersona;
+    }
+    
+    return balances;
+  }
+
+  /// Calcula las deudas optimizadas entre participantes
+  List<Map<String, dynamic>> _calcularDeudas() {
+    final balances = _calcularBalances();
+    if (balances.isEmpty) return [];
+    
+    // Separar deudores y acreedores
+    final deudores = <String, double>{};
+    final acreedores = <String, double>{};
+    
+    balances.forEach((id, balance) {
+      if (balance < -0.01) {
+        deudores[id] = -balance; // Debe pagar
+      } else if (balance > 0.01) {
+        acreedores[id] = balance; // Debe recibir
+      }
+    });
+    
+    // Crear lista de transacciones
+    final transacciones = <Map<String, dynamic>>[];
+    
+    final listaDeudores = deudores.entries.toList();
+    final listaAcreedores = acreedores.entries.toList();
+    
+    int i = 0, j = 0;
+    while (i < listaDeudores.length && j < listaAcreedores.length) {
+      final deudor = listaDeudores[i];
+      final acreedor = listaAcreedores[j];
+      
+      final monto = min(deudor.value, acreedor.value);
+      
+      transacciones.add({
+        'deudorId': deudor.key,
+        'acreedorId': acreedor.key,
+        'monto': monto,
+      });
+      
+      listaDeudores[i] = MapEntry(deudor.key, deudor.value - monto);
+      listaAcreedores[j] = MapEntry(acreedor.key, acreedor.value - monto);
+      
+      if (listaDeudores[i].value < 0.01) i++;
+      if (listaAcreedores[j].value < 0.01) j++;
+    }
+    
+    return transacciones;
+  }
+
+  /// Verifica si el usuario tiene Premium
+  Future<bool> _verificarPremium() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool('is_premium') ?? false;
+  }
+
+  /// Muestra diálogo de upgrade a Premium
+  void _mostrarDialogoPremium(String feature) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.workspace_premium, color: Color(0xFFF59E0B)),
+            SizedBox(width: 12),
+            Text('Función Premium'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('$feature es una función exclusiva para usuarios Premium.'),
+            const SizedBox(height: 16),
+            const Text(
+              'Con Premium obtienes:',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            const Text('✓ Solicitudes de pago personalizadas'),
+            const Text('✓ Códigos QR para pagos rápidos'),
+            const Text('✓ Deep links a apps de pago'),
+            const Text('✓ Eventos compartidos ilimitados'),
+            const Text('✓ Categorías personalizadas'),
+            const Text('✓ Sin anuncios'),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Ahora no'),
+          ),
+          ElevatedButton.icon(
+            onPressed: () {
+              Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => PremiumScreen(strings: widget.strings)),
+              );
+            },
+            icon: const Icon(Icons.star),
+            label: const Text('Ver Premium'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFF59E0B),
+              foregroundColor: Colors.white,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Genera y comparte solicitud de pago vía WhatsApp/mensaje
+  Future<void> _solicitarPago(String receptor, String pagador, double monto) async {
+    final isPremium = await _verificarPremium();
+    if (!isPremium) {
+      _mostrarDialogoPremium('Solicitudes de pago');
+      return;
+    }
+
+    final cbu = ''; // Se puede pedir al usuario
+    final alias = '';
+    final email = '';
+    final telefono = '';
+
+    final mensaje = PaymentRequestService.generarMensajeSolicitud(
+      nombreReceptor: receptor,
+      nombrePagador: pagador,
+      monto: monto,
+      simboloMoneda: widget.currency.symbol,
+      concepto: widget.evento.nombre,
+      cbu: cbu.isNotEmpty ? cbu : null,
+      alias: alias.isNotEmpty ? alias : null,
+      email: email.isNotEmpty ? email : null,
+      telefono: telefono.isNotEmpty ? telefono : null,
+    );
+
+    await Share.share(
+      mensaje,
+      subject: 'Solicitud de pago - ${widget.evento.nombre}',
+    );
+  }
+
+  /// Muestra QR de pago
+  Future<void> _mostrarQRPago(String receptor, double monto) async {
+    final isPremium = await _verificarPremium();
+    if (!isPremium) {
+      _mostrarDialogoPremium('Códigos QR de pago');
+      return;
+    }
+
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final primaryColor = Theme.of(context).colorScheme.primary;
+
+    showDialog(
+      context: context,
+      builder: (context) => PaymentQRWidget(
+        receptor: receptor,
+        monto: monto,
+        moneda: widget.currency.symbol,
+        concepto: widget.evento.nombre,
+        cbu: null, // Se puede pedir al usuario
+        email: null, // Se puede pedir al usuario
+        isDarkMode: isDarkMode,
+        primaryColor: primaryColor,
+      ),
+    );
+  }
+
+  /// Muestra opciones de pago con deep links
+  Future<void> _mostrarOpcionesPago(String receptor, String pagador, double monto) async {
+    final isPremium = await _verificarPremium();
+    if (!isPremium) {
+      _mostrarDialogoPremium('Deep links de pago');
+      return;
+    }
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.payment, color: Color(0xFF0EA5A4)),
+            SizedBox(width: 12),
+            Text('Opciones de Pago'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              '$pagador debe pagar ${widget.currency.formatAmount(monto)} a $receptor',
+              style: const TextStyle(fontWeight: FontWeight.w600),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Por: ${widget.evento.nombre}',
+              style: const TextStyle(fontSize: 12, color: Colors.grey),
+            ),
+            const Divider(height: 24),
+            const Text(
+              'Selecciona cómo deseas pagar:',
+              style: TextStyle(fontSize: 13),
+            ),
+            const SizedBox(height: 16),
+            _BotonAppPago(
+              app: PaymentApp.mercadoPago,
+              onTap: () {
+                // Abrir Mercado Pago
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Abriendo Mercado Pago...'),
+                    duration: Duration(seconds: 1),
+                  ),
+                );
+              },
+            ),
+            const SizedBox(height: 8),
+            _BotonAppPago(
+              app: PaymentApp.paypal,
+              onTap: () {
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Abriendo PayPal...'),
+                    duration: Duration(seconds: 1),
+                  ),
+                );
+              },
+            ),
+            const SizedBox(height: 8),
+            _BotonAppPago(
+              app: PaymentApp.venmo,
+              onTap: () {
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Abriendo Venmo...'),
+                    duration: Duration(seconds: 1),
+                  ),
+                );
+              },
+            ),
+            const SizedBox(height: 8),
+            _BotonAppPago(
+              app: PaymentApp.transferencia,
+              onTap: () {
+                Navigator.pop(context);
+                _solicitarPago(receptor, pagador, monto);
+              },
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancelar'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final color = Color(int.parse('FF${widget.evento.colorHex}', radix: 16));
@@ -1544,6 +1828,228 @@ class _DetalleEventoScreenState extends State<DetalleEventoScreen> {
               ),
             ),
           ),
+          const SizedBox(height: 16),
+          // Balance y deudas (PREMIUM)
+          if (widget.evento.totalGastado > 0 && widget.evento.participantes.length > 1)
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.payments, color: Color(0xFF0EA5A4)),
+                        const SizedBox(width: 8),
+                        const Text(
+                          'Balance de Pagos',
+                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                        ),
+                        const Spacer(),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF59E0B).withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: const Color(0xFFF59E0B), width: 1),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.workspace_premium, size: 14, color: Color(0xFFF59E0B)),
+                              SizedBox(width: 4),
+                              Text(
+                                'Premium',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFFF59E0B),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Resumen simplificado de quién debe pagar a quién',
+                      style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                    ),
+                    const Divider(),
+                    ..._calcularDeudas().map((deuda) {
+                      final deudor = widget.evento.participantes
+                          .firstWhere((p) => p.id == deuda['deudorId']);
+                      final acreedor = widget.evento.participantes
+                          .firstWhere((p) => p.id == deuda['acreedorId']);
+                      final monto = deuda['monto'] as double;
+                      
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 12),
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFFF7ED),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFFFBBF24), width: 1),
+                        ),
+                        child: Column(
+                          children: [
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Row(
+                                    children: [
+                                      CircleAvatar(
+                                        radius: 16,
+                                        backgroundColor: color.withOpacity(0.2),
+                                        child: Text(
+                                          deudor.nombre[0].toUpperCase(),
+                                          style: TextStyle(
+                                            color: color,
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 14,
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              deudor.nombre,
+                                              style: const TextStyle(fontWeight: FontWeight.w600),
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                            const Text(
+                                              'debe pagar',
+                                              style: TextStyle(fontSize: 11, color: Colors.grey),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(color: const Color(0xFFFBBF24), width: 1),
+                                  ),
+                                  child: Text(
+                                    widget.currency.formatAmount(monto),
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 15,
+                                      color: Color(0xFFD97706),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Row(
+                                    children: [
+                                      const Icon(Icons.arrow_forward, size: 16, color: Color(0xFFD97706)),
+                                      const SizedBox(width: 8),
+                                      CircleAvatar(
+                                        radius: 16,
+                                        backgroundColor: Colors.green.withOpacity(0.2),
+                                        child: Text(
+                                          acreedor.nombre[0].toUpperCase(),
+                                          style: const TextStyle(
+                                            color: Colors.green,
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 14,
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          acreedor.nombre,
+                                          style: const TextStyle(fontWeight: FontWeight.w600),
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: OutlinedButton.icon(
+                                    onPressed: () => _solicitarPago(acreedor.nombre, deudor.nombre, monto),
+                                    icon: const Icon(Icons.message, size: 16),
+                                    label: const Text('Solicitar', style: TextStyle(fontSize: 12)),
+                                    style: OutlinedButton.styleFrom(
+                                      padding: const EdgeInsets.symmetric(vertical: 8),
+                                      side: const BorderSide(color: Color(0xFF0EA5A4)),
+                                      foregroundColor: const Color(0xFF0EA5A4),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: OutlinedButton.icon(
+                                    onPressed: () => _mostrarQRPago(acreedor.nombre, monto),
+                                    icon: const Icon(Icons.qr_code_2, size: 16),
+                                    label: const Text('QR', style: TextStyle(fontSize: 12)),
+                                    style: OutlinedButton.styleFrom(
+                                      padding: const EdgeInsets.symmetric(vertical: 8),
+                                      side: const BorderSide(color: Color(0xFFF59E0B)),
+                                      foregroundColor: const Color(0xFFF59E0B),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: OutlinedButton.icon(
+                                    onPressed: () => _mostrarOpcionesPago(acreedor.nombre, deudor.nombre, monto),
+                                    icon: const Icon(Icons.credit_card, size: 16),
+                                    label: const Text('Pagar', style: TextStyle(fontSize: 12)),
+                                    style: OutlinedButton.styleFrom(
+                                      padding: const EdgeInsets.symmetric(vertical: 8),
+                                      side: const BorderSide(color: Colors.green),
+                                      foregroundColor: Colors.green,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      );
+                    }),
+                    if (_calcularDeudas().isEmpty)
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.green.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Row(
+                          children: [
+                            Icon(Icons.check_circle, color: Colors.green),
+                            SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                '¡Todos están a mano! No hay deudas pendientes.',
+                                style: TextStyle(color: Colors.green, fontWeight: FontWeight.w600),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
           const SizedBox(height: 16),
           // Lista de gastos
           Row(
@@ -1841,6 +2347,64 @@ class _DialogoNuevoGastoState extends State<_DialogoNuevoGasto> {
                 ),
               ),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+/// Widget para botón de app de pago
+class _BotonAppPago extends StatelessWidget {
+  final PaymentApp app;
+  final VoidCallback onTap;
+
+  const _BotonAppPago({
+    Key? key,
+    required this.app,
+    required this.onTap,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    final info = PaymentRequestService.getPaymentAppInfo(app);
+    final nombre = info['nombre'] as String;
+    final icono = info['icono'] as String;
+    final color = info['color'] as Color;
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          border: Border.all(color: color.withOpacity(0.3)),
+          borderRadius: BorderRadius.circular(12),
+          color: color.withOpacity(0.05),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                icono,
+                style: const TextStyle(fontSize: 24),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                nombre,
+                style: const TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 15,
+                ),
+              ),
+            ),
+            Icon(Icons.arrow_forward_ios, size: 16, color: color),
           ],
         ),
       ),
