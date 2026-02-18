@@ -3084,7 +3084,7 @@ Una app completa para controlar tus gastos y ahorros:
                           subtitle: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text('${_getSimboloMoneda(_appCurrency)}${recurrencia.monto.toStringAsFixed(2)}'),
+                              Text('${_appCurrency.symbol}${recurrencia.monto.toStringAsFixed(2)}'),
                               Text(
                                 recurrencia.getFrecuenciaString(
                                   _strings.language == AppLanguage.spanish ? 'es' : 'en',
@@ -3178,15 +3178,16 @@ Una app completa para controlar tus gastos y ahorros:
                     // Tipo
                     DropdownButtonFormField<String>(
                       value: tipoSeleccionado,
-                      decoration: InputDecoration(
-                        labelText: _strings.tipo,
-                        border: const OutlineInputBorder(),
+                      decoration: const InputDecoration(
+                        labelText: 'Tipo',
+                        border: OutlineInputBorder(),
                       ),
                       items: [
-                        DropdownMenuItem(value: 'Ingreso', child: Text(_strings.ingreso)),
-                        DropdownMenuItem(value: 'Egreso', child: Text(_strings.egreso)),
+                        DropdownMenuItem(value: 'Ingreso', child: Text(_strings.ingresos)),
+                        DropdownMenuItem(value: 'Egreso', child: Text(_strings.egresos)),
                       ],
                       onChanged: (v) => setDialogState(() => tipoSeleccionado = v!),
+
                     ),
                     const SizedBox(height: 12),
                     // Título
@@ -3205,7 +3206,7 @@ Una app completa para controlar tus gastos y ahorros:
                       decoration: InputDecoration(
                         labelText: _strings.monto,
                         border: const OutlineInputBorder(),
-                        prefixText: _getSimboloMoneda(_appCurrency),
+                        prefixText: _appCurrency.symbol,
                       ),
                     ),
                     const SizedBox(height: 12),

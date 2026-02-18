@@ -122,16 +122,16 @@ class RecurringTransaction {
       case RecurringFrequency.monthly:
         // Mantener el mismo día del mes
         int mes = base.month + 1;
-        int año = base.year;
+        int anio = base.year;
         if (mes > 12) {
           mes = 1;
-          año++;
+          anio++;
         }
         // Ajustar día si el mes tiene menos días
         int dia = base.day;
-        final diasEnMes = DateTime(año, mes + 1, 0).day;
+        final diasEnMes = DateTime(anio, mes + 1, 0).day;
         if (dia > diasEnMes) dia = diasEnMes;
-        return DateTime(año, mes, dia);
+        return DateTime(anio, mes, dia);
       case RecurringFrequency.yearly:
         return DateTime(base.year + 1, base.month, base.day);
     }
