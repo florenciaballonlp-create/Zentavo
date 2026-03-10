@@ -34,6 +34,10 @@ class _PremiumScreenState extends State<PremiumScreen> with TickerProviderStateM
   
   // Animaciones
   late AnimationController _pulseController;
+  
+  // Scroll controller para navegación programática
+  final ScrollController _scrollController = ScrollController();
+  final GlobalKey _planesKey = GlobalKey();
 
   // IDs de productos (estos deben coincidir con los configurados en Google Play y App Store)
   static const String productIdMonthly = 'premium_monthly';
@@ -43,6 +47,29 @@ class _PremiumScreenState extends State<PremiumScreen> with TickerProviderStateM
     productIdMonthly,
     productIdYearly,
   };
+
+  // ================================
+  // SISTEMA DE CUPONES DE DESCUENTO
+  // ================================
+  // Mapa de cupones válidos: código => duración en días (-1 = ilimitado)
+  static const Map<String, int> _validCoupons = {
+    // Cupones familiares/amigos (ilimitado)
+    'FAMILIA2026': -1,
+    'REGALO2026': -1,
+    'AMIGO2026': -1,
+    
+    // Cupones promocionales (1 año)
+    'PROMO365': 365,
+    'ANUAL2026': 365,
+    
+    // Cupones de prueba (30 días)
+    'PRUEBA30': 30,
+    'TEST30': 30,
+    
+    // Cupón especial para ti
+    'ZENTAVO2026': -1,
+  };
+  // ================================
 
   @override
   void initState() {
@@ -98,6 +125,207 @@ class _PremiumScreenState extends State<PremiumScreen> with TickerProviderStateM
       _isPremium = isPremium;
     });
   }
+
+  // ================================
+  // MÉTODOS PARA CUPONES
+  // ================================
+  
+  Future<void> _showCouponDialog() async {
+    final couponController = TextEditingController();
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.card_giftcard, color: Color(0xFF0EA5A4)),
+            SizedBox(width: 8),
+            Text('Canjear cupón'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              '¿Tienes un cupón de descuento?\nIngrésalo aquí:',
+              style: TextStyle(fontSize: 14),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: couponController,
+              textCapitalization: TextCapitalization.characters,
+              decoration: InputDecoration(
+                hintText: 'Ej: FAMILIA2026',
+                prefixIcon: const Icon(Icons.confirmation_number),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.blue[50],
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '💡 Tipos de cupones:',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                    ),
+                  ),
+                  SizedBox(height: 4),
+                  Text(
+                    '• Cupones de regalo (ilimitado)\n'
+                    '• Cupones promocionales (1 año)\n'
+                    '• Cupones de prueba (30 días)',
+                    style: TextStyle(fontSize: 11),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(_strings.cerrar),
+          ),
+          ElevatedButton.icon(
+            onPressed: () async {
+              final coupon = couponController.text.trim().toUpperCase();
+              Navigator.pop(context);
+              await _validateAndApplyCoupon(coupon);
+            },
+            icon: const Icon(Icons.check_circle),
+            label: const Text('Canjear'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF0EA5A4),
+              foregroundColor: Colors.white,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _validateAndApplyCoupon(String coupon) async {
+    if (coupon.isEmpty) {
+      _showMessage('⚠️ Error', 'Por favor ingresa un cupón válido', isError: true);
+      return;
+    }
+
+    // Verificar si el cupón existe
+    if (!_validCoupons.containsKey(coupon)) {
+      _showMessage(
+        '❌ Cupón inválido',
+        'El cupón "$coupon" no existe o ya expiró.\n\n'
+        'Verifica que esté escrito correctamente.',
+        isError: true,
+      );
+      return;
+    }
+
+    // Verificar si ya fue usado
+    final prefs = await SharedPreferences.getInstance();
+    final usedCoupons = prefs.getStringList('used_coupons') ?? [];
+    
+    if (usedCoupons.contains(coupon)) {
+      _showMessage(
+        '⚠️ Cupón ya usado',
+        'Este cupón ya fue canjeado anteriormente.',
+        isError: true,
+      );
+      return;
+    }
+
+    // Aplicar cupón
+    await _activatePremiumWithCoupon(coupon);
+  }
+
+  Future<void> _activatePremiumWithCoupon(String coupon) async {
+    final prefs = await SharedPreferences.getInstance();
+    final days = _validCoupons[coupon]!;
+    
+    // Marcar como Premium
+    await prefs.setBool('is_premium', true);
+    
+    // Guardar información del cupón
+    await prefs.setString('premium_source', 'coupon');
+    await prefs.setString('premium_coupon', coupon);
+    
+    // Calcular fecha de expiración
+    if (days == -1) {
+      // Premium ilimitado
+      await prefs.setString('premium_plan', 'Ilimitado (Cupón)');
+      await prefs.remove('premium_expiration');
+    } else {
+      // Premium temporal
+      final expirationDate = DateTime.now().add(Duration(days: days));
+      await prefs.setString('premium_plan', '$days días (Cupón)');
+      await prefs.setString('premium_expiration', expirationDate.toIso8601String());
+    }
+    
+    // Marcar cupón como usado
+    final usedCoupons = prefs.getStringList('used_coupons') ?? [];
+    usedCoupons.add(coupon);
+    await prefs.setStringList('used_coupons', usedCoupons);
+    
+    // Actualizar estado
+    setState(() {
+      _isPremium = true;
+    });
+    
+    // Mostrar mensaje de éxito
+    final message = days == -1
+        ? '¡Felicidades! 🎉\n\nPremium ILIMITADO activado con el cupón "$coupon".\n\n'
+          'Disfruta de todas las funciones sin restricciones.'
+        : '¡Felicidades! 🎉\n\nPremium activado por $days días con el cupón "$coupon".\n\n'
+          'Disfruta de todas las funciones hasta ${_formatDate(DateTime.now().add(Duration(days: days)))}.';
+    
+    _showMessage('✅ ¡Cupón canjeado!', message, isError: false);
+  }
+
+  void _showMessage(String title, String message, {required bool isError}) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(
+              isError ? Icons.error_outline : Icons.check_circle,
+              color: isError ? Colors.red : Colors.green,
+            ),
+            const SizedBox(width: 8),
+            Expanded(child: Text(title)),
+          ],
+        ),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatDate(DateTime date) {
+    final months = [
+      'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
+      'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'
+    ];
+    return '${date.day} de ${months[date.month - 1]} de ${date.year}';
+  }
+  
+  // ================================
 
   Future<void> _initStoreInfo() async {
     final bool available = await _inAppPurchase.isAvailable();
@@ -246,6 +474,7 @@ class _PremiumScreenState extends State<PremiumScreen> with TickerProviderStateM
   void dispose() {
     _offerTimer.cancel();
     _pulseController.dispose();
+    _scrollController.dispose();
     if (!kIsWeb && !Platform.isWindows && !Platform.isLinux && !Platform.isMacOS) {
       _subscription.cancel();
     }
@@ -317,6 +546,21 @@ class _PremiumScreenState extends State<PremiumScreen> with TickerProviderStateM
           ),
           const SizedBox(height: 20),
           _buildFeatureCard(
+            icon: Icons.payment,
+            title: _strings.solicitudesDePago,
+            description: 'Solicita y rastrea pagos en eventos compartidos con un solo toque',
+          ),
+          _buildFeatureCard(
+            icon: Icons.qr_code_2,
+            title: _strings.codigosQRPago,
+            description: 'Genera QR codes para recibir pagos al instante',
+          ),
+          _buildFeatureCard(
+            icon: Icons.open_in_new,
+            title: _strings.deepLinksAPago,
+            description: 'Integración directa con Mercado Pago, PayPal, Venmo, Cash App y Zelle',
+          ),
+          _buildFeatureCard(
             icon: Icons.block,
             title: _strings.sinPublicidad,
             description: _strings.sinPublicidadDesc,
@@ -366,12 +610,33 @@ class _PremiumScreenState extends State<PremiumScreen> with TickerProviderStateM
     );
   }
 
+  void _scrollToPlanes() {
+    // Intentar obtener el contexto del GlobalKey
+    final context = _planesKey.currentContext;
+    if (context != null) {
+      // Si existe el key, hacer scroll a su posición
+      Scrollable.ensureVisible(
+        context,
+        duration: const Duration(milliseconds: 600),
+        curve: Curves.easeInOut,
+      );
+    } else {
+      // Si no existe el key, hacer scroll a una posición estimada
+      _scrollController.animateTo(
+        600, // Posición aproximada de los planes
+        duration: const Duration(milliseconds: 600),
+        curve: Curves.easeInOut,
+      );
+    }
+  }
+
   Widget _buildPremiumOffersUI() {
     final hours = _timeRemaining.inHours;
     final minutes = _timeRemaining.inMinutes % 60;
     final seconds = _timeRemaining.inSeconds % 60;
     
     return SingleChildScrollView(
+      controller: _scrollController,
       padding: const EdgeInsets.all(24),
       child: Column(
         children: [
@@ -449,9 +714,7 @@ class _PremiumScreenState extends State<PremiumScreen> with TickerProviderStateM
                   ),
                   const SizedBox(height: 8),
                   GestureDetector(
-                    onTap: () {
-                      // El usuario puede scrollear manualmente para ver los planes
-                    },
+                    onTap: _scrollToPlanes,
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                       decoration: BoxDecoration(
@@ -492,13 +755,13 @@ class _PremiumScreenState extends State<PremiumScreen> with TickerProviderStateM
             color: Color(0xFF0EA5A4),
           ),
           const SizedBox(height: 16),
-          const Text(
-            'Mejora a Premium',
-            style: TextStyle(fontSize: 32, fontWeight: FontWeight.w800),
+          Text(
+            _strings.mejoraAPremium,
+            style: const TextStyle(fontSize: 32, fontWeight: FontWeight.w800),
           ),
           const SizedBox(height: 8),
-          const Text(
-            'Desbloquea todas las funciones avanzadas',
+          Text(
+            _strings.desbloqueaFunciones,
             style: TextStyle(fontSize: 16, color: Color(0xFF6B7280)),
             textAlign: TextAlign.center,
           ),
@@ -511,44 +774,59 @@ class _PremiumScreenState extends State<PremiumScreen> with TickerProviderStateM
           const SizedBox(height: 32),
           
           // Casos de uso
-          const Text(
-            'Perfecto para:',
+          Text(
+            _strings.perfectoPara,
             style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: 16),
           _buildUseCaseCard(
             emoji: '✈️',
-            title: 'Viajeros',
-            description: 'Organiza gastos de viajes grupales sin complicaciones',
+            title: _strings.viajeros,
+            description: 'Organiza gastos grupales y solicita pagos con QR o enlaces directos',
           ),
           _buildUseCaseCard(
             emoji: '🏠',
-            title: 'Roommates',
-            description: 'Divide servicios y compras del hogar fácilmente',
+            title: _strings.roommates,
+            description: 'Divide servicios, compras y cobra con solicitudes de pago automáticas',
           ),
           _buildUseCaseCard(
             emoji: '🎓',
-            title: 'Estudiantes',
-            description: 'Controla tu presupuesto mensual y ahorra más',
+            title: _strings.estudiantes,
+            description: 'Controla tu presupuesto y comparte gastos con tu grupo de estudio',
           ),
           _buildUseCaseCard(
             emoji: '💑',
-            title: 'Parejas',
-            description: 'Gestionen sus finanzas juntos de forma transparente',
+            title: _strings.parejas,
+            description: 'Gestionen finanzas juntos y dividan gastos sin complicaciones',
           ),
           
           const SizedBox(height: 32),
           
           // Funciones Premium
-          const Text(
-            'Funciones Premium',
+          Text(
+            _strings.funcionesPremium,
             style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: 20),
           _buildFeatureCard(
             icon: Icons.group,
-            title: 'Eventos Ilimitados',
+            title: _strings.eventosIlimitados,
             description: 'Crea todos los eventos compartidos que necesites',
+          ),
+          _buildFeatureCard(
+            icon: Icons.payment,
+            title: _strings.solicitudesDePago,
+            description: 'Solicita y rastrea pagos en eventos compartidos con un solo toque',
+          ),
+          _buildFeatureCard(
+            icon: Icons.qr_code_2,
+            title: _strings.codigosQRPago,
+            description: 'Genera QR codes con tu info de pago para recibir dinero al instante',
+          ),
+          _buildFeatureCard(
+            icon: Icons.open_in_new,
+            title: _strings.deepLinksAPago,
+            description: 'Abre directamente Mercado Pago, PayPal, Venmo, Cash App y Zelle desde la app',
           ),
           _buildFeatureCard(
             icon: Icons.block,
@@ -598,7 +876,7 @@ class _PremiumScreenState extends State<PremiumScreen> with TickerProviderStateM
             name: 'María G.',
             role: 'Viajera frecuente',
             rating: 5,
-            comment: 'La función de eventos compartidos es increíble. Organicé un viaje con 8 amigos y todos supieron exactamente cuánto gastar. ¡Sin peleas!',
+            comment: 'La función de eventos compartidos con solicitudes de pago por QR es increíble. Organicé un viaje con 8 amigos y todos pagaron al instante. ¡Sin peleas ni cuentas confusas!',
           ),
           _buildTestimonialCard(
             name: 'Carlos R.',
@@ -651,9 +929,12 @@ class _PremiumScreenState extends State<PremiumScreen> with TickerProviderStateM
           const SizedBox(height: 32),
           
           // Planes
-          Text(
-            'Elige tu Plan',
-            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
+          Container(
+            key: _planesKey,
+            child: const Text(
+              'Elige tu Plan',
+              style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
+            ),
           ),
           const SizedBox(height: 20),
           if (kIsWeb || (!_isAvailable))
@@ -668,6 +949,26 @@ class _PremiumScreenState extends State<PremiumScreen> with TickerProviderStateM
               onPressed: _restorePurchases,
               child: Text(_strings.yaCompraste),
             ),
+          const SizedBox(height: 8),
+          // Botón para canjear cupones
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: OutlinedButton.icon(
+              onPressed: _showCouponDialog,
+              icon: const Icon(Icons.card_giftcard),
+              label: const Text('¿Tienes un cupón de descuento?'),
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
+                side: const BorderSide(color: Color(0xFF0EA5A4), width: 2),
+                foregroundColor: const Color(0xFF0EA5A4),
+                textStyle: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ),
         ],
       ),
     );

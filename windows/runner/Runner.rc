@@ -89,13 +89,13 @@ BEGIN
     BEGIN
         BLOCK "040904e4"
         BEGIN
-            VALUE "CompanyName", "com.example" "\0"
-            VALUE "FileDescription", "control_gastos" "\0"
+            VALUE "CompanyName", "Zentavo" "\0"
+            VALUE "FileDescription", "Zentavo - Tu control financiero" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
-            VALUE "InternalName", "control_gastos" "\0"
-            VALUE "LegalCopyright", "Copyright (C) 2026 com.example. All rights reserved." "\0"
-            VALUE "OriginalFilename", "control_gastos.exe" "\0"
-            VALUE "ProductName", "control_gastos" "\0"
+            VALUE "InternalName", "Zentavo" "\0"
+            VALUE "LegalCopyright", "Copyright (C) 2026 Zentavo. Todos los derechos reservados." "\0"
+            VALUE "OriginalFilename", "Zentavo.exe" "\0"
+            VALUE "ProductName", "Zentavo - Tu control financiero" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END

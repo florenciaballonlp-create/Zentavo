@@ -1282,6 +1282,261 @@ class AppStrings {
     }
   }
 
+  String get mostrarCodigoQR {
+    switch (language) {
+      case AppLanguage.english:
+        return 'Show QR Code';
+      case AppLanguage.portuguese:
+        return 'Mostrar Código QR';
+      case AppLanguage.italian:
+        return 'Mostra Codice QR';
+      case AppLanguage.chinese:
+        return '显示二维码';
+      case AppLanguage.japanese:
+        return 'QRコードを表示';
+      default:
+        return 'Mostrar Código QR';
+    }
+  }
+
+  String get escanearCodigoQR {
+    switch (language) {
+      case AppLanguage.english:
+        return 'Scan QR Code';
+      case AppLanguage.portuguese:
+        return 'Escanear Código QR';
+      case AppLanguage.italian:
+        return 'Scansiona Codice QR';
+      case AppLanguage.chinese:
+        return '扫描二维码';
+      case AppLanguage.japanese:
+        return 'QRコードをスキャン';
+      default:
+        return 'Escanear Código QR';
+    }
+  }
+
+  String get comparteEscaneaApp {
+    switch (language) {
+      case AppLanguage.english:
+        return 'Share or scan to download Zentavo';
+      case AppLanguage.portuguese:
+        return 'Compartilhe ou escaneie para baixar Zentavo';
+      case AppLanguage.italian:
+        return 'Condividi o scansiona per scaricare Zentavo';
+      case AppLanguage.chinese:
+        return '分享或扫描下载 Zentavo';
+      case AppLanguage.japanese:
+        return 'Zentavoをダウンロードするには共有またはスキャン';
+      default:
+        return 'Comparte o escanea para descargar Zentavo';
+    }
+  }
+
+  String get escaneaQRDescripcion {
+    switch (language) {
+      case AppLanguage.english:
+        return 'Scan this QR code to download Zentavo on your device';
+      case AppLanguage.portuguese:
+        return 'Escaneie este código QR para baixar Zentavo no seu dispositivo';
+      case AppLanguage.italian:
+        return 'Scansiona questo codice QR per scaricare Zentavo sul tuo dispositivo';
+      case AppLanguage.chinese:
+        return '扫描此二维码以在您的设备上下载 Zentavo';
+      case AppLanguage.japanese:
+        return 'このQRコードをスキャンして、デバイスにZentavoをダウンロードしてください';
+      default:
+        return 'Escanea este código QR para descargar Zentavo en tu dispositivo';
+    }
+  }
+
+  String get codigoQRApp {
+    switch (language) {
+      case AppLanguage.english:
+        return 'App QR Code';
+      case AppLanguage.portuguese:
+        return 'Código QR do App';
+      case AppLanguage.italian:
+        return 'Codice QR dell\'App';
+      case AppLanguage.chinese:
+        return '应用二维码';
+      case AppLanguage.japanese:
+        return 'アプリのQRコード';
+      default:
+        return 'Código QR de la App';
+    }
+  }
+
+  String get compartirTexto {
+    switch (language) {
+      case AppLanguage.english:
+        return 'Share Text';
+      case AppLanguage.portuguese:
+        return 'Compartilhar Texto';
+      case AppLanguage.italian:
+        return 'Condividi Testo';
+      case AppLanguage.chinese:
+        return '分享文本';
+      case AppLanguage.japanese:
+        return 'テキストを共有';
+      default:
+        return 'Compartir Texto';
+    }
+  }
+
+  String get servicioTecnico {
+    switch (language) {
+      case AppLanguage.english:
+        return 'Technical Support';
+      case AppLanguage.portuguese:
+        return 'Suporte Técnico';
+      case AppLanguage.italian:
+        return 'Supporto Tecnico';
+      case AppLanguage.chinese:
+        return '技术支持';
+      case AppLanguage.japanese:
+        return 'テクニカルサポート';
+      default:
+        return 'Servicio Técnico';
+    }
+  }
+
+  String get servicioTecnicoDesc {
+    switch (language) {
+      case AppLanguage.english:
+        return 'Help and support';
+      case AppLanguage.portuguese:
+        return 'Ajuda e suporte';
+      case AppLanguage.italian:
+        return 'Aiuto e supporto';
+      case AppLanguage.chinese:
+        return '帮助和支持';
+      case AppLanguage.japanese:
+        return 'ヘルプとサポート';
+      default:
+        return 'Ayuda y soporte';
+    }
+  }
+
+  String get preguntasFrecuentes {
+    switch (language) {
+      case AppLanguage.english:
+        return 'Frequently Asked Questions';
+      case AppLanguage.portuguese:
+        return 'Perguntas Frequentes';
+      case AppLanguage.italian:
+        return 'Domande Frequenti';
+      case AppLanguage.chinese:
+        return '常见问题';
+      case AppLanguage.japanese:
+        return 'よくある質問';
+      default:
+        return 'Preguntas Frecuentes';
+    }
+  }
+
+  String get contactenos {
+    switch (language) {
+      case AppLanguage.english:
+        return 'Contact Us';
+      case AppLanguage.portuguese:
+        return 'Contate-nos';
+      case AppLanguage.italian:
+        return 'Contattaci';
+      case AppLanguage.chinese:
+        return '联系我们';
+      case AppLanguage.japanese:
+        return 'お問い合わせ';
+      default:
+        return 'Contáctenos';
+    }
+  }
+
+  String get contactenosDesc {
+    switch (language) {
+      case AppLanguage.english:
+        return 'Get help from our support team';
+      case AppLanguage.portuguese:
+        return 'Obtenha ajuda de nossa equipe de suporte';
+      case AppLanguage.italian:
+        return 'Ricevi aiuto dal nostro team di supporto';
+      case AppLanguage.chinese:
+        return '从我们的支持团队获得帮助';
+      case AppLanguage.japanese:
+        return 'サポートチームからサポートを受ける';
+      default:
+        return 'Obtén ayuda de nuestro equipo de soporte';
+    }
+  }
+
+  String get informacionContacto {
+    switch (language) {
+      case AppLanguage.english:
+        return 'Contact Information';
+      case AppLanguage.portuguese:
+        return 'Informações de Contato';
+      case AppLanguage.italian:
+        return 'Informazioni di Contatto';
+      case AppLanguage.chinese:
+        return '联系信息';
+      case AppLanguage.japanese:
+        return '連絡先情報';
+      default:
+        return 'Información de Contacto';
+    }
+  }
+
+  String get emailSoporte {
+    switch (language) {
+      case AppLanguage.english:
+        return 'Support Email';
+      case AppLanguage.portuguese:
+        return 'Email de Suporte';
+      case AppLanguage.italian:
+        return 'Email di Supporto';
+      case AppLanguage.chinese:
+        return '支持电子邮件';
+      case AppLanguage.japanese:
+        return 'サポートメール';
+      default:
+        return 'Email de Soporte';
+    }
+  }
+
+  String get horarioAtencion {
+    switch (language) {
+      case AppLanguage.english:
+        return 'Support Hours';
+      case AppLanguage.portuguese:
+        return 'Horário de Atendimento';
+      case AppLanguage.italian:
+        return 'Orario di Assistenza';
+      case AppLanguage.chinese:
+        return '服务时间';
+      case AppLanguage.japanese:
+        return 'サポート時間';
+      default:
+        return 'Horario de Atención';
+    }
+  }
+
+  String get enviarEmail {
+    switch (language) {
+      case AppLanguage.english:
+        return 'Send Email';
+      case AppLanguage.portuguese:
+        return 'Enviar Email';
+      case AppLanguage.italian:
+        return 'Invia Email';
+      case AppLanguage.chinese:
+        return '发送电子邮件';
+      case AppLanguage.japanese:
+        return 'メールを送信';
+      default:
+        return 'Enviar Email';
+    }
+  }
+
   // Manual de uso - Inicio
   String get manualBienvenida {
     switch (language) {
@@ -2529,6 +2784,40 @@ class AppStrings {
         return 'Agregar';
     }
   }
+  
+  String get retirar {
+    switch (language) {
+      case AppLanguage.english:
+        return 'Withdraw';
+      case AppLanguage.portuguese:
+        return 'Retirar';
+      case AppLanguage.italian:
+        return 'Prelevare';
+      case AppLanguage.chinese:
+        return '提取';
+      case AppLanguage.japanese:
+        return '引き出す';
+      default:
+        return 'Retirar';
+    }
+  }
+  
+  String get historial {
+    switch (language) {
+      case AppLanguage.english:
+        return 'History';
+      case AppLanguage.portuguese:
+        return 'Histórico';
+      case AppLanguage.italian:
+        return 'Storico';
+      case AppLanguage.chinese:
+        return '历史';
+      case AppLanguage.japanese:
+        return '履歴';
+      default:
+        return 'Historial';
+    }
+  }
 
   String get noObtieneMonedasDisponibles {
     switch (language) {
@@ -3441,23 +3730,6 @@ class AppStrings {
     }
   }
 
-  String get escanearCodigoQR {
-    switch (language) {
-      case AppLanguage.english:
-        return 'Scan QR Code';
-      case AppLanguage.portuguese:
-        return 'Escanear Código QR';
-      case AppLanguage.italian:
-        return 'Scansiona Codice QR';
-      case AppLanguage.chinese:
-        return '扫描二维码';
-      case AppLanguage.japanese:
-        return 'QRコードをスキャン';
-      default:
-        return 'Escanear código QR';
-    }
-  }
-
   String get estadoSuscripcion {
     switch (language) {
       case AppLanguage.english:
@@ -4231,6 +4503,859 @@ class AppStrings {
         return '$anios ${anio(anios)}前';
       default:
         return 'Hace $anios ${anio(anios)}';
+    }
+  }
+
+  // Pantalla de configuración
+  String get analytics {
+    switch (language) {
+      case AppLanguage.english:
+        return 'Analytics';
+      case AppLanguage.portuguese:
+        return 'Analíticas';
+      case AppLanguage.italian:
+        return 'Analytics';
+      case AppLanguage.chinese:
+        return '分析';
+      case AppLanguage.japanese:
+        return '分析';
+      default:
+        return 'Analytics';
+    }
+  }
+
+  String get verEstadisticas {
+    switch (language) {
+      case AppLanguage.english:
+        return 'View usage statistics';
+      case AppLanguage.portuguese:
+        return 'Ver estatísticas de uso';
+      case AppLanguage.italian:
+        return 'Visualizza statistiche di utilizzo';
+      case AppLanguage.chinese:
+        return '查看使用统计';
+      case AppLanguage.japanese:
+        return '使用統計を表示';
+      default:
+        return 'Ver estadísticas de uso';
+    }
+  }
+
+  String get backupYRestauracion {
+    switch (language) {
+      case AppLanguage.english:
+        return 'Backup & Restore';
+      case AppLanguage.portuguese:
+        return 'Backup e Restauração';
+      case AppLanguage.italian:
+        return 'Backup e Ripristino';
+      case AppLanguage.chinese:
+        return '备份与恢复';
+      case AppLanguage.japanese:
+        return 'バックアップと復元';
+      default:
+        return 'Backup y Restauración';
+    }
+  }
+
+  String get guardarYRestaurarDatos {
+    switch (language) {
+      case AppLanguage.english:
+        return 'Save and restore data';
+      case AppLanguage.portuguese:
+        return 'Salvar e restaurar dados';
+      case AppLanguage.italian:
+        return 'Salva e ripristina dati';
+      case AppLanguage.chinese:
+        return '保存和恢复数据';
+      case AppLanguage.japanese:
+        return 'データの保存と復元';
+      default:
+        return 'Guardar y restaurar datos';
+    }
+  }
+
+  String get notificaciones {
+    switch (language) {
+      case AppLanguage.english:
+        return 'Notifications';
+      case AppLanguage.portuguese:
+        return 'Notificações';
+      case AppLanguage.italian:
+        return 'Notifiche';
+      case AppLanguage.chinese:
+        return '通知';
+      case AppLanguage.japanese:
+        return '通知';
+      default:
+        return 'Notificaciones';
+    }
+  }
+
+  String get configurarRecordatorios {
+    switch (language) {
+      case AppLanguage.english:
+        return 'Configure reminders';
+      case AppLanguage.portuguese:
+        return 'Configurar lembretes';
+      case AppLanguage.italian:
+        return 'Configura promemoria';
+      case AppLanguage.chinese:
+        return '配置提醒';
+      case AppLanguage.japanese:
+        return 'リマインダーを設定';
+      default:
+        return 'Configurar recordatorios';
+    }
+  }
+
+  String get tutorial {
+    switch (language) {
+      case AppLanguage.english:
+        return 'Tutorial';
+      case AppLanguage.portuguese:
+        return 'Tutorial';
+      case AppLanguage.italian:
+        return 'Tutorial';
+      case AppLanguage.chinese:
+        return '教程';
+      case AppLanguage.japanese:
+        return 'チュートリアル';
+      default:
+        return 'Tutorial';
+    }
+  }
+
+  String get verTutorialDeNuevo {
+    switch (language) {
+      case AppLanguage.english:
+        return 'View tutorial again';
+      case AppLanguage.portuguese:
+        return 'Ver tutorial novamente';
+      case AppLanguage.italian:
+        return 'Rivedi tutorial';
+      case AppLanguage.chinese:
+        return '再次查看教程';
+      case AppLanguage.japanese:
+        return 'チュートリアルをもう一度見る';
+      default:
+        return 'Ver tutorial de nuevo';
+    }
+  }
+
+  String get graficosEInformes {
+    switch (language) {
+      case AppLanguage.english:
+        return 'Charts & Reports';
+      case AppLanguage.portuguese:
+        return 'Gráficos e Relatórios';
+      case AppLanguage.italian:
+        return 'Grafici e Report';
+      case AppLanguage.chinese:
+        return '图表和报告';
+      case AppLanguage.japanese:
+        return 'グラフとレポート';
+      default:
+        return 'Gráficos e Informes';
+    }
+  }
+
+  String get transaccionesFijas {
+    switch (language) {
+      case AppLanguage.english:
+        return 'Fixed Transactions';
+      case AppLanguage.portuguese:
+        return 'Transações Fixas';
+      case AppLanguage.italian:
+        return 'Transazioni Fisse';
+      case AppLanguage.chinese:
+        return '固定交易';
+      case AppLanguage.japanese:
+        return '固定取引';
+      default:
+        return 'Transacciones Fijas';
+    }
+  }
+
+  // Premium Screen
+  String get mejoraAPremium {
+    switch (language) {
+      case AppLanguage.english:
+        return 'Upgrade to Premium';
+      case AppLanguage.portuguese:
+        return 'Atualize para Premium';
+      case AppLanguage.italian:
+        return 'Passa a Premium';
+      case AppLanguage.chinese:
+        return '升级到高级版';
+      case AppLanguage.japanese:
+        return 'プレミアムにアップグレード';
+      default:
+        return 'Mejora a Premium';
+    }
+  }
+
+  String get desbloqueaFunciones {
+    switch (language) {
+      case AppLanguage.english:
+        return 'Unlock all advanced features';
+      case AppLanguage.portuguese:
+        return 'Desbloqueie todos os recursos avançados';
+      case AppLanguage.italian:
+        return 'Sblocca tutte le funzionalità avanzate';
+      case AppLanguage.chinese:
+        return '解锁所有高级功能';
+      case AppLanguage.japanese:
+        return 'すべての高度な機能をアンロック';
+      default:
+        return 'Desbloquea todas las funciones avanzadas';
+    }
+  }
+
+  String get perfectoPara {
+    switch (language) {
+      case AppLanguage.english:
+        return 'Perfect for:';
+      case AppLanguage.portuguese:
+        return 'Perfeito para:';
+      case AppLanguage.italian:
+        return 'Perfetto per:';
+      case AppLanguage.chinese:
+        return '最适合：';
+      case AppLanguage.japanese:
+        return '最適な用途：';
+      default:
+        return 'Perfecto para:';
+    }
+  }
+
+  String get viajeros {
+    switch (language) {
+      case AppLanguage.english:
+        return 'Travelers';
+      case AppLanguage.portuguese:
+        return 'Viajantes';
+      case AppLanguage.italian:
+        return 'Viaggiatori';
+      case AppLanguage.chinese:
+        return '旅行者';
+      case AppLanguage.japanese:
+        return '旅行者';
+      default:
+        return 'Viajeros';
+    }
+  }
+
+  String get roommates {
+    switch (language) {
+      case AppLanguage.english:
+        return 'Roommates';
+      case AppLanguage.portuguese:
+        return 'Colegas de Quarto';
+      case AppLanguage.italian:
+        return 'Coinquilini';
+      case AppLanguage.chinese:
+        return '室友';
+      case AppLanguage.japanese:
+        return 'ルームメイト';
+      default:
+        return 'Roommates';
+    }
+  }
+
+  String get estudiantes {
+    switch (language) {
+      case AppLanguage.english:
+        return 'Students';
+      case AppLanguage.portuguese:
+        return 'Estudantes';
+      case AppLanguage.italian:
+        return 'Studenti';
+      case AppLanguage.chinese:
+        return '学生';
+      case AppLanguage.japanese:
+        return '学生';
+      default:
+        return 'Estudiantes';
+    }
+  }
+
+  String get parejas {
+    switch (language) {
+      case AppLanguage.english:
+        return 'Couples';
+      case AppLanguage.portuguese:
+        return 'Casais';
+      case AppLanguage.italian:
+        return 'Coppie';
+      case AppLanguage.chinese:
+        return '情侣';
+      case AppLanguage.japanese:
+        return 'カップル';
+      default:
+        return 'Parejas';
+    }
+  }
+
+  String get funcionesPremium {
+    switch (language) {
+      case AppLanguage.english:
+        return 'Premium Features';
+      case AppLanguage.portuguese:
+        return 'Recursos Premium';
+      case AppLanguage.italian:
+        return 'Funzionalità Premium';
+      case AppLanguage.chinese:
+        return '高级功能';
+      case AppLanguage.japanese:
+        return 'プレミアム機能';
+      default:
+        return 'Funciones Premium';
+    }
+  }
+
+  String get eventosIlimitados {
+    switch (language) {
+      case AppLanguage.english:
+        return 'Unlimited Events';
+      case AppLanguage.portuguese:
+        return 'Eventos Ilimitados';
+      case AppLanguage.italian:
+        return 'Eventi Illimitati';
+      case AppLanguage.chinese:
+        return '无限活动';
+      case AppLanguage.japanese:
+        return '無制限イベント';
+      default:
+        return 'Eventos Ilimitados';
+    }
+  }
+
+  String get solicitudesDePago {
+    switch (language) {
+      case AppLanguage.english:
+        return 'Payment Requests';
+      case AppLanguage.portuguese:
+        return 'Solicitações de Pagamento';
+      case AppLanguage.italian:
+        return 'Richieste di Pagamento';
+      case AppLanguage.chinese:
+        return '付款请求';
+      case AppLanguage.japanese:
+        return '支払いリクエスト';
+      default:
+        return 'Solicitudes de Pago';
+    }
+  }
+
+  String get codigosQRPago {
+    switch (language) {
+      case AppLanguage.english:
+        return 'Payment QR Codes';
+      case AppLanguage.portuguese:
+        return 'Códigos QR de Pagamento';
+      case AppLanguage.italian:
+        return 'Codici QR di Pagamento';
+      case AppLanguage.chinese:
+        return '支付二维码';
+      case AppLanguage.japanese:
+        return '支払いQRコード';
+      default:
+        return 'Códigos QR de Pago';
+    }
+  }
+
+  String get deepLinksAPago {
+    switch (language) {
+      case AppLanguage.english:
+        return 'Deep Links to Payment Apps';
+      case AppLanguage.portuguese:
+        return 'Links Diretos para Apps de Pagamento';
+      case AppLanguage.italian:
+        return 'Link Diretti alle App di Pagamento';
+      case AppLanguage.chinese:
+        return '深度链接到支付应用';
+      case AppLanguage.japanese:
+        return '決済アプリへのディープリンク';
+      default:
+        return 'Deep Links a Apps de Pago';
+    }
+  }
+  
+  // Nuevos strings para ahorros en monedas extranjeras
+  String get ahorrosMonedas {
+    switch (language) {
+      case AppLanguage.english:
+        return 'Foreign Currency Savings';
+      case AppLanguage.portuguese:
+        return 'Poupanças em Moedas Estrangeiras';
+      case AppLanguage.italian:
+        return 'Risparmi in Valute Estere';
+      case AppLanguage.chinese:
+        return '外币储蓄';
+      case AppLanguage.japanese:
+        return '外貨貯蓄';
+      default:
+        return 'Ahorros en Monedas Extranjeras';
+    }
+  }
+  
+  String get sinAhorrosMonedas {
+    switch (language) {
+      case AppLanguage.english:
+        return 'No foreign currency savings yet';
+      case AppLanguage.portuguese:
+        return 'Sem poupanças em moedas estrangeiras ainda';
+      case AppLanguage.italian:
+        return 'Nessun risparmio in valuta estera ancora';
+      case AppLanguage.chinese:
+        return '暂无外币储蓄';
+      case AppLanguage.japanese:
+        return 'まだ外貨貯蓄がありません';
+      default:
+        return 'Sin ahorros en monedas extranjeras aún';
+    }
+  }
+  
+  String get agregaAhorroMoneda {
+    switch (language) {
+      case AppLanguage.english:
+        return 'Add savings in any currency';
+      case AppLanguage.portuguese:
+        return 'Adicione poupanças em qualquer moeda';
+      case AppLanguage.italian:
+        return 'Aggiungi risparmi in qualsiasi valuta';
+      case AppLanguage.chinese:
+        return '添加任何货币的储蓄';
+      case AppLanguage.japanese:
+        return '任意の通貨で貯蓄を追加';
+      default:
+        return 'Agrega ahorros en cualquier moneda';
+    }
+  }
+  
+  String get nuevaMoneda {
+    switch (language) {
+      case AppLanguage.english:
+        return 'New Currency';
+      case AppLanguage.portuguese:
+        return 'Nova Moeda';
+      case AppLanguage.italian:
+        return 'Nuova Valuta';
+      case AppLanguage.chinese:
+        return '新货币';
+      case AppLanguage.japanese:
+        return '新しい通貨';
+      default:
+        return 'Nueva Moneda';
+    }
+  }
+  
+  String get seleccionarMoneda {
+    switch (language) {
+      case AppLanguage.english:
+        return 'Select Currency';
+      case AppLanguage.portuguese:
+        return 'Selecionar Moeda';
+      case AppLanguage.italian:
+        return 'Seleziona Valuta';
+      case AppLanguage.chinese:
+        return '选择货币';
+      case AppLanguage.japanese:
+        return '通貨を選択';
+      default:
+        return 'Seleccionar Moneda';
+    }
+  }
+  
+  String get agregarAhorro {
+    switch (language) {
+      case AppLanguage.english:
+        return 'Add Savings';
+      case AppLanguage.portuguese:
+        return 'Adicionar Poupança';
+      case AppLanguage.italian:
+        return 'Aggiungi Risparmio';
+      case AppLanguage.chinese:
+        return '添加储蓄';
+      case AppLanguage.japanese:
+        return '貯蓄を追加';
+      default:
+        return 'Agregar Ahorro';
+    }
+  }
+  
+  String get retirarAhorro {
+    switch (language) {
+      case AppLanguage.english:
+        return 'Withdraw Savings';
+      case AppLanguage.portuguese:
+        return 'Retirar Poupança';
+      case AppLanguage.italian:
+        return 'Prelevare Risparmio';
+      case AppLanguage.chinese:
+        return '提取储蓄';
+      case AppLanguage.japanese:
+        return '貯蓄を引き出す';
+      default:
+        return 'Retirar Ahorro';
+    }
+  }
+  
+  String get depositarEn {
+    switch (language) {
+      case AppLanguage.english:
+        return 'Deposit in';
+      case AppLanguage.portuguese:
+        return 'Depositar em';
+      case AppLanguage.italian:
+        return 'Depositare in';
+      case AppLanguage.chinese:
+        return '存入';
+      case AppLanguage.japanese:
+        return '預金する';
+      default:
+        return 'Depositar en';
+    }
+  }
+  
+  String get retirarDe {
+    switch (language) {
+      case AppLanguage.english:
+        return 'Withdraw from';
+      case AppLanguage.portuguese:
+        return 'Retirar de';
+      case AppLanguage.italian:
+        return 'Prelevare da';
+      case AppLanguage.chinese:
+        return '从...提取';
+      case AppLanguage.japanese:
+        return 'から引き出す';
+      default:
+        return 'Retirar de';
+    }
+  }
+  
+  String get notaOpcional {
+    switch (language) {
+      case AppLanguage.english:
+        return 'Note (optional)';
+      case AppLanguage.portuguese:
+        return 'Nota (opcional)';
+      case AppLanguage.italian:
+        return 'Nota (opzionale)';
+      case AppLanguage.chinese:
+        return '备注（可选）';
+      case AppLanguage.japanese:
+        return 'メモ（任意）';
+      default:
+        return 'Nota (opcional)';
+    }
+  }
+  
+  String get depositar {
+    switch (language) {
+      case AppLanguage.english:
+        return 'Deposit';
+      case AppLanguage.portuguese:
+        return 'Depositar';
+      case AppLanguage.italian:
+        return 'Depositare';
+      case AppLanguage.chinese:
+        return '存款';
+      case AppLanguage.japanese:
+        return '預金';
+      default:
+        return 'Depositar';
+    }
+  }
+  
+  String get depositoExitoso {
+    switch (language) {
+      case AppLanguage.english:
+        return 'Successful deposit:';
+      case AppLanguage.portuguese:
+        return 'Depósito bem-sucedido:';
+      case AppLanguage.italian:
+        return 'Deposito riuscito:';
+      case AppLanguage.chinese:
+        return '存款成功：';
+      case AppLanguage.japanese:
+        return '預金成功：';
+      default:
+        return 'Depósito exitoso:';
+    }
+  }
+  
+  String get retiroExitoso {
+    switch (language) {
+      case AppLanguage.english:
+        return 'Successful withdrawal:';
+      case AppLanguage.portuguese:
+        return 'Retirada bem-sucedida:';
+      case AppLanguage.italian:
+        return 'Prelievo riuscito:';
+      case AppLanguage.chinese:
+        return '提款成功：';
+      case AppLanguage.japanese:
+        return '引き出し成功：';
+      default:
+        return 'Retiro exitoso:';
+    }
+  }
+  
+  String get sinTransacciones {
+    switch (language) {
+      case AppLanguage.english:
+        return 'No transactions';
+      case AppLanguage.portuguese:
+        return 'Sem transações';
+      case AppLanguage.italian:
+        return 'Nessuna transazione';
+      case AppLanguage.chinese:
+        return '无交易';
+      case AppLanguage.japanese:
+        return '取引なし';
+      default:
+        return 'Sin transacciones';
+    }
+  }
+  
+  String get confirmarEliminacion {
+    switch (language) {
+      case AppLanguage.english:
+        return 'Confirm Deletion';
+      case AppLanguage.portuguese:
+        return 'Confirmar Exclusão';
+      case AppLanguage.italian:
+        return 'Conferma Eliminazione';
+      case AppLanguage.chinese:
+        return '确认删除';
+      case AppLanguage.japanese:
+        return '削除の確認';
+      default:
+        return 'Confirmar Eliminación';
+    }
+  }
+  
+  String get eliminarTransaccion {
+    switch (language) {
+      case AppLanguage.english:
+        return 'Are you sure you want to delete this transaction?';
+      case AppLanguage.portuguese:
+        return 'Tem certeza de que deseja excluir esta transação?';
+      case AppLanguage.italian:
+        return 'Sei sicuro di voler eliminare questa transazione?';
+      case AppLanguage.chinese:
+        return '您确定要删除此交易吗？';
+      case AppLanguage.japanese:
+        return 'この取引を削除してもよろしいですか？';
+      default:
+        return '¿Estás seguro de que deseas eliminar esta transacción?';
+    }
+  }
+  
+  String get transaccionEliminada {
+    switch (language) {
+      case AppLanguage.english:
+        return 'Transaction deleted';
+      case AppLanguage.portuguese:
+        return 'Transação excluída';
+      case AppLanguage.italian:
+        return 'Transazione eliminata';
+      case AppLanguage.chinese:
+        return '交易已删除';
+      case AppLanguage.japanese:
+        return '取引が削除されました';
+      default:
+        return 'Transacción eliminada';
+    }
+  }
+  
+  String get resumenMonedasExtranjeras {
+    switch (language) {
+      case AppLanguage.english:
+        return 'Foreign Currencies Summary';
+      case AppLanguage.portuguese:
+        return 'Resumo de Moedas Estrangeiras';
+      case AppLanguage.italian:
+        return 'Riepilogo Valute Estere';
+      case AppLanguage.chinese:
+        return '外币汇总';
+      case AppLanguage.japanese:
+        return '外貨概要';
+      default:
+        return 'Resumen de Monedas Extranjeras';
+    }
+  }
+  
+  String get monedaTransaccion {
+    switch (language) {
+      case AppLanguage.english:
+        return 'Transaction Currency';
+      case AppLanguage.portuguese:
+        return 'Moeda da Transação';
+      case AppLanguage.italian:
+        return 'Valuta della Transazione';
+      case AppLanguage.chinese:
+        return '交易货币';
+      case AppLanguage.japanese:
+        return '取引通貨';
+      default:
+        return 'Moneda de la Transacción';
+    }
+  }
+  
+  String get principal {
+    switch (language) {
+      case AppLanguage.english:
+        return 'Main';
+      case AppLanguage.portuguese:
+        return 'Principal';
+      case AppLanguage.italian:
+        return 'Principale';
+      case AppLanguage.chinese:
+        return '主要';
+      case AppLanguage.japanese:
+        return 'メイン';
+      default:
+        return 'Principal';
+    }
+  }
+  
+  String get desglosePorMoneda {
+    switch (language) {
+      case AppLanguage.english:
+        return 'Breakdown by Currency';
+      case AppLanguage.portuguese:
+        return 'Detalhamento por Moeda';
+      case AppLanguage.italian:
+        return 'Dettaglio per Valuta';
+      case AppLanguage.chinese:
+        return '货币明细';
+      case AppLanguage.japanese:
+        return '通貨別内訳';
+      default:
+        return 'Desglose por Moneda';
+    }
+  }
+  
+  String get compraMonedaExtranjera {
+    switch (language) {
+      case AppLanguage.english:
+        return 'Foreign Currency Purchase';
+      case AppLanguage.portuguese:
+        return 'Compra de Moeda Estrangeira';
+      case AppLanguage.italian:
+        return 'Acquisto di Valuta Estera';
+      case AppLanguage.chinese:
+        return '购买外币';
+      case AppLanguage.japanese:
+        return '外貨購入';
+      default:
+        return 'Compra de Moneda Extranjera';
+    }
+  }
+  
+  String get compraMonedaExtrajeraDesc {
+    switch (language) {
+      case AppLanguage.english:
+        return 'Add converted amount to foreign currency savings';
+      case AppLanguage.portuguese:
+        return 'Adicionar valor convertido às economias em moeda estrangeira';
+      case AppLanguage.italian:
+        return 'Aggiungi importo convertito ai risparmi in valuta estera';
+      case AppLanguage.chinese:
+        return '将兑换金额添加到外币储蓄';
+      case AppLanguage.japanese:
+        return '換算額を外貨貯蓄に追加';
+      default:
+        return 'Agregar monto convertido a ahorros en moneda extranjera';
+    }
+  }
+  
+  String get monedaAComprar {
+    switch (language) {
+      case AppLanguage.english:
+        return 'Currency to Purchase';
+      case AppLanguage.portuguese:
+        return 'Moeda a Comprar';
+      case AppLanguage.italian:
+        return 'Valuta da Acquistare';
+      case AppLanguage.chinese:
+        return '要购买的货币';
+      case AppLanguage.japanese:
+        return '購入する通貨';
+      default:
+        return 'Moneda a Comprar';
+    }
+  }
+  
+  String get recibirasAproximadamente {
+    switch (language) {
+      case AppLanguage.english:
+        return 'You will receive approximately';
+      case AppLanguage.portuguese:
+        return 'Você receberá aproximadamente';
+      case AppLanguage.italian:
+        return 'Riceverai circa';
+      case AppLanguage.chinese:
+        return '您将收到大约';
+      case AppLanguage.japanese:
+        return 'およそ受け取ります';
+      default:
+        return 'Recibirás aproximadamente';
+    }
+  }
+  
+  String get compraDe {
+    switch (language) {
+      case AppLanguage.english:
+        return 'Purchase of';
+      case AppLanguage.portuguese:
+        return 'Compra de';
+      case AppLanguage.italian:
+        return 'Acquisto di';
+      case AppLanguage.chinese:
+        return '购买';
+      case AppLanguage.japanese:
+        return '購入';
+      default:
+        return 'Compra de';
+    }
+  }
+  
+  String get compraMoneda {
+    switch (language) {
+      case AppLanguage.english:
+        return 'Currency Purchase';
+      case AppLanguage.portuguese:
+        return 'Compra de Moeda';
+      case AppLanguage.italian:
+        return 'Acquisto di Valuta';
+      case AppLanguage.chinese:
+        return '货币购买';
+      case AppLanguage.japanese:
+        return '通貨購入';
+      default:
+        return 'Compra de Moneda';
+    }
+  }
+  
+  String get compraExitosa {
+    switch (language) {
+      case AppLanguage.english:
+        return 'Successful Purchase!';
+      case AppLanguage.portuguese:
+        return 'Compra Bem-sucedida!';
+      case AppLanguage.italian:
+        return 'Acquisto Riuscito!';
+      case AppLanguage.chinese:
+        return '购买成功！';
+      case AppLanguage.japanese:
+        return '購入成功！';
+      default:
+        return '¡Compra Exitosa!';
     }
   }
 }

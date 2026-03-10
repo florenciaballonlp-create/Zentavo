@@ -25,6 +25,17 @@ import 'recurring_transactions.dart';
 import 'backup_service.dart';
 import 'package:intl/intl.dart';
 import 'package:file_picker/file_picker.dart';
+import 'currency_exchange_service.dart';
+import 'package:qr_flutter/qr_flutter.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
+
+// ================================
+// MODO DESARROLLADOR
+// ================================
+// Cambiar a 'true' para tener acceso Premium ilimitado sin pagar
+// Cambiar a 'false' para la versión pública que requiere compra
+const bool kDeveloperMode = true;
+// ================================
 
 void main() => runApp(const ExpenseApp());
 
@@ -196,6 +207,11 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   
   // Control de ahorros
   List<Map<String, dynamic>> _registrosAhorros = [];
+  
+  // Ahorros en monedas extranjeras (Premium)
+  // Map: código de moneda -> lista de transacciones
+  Map<String, List<Map<String, dynamic>>> _ahorrosMonedas = {};
+  
   late TabController _tabController;
 
   // Biometría
@@ -254,6 +270,20 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   Future<void> _checkPremiumStatus() async {
     try {
       final prefs = await SharedPreferences.getInstance();
+      
+      // Si está en modo desarrollador, siempre es Premium
+      if (kDeveloperMode) {
+        if (mounted) {
+          setState(() {
+            _isPremium = true;
+          });
+        }
+        // También guardar en preferencias para consistencia
+        await prefs.setBool('is_premium', true);
+        return;
+      }
+      
+      // Modo normal: verificar si compró Premium
       final isPremium = prefs.getBool('is_premium') ?? false;
       if (mounted) {
         setState(() {
@@ -262,6 +292,12 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
       }
     } catch (e) {
       print('Error al verificar estado premium: $e');
+      // En caso de error en modo desarrollador, activar Premium de todos modos
+      if (kDeveloperMode && mounted) {
+        setState(() {
+          _isPremium = true;
+        });
+      }
     }
   }
 
@@ -513,6 +549,25 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
       }
     }
     _recordTiming('Ahorros cargados');
+    
+    // Cargar ahorros en monedas extranjeras (Premium)
+    final String? ahorrosMonedasGuardados = _prefs.getString('ahorros_monedas');
+    if (ahorrosMonedasGuardados != null && _isPremium) {
+      try {
+        final Map<String, dynamic> decoded = jsonDecode(ahorrosMonedasGuardados);
+        setState(() {
+          _ahorrosMonedas = decoded.map((key, value) {
+            return MapEntry(
+              key,
+              (value as List).map((item) => Map<String, dynamic>.from(item)).toList(),
+            );
+          });
+        });
+      } catch (e) {
+        print('Error al cargar ahorros en monedas: $e');
+      }
+    }
+    _recordTiming('Ahorros en monedas cargados');
 
     // Cargar gastos fijos
     final String? gastosFijosGuardados = _prefs.getString('gastos_fijos');
@@ -861,8 +916,8 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                 const Divider(),
                 ListTile(
                   leading: const Icon(Icons.analytics, color: Color(0xFF0EA5A4)),
-                  title: const Text('Analytics'),
-                  subtitle: const Text('Ver estadísticas de uso'),
+                  title: Text(_strings.analytics),
+                  subtitle: Text(_strings.verEstadisticas),
                   trailing: const Icon(Icons.chevron_right),
                   onTap: () {
                     Navigator.of(context).pop();
@@ -872,9 +927,19 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                   },
                 ),
                 ListTile(
+                  leading: const Icon(Icons.backup, color: Color(0xFF06B6D4)),
+                  title: Text(_strings.backupYRestauracion),
+                  subtitle: Text(_strings.guardarYRestaurarDatos),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    _mostrarDialogoBackupRestauracion();
+                  },
+                ),
+                ListTile(
                   leading: const Icon(Icons.notifications, color: Color(0xFFF59E0B)),
-                  title: const Text('Notificaciones'),
-                  subtitle: const Text('Configurar recordatorios'),
+                  title: Text(_strings.notificaciones),
+                  subtitle: Text(_strings.configurarRecordatorios),
                   trailing: const Icon(Icons.chevron_right),
                   onTap: () {
                     Navigator.of(context).pop();
@@ -886,14 +951,25 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                 const Divider(),
                 ListTile(
                   leading: const Icon(Icons.school, color: Color(0xFF6366F1)),
-                  title: const Text('Tutorial'),
-                  subtitle: const Text('Ver tutorial de nuevo'),
+                  title: Text(_strings.tutorial),
+                  subtitle: Text(_strings.verTutorialDeNuevo),
                   trailing: const Icon(Icons.chevron_right),
                   onTap: () {
                     Navigator.of(context).pop();
                     Navigator.of(context).push(
                       MaterialPageRoute(builder: (_) => const OnboardingScreen()),
                     );
+                  },
+                ),
+                const Divider(),
+                ListTile(
+                  leading: const Icon(Icons.support_agent, color: Color(0xFF8B5CF6)),
+                  title: Text(_strings.servicioTecnico),
+                  subtitle: Text(_strings.servicioTecnicoDesc),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    _mostrarServicioTecnico();
                   },
                 ),
                 const Divider(),
@@ -916,6 +992,225 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   }
 
   void _compartirApp() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          title: Row(
+            children: [
+              const Icon(Icons.share, color: Color(0xFF0EA5A4), size: 28),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  _strings.compartirApp,
+                  style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                _strings.comparteEscaneaApp,
+                style: const TextStyle(
+                  fontSize: 14,
+                  color: Color(0xFF6B7280),
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 24),
+              // Opción: Mostrar código QR
+              Card(
+                elevation: 0,
+                color: const Color(0xFFE7F8F7),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  side: const BorderSide(color: Color(0xFF0EA5A4), width: 1.5),
+                ),
+                child: InkWell(
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    _mostrarQRCode();
+                  },
+                  borderRadius: BorderRadius.circular(12),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF0EA5A4).withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: const Icon(
+                            Icons.qr_code_2,
+                            color: Color(0xFF0EA5A4),
+                            size: 28,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                _strings.mostrarCodigoQR,
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                  color: Color(0xFF0EA5A4),
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                _strings.escaneaQRDescripcion,
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  color: Color(0xFF6B7280),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const Icon(
+                          Icons.chevron_right,
+                          color: Color(0xFF0EA5A4),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              // Opción: Escanear código QR
+              Card(
+                elevation: 0,
+                color: const Color(0xFFFEF3C7),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  side: const BorderSide(color: Color(0xFFF59E0B), width: 1.5),
+                ),
+                child: InkWell(
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    _escanearQRCode();
+                  },
+                  borderRadius: BorderRadius.circular(12),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF59E0B).withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: const Icon(
+                            Icons.qr_code_scanner,
+                            color: Color(0xFFF59E0B),
+                            size: 28,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Text(
+                            _strings.escanearCodigoQR,
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFFF59E0B),
+                            ),
+                          ),
+                        ),
+                        const Icon(
+                          Icons.chevron_right,
+                          color: Color(0xFFF59E0B),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              // Opción: Compartir texto
+              Card(
+                elevation: 0,
+                color: const Color(0xFFF3F4F6),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  side: const BorderSide(color: Color(0xFF9CA3AF), width: 1.5),
+                ),
+                child: InkWell(
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    _compartirTexto();
+                  },
+                  borderRadius: BorderRadius.circular(12),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF9CA3AF).withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: const Icon(
+                            Icons.text_fields,
+                            color: Color(0xFF9CA3AF),
+                            size: 28,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Text(
+                            _strings.compartirTexto,
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF4B5563),
+                            ),
+                          ),
+                        ),
+                        const Icon(
+                          Icons.chevron_right,
+                          color: Color(0xFF9CA3AF),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text(
+                _strings.cerrar,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _compartirTexto() {
     final String mensaje = '''
 🌟 ¡Descubre Zentavo! 🌟
 
@@ -933,6 +1228,878 @@ Una app completa para controlar tus gastos y ahorros:
 ''';
     
     Share.share(mensaje, subject: 'Zentavo - Control de Gastos');
+  }
+
+  void _mostrarQRCode() {
+    // URL de descarga de la app (puedes cambiar esto por tu URL real)
+    const String appURL = 'https://github.com/florenciaballonlp-create/Zentavo';
+    
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          title: Row(
+            children: [
+              const Icon(Icons.qr_code_2, color: Color(0xFF0EA5A4), size: 28),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  _strings.codigoQRApp,
+                  style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                _strings.escaneaQRDescripcion,
+                style: const TextStyle(
+                  fontSize: 14,
+                  color: Color(0xFF6B7280),
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 24),
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: const Color(0xFF0EA5A4),
+                    width: 3,
+                  ),
+                ),
+                child: QrImageView(
+                  data: appURL,
+                  version: QrVersions.auto,
+                  size: 250.0,
+                  backgroundColor: Colors.white,
+                  foregroundColor: Colors.black,
+                  errorCorrectionLevel: QrErrorCorrectLevel.H,
+                  embeddedImage: const AssetImage('assets/images/logo.png'),
+                  embeddedImageStyle: const QrEmbeddedImageStyle(
+                    size: Size(40, 40),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Zentavo',
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF0EA5A4),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE7F8F7),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: const Color(0xFF0EA5A4),
+                    width: 1,
+                  ),
+                ),
+                child: Text(
+                  appURL,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: Color(0xFF0EA5A4),
+                    fontFamily: 'monospace',
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text(
+                _strings.cerrar,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _escanearQRCode() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => Scaffold(
+          appBar: AppBar(
+            title: Text(
+              _strings.escanearCodigoQR,
+              style: const TextStyle(
+                fontWeight: FontWeight.w700,
+                fontSize: 20,
+              ),
+            ),
+            centerTitle: true,
+            elevation: 0,
+            backgroundColor: const Color(0xFF0EA5A4),
+            foregroundColor: Colors.white,
+          ),
+          body: Stack(
+            children: [
+              MobileScanner(
+                onDetect: (capture) {
+                  final List<Barcode> barcodes = capture.barcodes;
+                  for (final barcode in barcodes) {
+                    final String? code = barcode.rawValue;
+                    if (code != null) {
+                      Navigator.of(context).pop();
+                      _procesarQRCode(code);
+                      break;
+                    }
+                  }
+                },
+              ),
+              // Overlay con marco de escaneo
+              Center(
+                child: Container(
+                  width: 300,
+                  height: 300,
+                  decoration: BoxDecoration(
+                    border: Border.all(
+                      color: const Color(0xFF0EA5A4),
+                      width: 3,
+                    ),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                ),
+              ),
+              // Instrucciones en la parte inferior
+              Positioned(
+                bottom: 50,
+                left: 0,
+                right: 0,
+                child: Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 32),
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.7),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    _strings.escaneaQRDescripcion,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      color: Colors.white,
+                      fontWeight: FontWeight.w500,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _procesarQRCode(String url) {
+    // Intentar abrir la URL escaneada
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          title: Row(
+            children: [
+              const Icon(Icons.check_circle, color: Color(0xFF22C55E), size: 28),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Text(
+                  '¡QR Escaneado!',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'URL detectada:',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF6B7280),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF3F4F6),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  url,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontFamily: 'monospace',
+                    color: Color(0xFF0EA5A4),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                '¿Deseas abrir este enlace en tu navegador?',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Color(0xFF6B7280),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text(
+                _strings.cancelar,
+                style: const TextStyle(
+                  fontSize: 16,
+                  color: Color(0xFF6B7280),
+                ),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                Navigator.of(context).pop();
+                try {
+                  final Uri uri = Uri.parse(url);
+                  if (await canLaunchUrl(uri)) {
+                    await launchUrl(
+                      uri,
+                      mode: LaunchMode.externalApplication,
+                    );
+                  } else {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('No se pudo abrir el enlace'),
+                          backgroundColor: const Color(0xFFEF4444),
+                        ),
+                      );
+                    }
+                  }
+                } catch (e) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Error al procesar el QR: $e'),
+                        backgroundColor: const Color(0xFFEF4444),
+                      ),
+                    );
+                  }
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF0EA5A4),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              child: const Text(
+                'Abrir enlace',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _mostrarServicioTecnico() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          title: Row(
+            children: [
+              const Icon(Icons.support_agent, color: Color(0xFF8B5CF6), size: 28),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  _strings.servicioTecnico,
+                  style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  _strings.servicioTecnicoDesc,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    color: Color(0xFF6B7280),
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 24),
+                // Opción: Preguntas Frecuentes
+                Card(
+                  elevation: 0,
+                  color: const Color(0xFFE0E7FF),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    side: const BorderSide(color: Color(0xFF6366F1), width: 1.5),
+                  ),
+                  child: InkWell(
+                    onTap: () {
+                      Navigator.of(context).pop();
+                      _mostrarPreguntasFrecuentes();
+                    },
+                    borderRadius: BorderRadius.circular(12),
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF6366F1).withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: const Icon(
+                              Icons.help_outline,
+                              color: Color(0xFF6366F1),
+                              size: 28,
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  _strings.preguntasFrecuentes,
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                    color: Color(0xFF6366F1),
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                const Text(
+                                  'FAQ',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Color(0xFF6B7280),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const Icon(
+                            Icons.chevron_right,
+                            color: Color(0xFF6366F1),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                // Opción: Contáctenos
+                Card(
+                  elevation: 0,
+                  color: const Color(0xFFDCFCE7),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    side: const BorderSide(color: Color(0xFF22C55E), width: 1.5),
+                  ),
+                  child: InkWell(
+                    onTap: () {
+                      Navigator.of(context).pop();
+                      _mostrarContactenos();
+                    },
+                    borderRadius: BorderRadius.circular(12),
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF22C55E).withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: const Icon(
+                              Icons.email_outlined,
+                              color: Color(0xFF22C55E),
+                              size: 28,
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  _strings.contactenos,
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                    color: Color(0xFF22C55E),
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  _strings.contactenosDesc,
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: Color(0xFF6B7280),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const Icon(
+                            Icons.chevron_right,
+                            color: Color(0xFF22C55E),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text(
+                _strings.cerrar,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _mostrarPreguntasFrecuentes() {
+    // Lista de preguntas frecuentes
+    final List<Map<String, String>> faqs = [
+      {
+        'pregunta': '¿Cómo agrego una nueva transacción?',
+        'respuesta': 'Toca el botón "+" en la pantalla principal y selecciona "Ingreso" o "Egreso". Completa los campos requeridos y guarda.',
+      },
+      {
+        'pregunta': '¿Puedo usar múltiples monedas?',
+        'respuesta': 'Sí, Zentavo soporta 16 monedas diferentes. Puedes cambiar la moneda principal en Configuración > Moneda, y registrar transacciones en cualquier moneda extranjera.',
+      },
+      {
+        'pregunta': '¿Cómo configuro un presupuesto mensual?',
+        'respuesta': 'Ve a la pestaña "Transacciones", toca el ícono de configuración (⚙️) arriba a la derecha, y selecciona "Establecer presupuesto mensual".',
+      },
+      {
+        'pregunta': '¿Puedo exportar mis datos?',
+        'respuesta': 'Sí, puedes exportar en múltiples formatos: PDF, Excel, CSV, JSON. Ve a la pestaña "Transacciones" y toca el botón de exportar.',
+      },
+      {
+        'pregunta': '¿Los datos están seguros?',
+        'respuesta': 'Todos tus datos se almacenan localmente en tu dispositivo. Puedes habilitar protección con biometría en Configuración.',
+      },
+      {
+        'pregunta': '¿Qué incluye la versión Premium?',
+        'respuesta': 'Premium incluye: categorías personalizadas, múltiples monedas, reportes avanzados, análisis predictivo, respaldos en la nube, y más funciones premium.',
+      },
+      {
+        'pregunta': '¿Cómo funcionan los ahorros en monedas extranjeras?',
+        'respuesta': 'Ve a la pestaña "Ahorros" y toca "Ahorros en Monedas". Puedes agregar, retirar y ver el historial de transacciones en cualquiera de las 16 monedas soportadas.',
+      },
+      {
+        'pregunta': '¿Puedo programar transacciones recurrentes?',
+        'respuesta': 'Sí, en la pestaña "Gastos Fijos" puedes configurar gastos que se repiten mensualmente, como alquiler, servicios, suscripciones, etc.',
+      },
+      {
+        'pregunta': '¿Cómo activo el tema oscuro?',
+        'respuesta': 'Ve a Configuración > Tema y selecciona "Oscuro" o "Automático" para que siga el tema del sistema.',
+      },
+      {
+        'pregunta': '¿Puedo compartir eventos de gastos?',
+        'respuesta': 'Sí, usa la función "Eventos Compartidos" para planificar gastos grupales con amigos o familia. Genera un código QR para que otros se unan.',
+      },
+    ];
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          title: Row(
+            children: [
+              const Icon(Icons.help_outline, color: Color(0xFF6366F1), size: 28),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  _strings.preguntasFrecuentes,
+                  style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: ListView.builder(
+              shrinkWrap: true,
+              itemCount: faqs.length,
+              itemBuilder: (context, index) {
+                final faq = faqs[index];
+                return Card(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  elevation: 0,
+                  color: const Color(0xFFF3F4F6),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: ExpansionTile(
+                    tilePadding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 4,
+                    ),
+                    leading: CircleAvatar(
+                      backgroundColor: const Color(0xFF6366F1).withOpacity(0.1),
+                      child: Text(
+                        '${index + 1}',
+                        style: const TextStyle(
+                          color: Color(0xFF6366F1),
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    title: Text(
+                      faq['pregunta']!,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF1F2937),
+                      ),
+                    ),
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                        child: Text(
+                          faq['respuesta']!,
+                          style: const TextStyle(
+                            fontSize: 14,
+                            color: Color(0xFF6B7280),
+                            height: 1.5,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text(
+                _strings.cerrar,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _mostrarContactenos() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          title: Row(
+            children: [
+              const Icon(Icons.email_outlined, color: Color(0xFF22C55E), size: 28),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  _strings.contactenos,
+                  style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  _strings.informacionContacto,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF1F2937),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                // Email de soporte
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFDCFCE7),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: const Color(0xFF22C55E),
+                      width: 1.5,
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(
+                            Icons.email,
+                            color: Color(0xFF22C55E),
+                            size: 20,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            _strings.emailSoporte,
+                            style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF1F2937),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      const Text(
+                        'soporte@zentavo.com',
+                        style: TextStyle(
+                          fontSize: 15,
+                          color: Color(0xFF22C55E),
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          onPressed: () async {
+                            final Uri emailUri = Uri(
+                              scheme: 'mailto',
+                              path: 'soporte@zentavo.com',
+                              query: 'subject=Soporte Zentavo&body=Describe tu consulta aquí...',
+                            );
+                            try {
+                              if (await canLaunchUrl(emailUri)) {
+                                await launchUrl(emailUri);
+                              } else {
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text('No se pudo abrir el cliente de correo'),
+                                      backgroundColor: Color(0xFFEF4444),
+                                    ),
+                                  );
+                                }
+                              }
+                            } catch (e) {
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('Error: $e'),
+                                    backgroundColor: const Color(0xFFEF4444),
+                                  ),
+                                );
+                              }
+                            }
+                          },
+                          icon: const Icon(Icons.send, size: 18),
+                          label: Text(_strings.enviarEmail),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF22C55E),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                // Horario de atención
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE0E7FF),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: const Color(0xFF6366F1),
+                      width: 1.5,
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(
+                            Icons.schedule,
+                            color: Color(0xFF6366F1),
+                            size: 20,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            _strings.horarioAtencion,
+                            style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF1F2937),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      const Text(
+                        'Lunes a Viernes: 9:00 AM - 6:00 PM',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Color(0xFF6B7280),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      const Text(
+                        'Sábados: 10:00 AM - 2:00 PM',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Color(0xFF6B7280),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      const Text(
+                        'Zona horaria: UTC-5 (COT)',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Color(0xFF9CA3AF),
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                // Información adicional
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFEF3C7),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.info_outline,
+                        color: Color(0xFFF59E0B),
+                        size: 20,
+                      ),
+                      const SizedBox(width: 12),
+                      const Expanded(
+                        child: Text(
+                          'Responderemos tu consulta en un máximo de 24 horas.',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Color(0xFF92400E),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text(
+                _strings.cerrar,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   void _showManualScreen() {
@@ -1061,6 +2228,180 @@ Una app completa para controlar tus gastos y ahorros:
     });
     await _prefs.setDouble('presupuesto_mensual', monto);
     _verificarPresupuesto();
+  }
+
+  void _mostrarDialogoGraficosReportes() {
+    showDialog(
+      context: context,
+      builder: (_) {
+        return DefaultTabController(
+          length: 2,
+          child: Dialog(
+            child: Container(
+              width: MediaQuery.of(context).size.width * 0.95,
+              height: MediaQuery.of(context).size.height * 0.85,
+              child: Column(
+                children: [
+                  AppBar(
+                    title: Text(_strings.graficosEInformes),
+                    automaticallyImplyLeading: false,
+                    actions: [
+                      IconButton(
+                        icon: const Icon(Icons.close),
+                        onPressed: () => Navigator.pop(context),
+                      ),
+                    ],
+                    bottom: TabBar(
+                      indicatorColor: Colors.white,
+                      labelColor: Colors.white,
+                      unselectedLabelColor: Colors.white70,
+                      tabs: [
+                        Tab(
+                          icon: const Icon(Icons.bar_chart),
+                          text: _strings.verGraficos,
+                        ),
+                        Tab(
+                          icon: const Icon(Icons.description),
+                          text: _strings.reportes,
+                        ),
+                      ],
+                    ),
+                  ),
+                  Expanded(
+                    child: TabBarView(
+                      children: [
+                        _buildGraficosTab(),
+                        _buildReportesTab(),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildGraficosTab() {
+    return SingleChildScrollView(
+      child: Column(
+        children: [
+          // Gráfico de distribución mensual
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Card(
+              elevation: 0,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _strings.distribucionMensual,
+                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: Color(0xFF4B5563)),
+                    ),
+                    const SizedBox(height: 20),
+                    SizedBox(
+                      height: 200,
+                      child: PieChart(
+                        PieChartData(
+                          sections: _obtenerDatosGraficoMensual(),
+                          centerSpaceRadius: 40,
+                          sectionsSpace: 2,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    Text(
+                      _strings.distribucionAnual,
+                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: Color(0xFF4B5563)),
+                    ),
+                    const SizedBox(height: 20),
+                    SizedBox(
+                      height: 200,
+                      child: PieChart(
+                        PieChartData(
+                          sections: _obtenerDatosGraficoAnual(),
+                          centerSpaceRadius: 40,
+                          sectionsSpace: 2,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildReportesTab() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.description, size: 80, color: Color(0xFF0EA5A4)),
+            const SizedBox(height: 24),
+            Text(
+              _strings.seleccionaFormatoReporte,
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+              textAlign: TextAlign.center,
+            ),
+            if (_isPremium)
+              const Padding(
+                padding: EdgeInsets.only(top: 12),
+                child: Text(
+                  '✨ Exportación anual disponible',
+                  style: TextStyle(fontSize: 14, color: Color(0xFFF59E0B)),
+                ),
+              ),
+            const SizedBox(height: 32),
+            ElevatedButton.icon(
+              icon: const Icon(Icons.picture_as_pdf),
+              label: Text(_strings.reportePDF),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFEF4444),
+                foregroundColor: Colors.white,
+                minimumSize: const Size(double.infinity, 56),
+              ),
+              onPressed: () async {
+                Navigator.of(context).pop();
+                if (_isPremium) {
+                  _mostrarOpcionesExportacion('pdf');
+                } else {
+                  _exportarMesActual('pdf');
+                }
+              },
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton.icon(
+              icon: const Icon(Icons.table_chart),
+              label: Text(_strings.reporteExcel),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF0EA5A4),
+                foregroundColor: Colors.white,
+                minimumSize: const Size(double.infinity, 56),
+              ),
+              onPressed: () async {
+                Navigator.of(context).pop();
+                if (_isPremium) {
+                  _mostrarOpcionesExportacion('excel');
+                } else {
+                  _exportarMesActual('excel');
+                }
+              },
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   void _showReportesDialog() {
@@ -1522,6 +2863,82 @@ Una app completa para controlar tus gastos y ahorros:
       print('Error al guardar ahorros: $e');
     }
   }
+  
+  // Métodos para ahorros en monedas extranjeras
+  Future<void> _guardarAhorrosMonedas() async {
+    try {
+      final String datosJSON = jsonEncode(_ahorrosMonedas);
+      await _prefs.setString('ahorros_monedas', datosJSON);
+    } catch (e) {
+      print('Error al guardar ahorros en monedas: $e');
+    }
+  }
+  
+  double _calcularTotalMoneda(String codigoMoneda) {
+    final transacciones = _ahorrosMonedas[codigoMoneda] ?? [];
+    return transacciones.fold(0.0, (sum, item) => sum + (item['monto'] as num).toDouble());
+  }
+  
+  void _agregarAhorroMoneda(AppCurrency moneda, double monto, String nota) {
+    final codigoMoneda = moneda.toString().split('.').last;
+    
+    if (!_ahorrosMonedas.containsKey(codigoMoneda)) {
+      _ahorrosMonedas[codigoMoneda] = [];
+    }
+    
+    setState(() {
+      _ahorrosMonedas[codigoMoneda]!.add({
+        'monto': monto,
+        'fecha': DateTime.now().toIso8601String(),
+        'nota': nota,
+      });
+    });
+    
+    _guardarAhorrosMonedas();
+  }
+  
+  void _eliminarTransaccionMoneda(String codigoMoneda, int index) {
+    setState(() {
+      _ahorrosMonedas[codigoMoneda]?.removeAt(index);
+      if (_ahorrosMonedas[codigoMoneda]?.isEmpty ?? false) {
+        _ahorrosMonedas.remove(codigoMoneda);
+      }
+    });
+    _guardarAhorrosMonedas();
+  }
+  
+  // Método para manejar compra de moneda extranjera
+  void _agregarCompraMonedaExtranjera(
+    AppCurrency monedaOrigen,
+    AppCurrency monedaDestino,
+    double montoOrigen,
+    String nota,
+  ) {
+    // Convertir el monto de la moneda origen a la moneda destino
+    final montoConvertido = CurrencyExchangeService.convert(
+      amount: montoOrigen,
+      from: monedaOrigen,
+      to: monedaDestino,
+    );
+    
+    // Agregar el monto convertido como ahorro en la moneda destino
+    final notaCompleta = nota.isNotEmpty 
+        ? '$nota (${_strings.compraDe} ${montoOrigen.toStringAsFixed(2)} ${monedaOrigen.symbol})'
+        : '${_strings.compraMoneda} - ${montoOrigen.toStringAsFixed(2)} ${monedaOrigen.symbol}';
+    
+    _agregarAhorroMoneda(monedaDestino, montoConvertido, notaCompleta);
+    
+    // Mostrar confirmación
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          '${_strings.compraExitosa}\n${monedaOrigen.formatAmount(montoOrigen)} → ${monedaDestino.formatAmount(montoConvertido)}',
+        ),
+        backgroundColor: const Color(0xFF22C55E),
+        duration: const Duration(seconds: 4),
+      ),
+    );
+  }
 
   void _actualizarAhorrosDelMes() {
     // Calcular balance del mes seleccionado
@@ -1666,6 +3083,428 @@ Una app completa para controlar tus gastos y ahorros:
         );
       },
     ).then((_) => motivoController.dispose());
+  }
+  
+  // ===== MÉTODOS PARA AHORROS EN MONEDAS EXTRANJERAS =====
+  
+  void _mostrarDialogoAhorrosMonedas() {
+    if (!_isPremium) {
+      _mostrarDialogoPremiumRequerido(_strings.ahorrosMonedas);
+      return;
+    }
+    
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            // Obtener monedas con saldo
+            final monedasConSaldo = _ahorrosMonedas.keys.toList();
+            
+            return AlertDialog(
+              title: Row(
+                children: [
+                  const Icon(Icons.account_balance_wallet, color: Color(0xFF0EA5A4)),
+                  const SizedBox(width: 12),
+                  Expanded(child: Text(_strings.ahorrosMonedas)),
+                ],
+              ),
+              content: SizedBox(
+                width: double.maxFinite,
+                child: monedasConSaldo.isEmpty
+                    ? Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.currency_exchange, size: 64, color: Color(0xFFD1D5DB)),
+                          const SizedBox(height: 16),
+                          Text(
+                            _strings.sinAhorrosMonedas,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(fontSize: 16, color: Color(0xFF6B7280)),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            _strings.agregaAhorroMoneda,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(fontSize: 13, color: Color(0xFF9CA3AF)),
+                          ),
+                        ],
+                      )
+                    : ListView.builder(
+                        shrinkWrap: true,
+                        itemCount: monedasConSaldo.length,
+                        itemBuilder: (context, index) {
+                          final codigoMoneda = monedasConSaldo[index];
+                          final moneda = AppCurrency.values.firstWhere(
+                            (m) => m.toString().split('.').last == codigoMoneda,
+                          );
+                          final total = _calcularTotalMoneda(codigoMoneda);
+                          
+                          return Card(
+                            elevation: 0,
+                            color: const Color(0xFFF9FAFB),
+                            margin: const EdgeInsets.only(bottom: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              side: const BorderSide(color: Color(0xFFE5E7EB)),
+                            ),
+                            child: ListTile(
+                              leading: CircleAvatar(
+                                backgroundColor: const Color(0xFFE7F8F7),
+                                child: Text(
+                                  moneda.symbol,
+                                  style: const TextStyle(
+                                    color: Color(0xFF0EA5A4),
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                              title: Text(
+                                moneda.name,
+                                style: const TextStyle(fontWeight: FontWeight.w600),
+                              ),
+                              subtitle: Text(
+                                moneda.formatAmount(total),
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 16,
+                                  color: total >= 0 ? const Color(0xFF0EA5A4) : const Color(0xFFEF4444),
+                                ),
+                              ),
+                              trailing: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  IconButton(
+                                    icon: const Icon(Icons.add_circle_outline, color: Color(0xFF0EA5A4)),
+                                    tooltip: _strings.agregar,
+                                    onPressed: () {
+                                      Navigator.of(context).pop();
+                                      _mostrarDialogoAgregarRetiro(moneda, true);
+                                    },
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(Icons.remove_circle_outline, color: Color(0xFFEF4444)),
+                                    tooltip: _strings.retirar,
+                                    onPressed: () {
+                                      Navigator.of(context).pop();
+                                      _mostrarDialogoAgregarRetiro(moneda, false);
+                                    },
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(Icons.history, color: Color(0xFF6B7280)),
+                                    tooltip: _strings.historial,
+                                    onPressed: () {
+                                      Navigator.of(context).pop();
+                                      _mostrarHistorialMoneda(moneda);
+                                    },
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: Text(_strings.cerrar),
+                ),
+                ElevatedButton.icon(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                    _mostrarDialogoSeleccionarMoneda();
+                  },
+                  icon: const Icon(Icons.add),
+                  label: Text(_strings.nuevaMoneda),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF0EA5A4),
+                    foregroundColor: Colors.white,
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+  
+  void _mostrarDialogoSeleccionarMoneda() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text(_strings.seleccionarMoneda),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: ListView.builder(
+              shrinkWrap: true,
+              itemCount: AppCurrency.values.length,
+              itemBuilder: (context, index) {
+                final moneda = AppCurrency.values[index];
+                
+                return ListTile(
+                  leading: CircleAvatar(
+                    backgroundColor: const Color(0xFFE7F8F7),
+                    child: Text(
+                      moneda.symbol,
+                      style: const TextStyle(
+                        color: Color(0xFF0EA5A4),
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  title: Text(moneda.name),
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    _mostrarDialogoAgregarRetiro(moneda, true);
+                  },
+                );
+              },
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text(_strings.cancelar),
+            ),
+          ],
+        );
+      },
+    );
+  }
+  
+  void _mostrarDialogoAgregarRetiro(AppCurrency moneda, bool esDeposito) {
+    final montoController = TextEditingController();
+    final notaController = TextEditingController();
+    
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text(
+            esDeposito ? _strings.agregarAhorro : _strings.retirarAhorro,
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                '${esDeposito ? _strings.depositarEn : _strings.retirarDe} ${moneda.name}',
+                style: const TextStyle(fontSize: 14, color: Color(0xFF6B7280)),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: montoController,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                decoration: InputDecoration(
+                  labelText: _strings.monto,
+                  border: const OutlineInputBorder(),
+                  prefixText: moneda.symbol,
+                  hintText: '0.00',
+                ),
+                autofocus: true,
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: notaController,
+                decoration: InputDecoration(
+                  labelText: _strings.notaOpcional,
+                  border: const OutlineInputBorder(),
+                ),
+                maxLines: 2,
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text(_strings.cancelar),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                final monto = double.tryParse(montoController.text) ?? 0.0;
+                if (monto <= 0) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text(_strings.ingresaMontoValido)),
+                  );
+                  return;
+                }
+                
+                final montoFinal = esDeposito ? monto : -monto;
+                _agregarAhorroMoneda(moneda, montoFinal, notaController.text.trim());
+                
+                Navigator.of(context).pop();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      esDeposito
+                          ? '${_strings.depositoExitoso} ${moneda.formatAmount(monto)}'
+                          : '${_strings.retiroExitoso} ${moneda.formatAmount(monto)}',
+                    ),
+                    backgroundColor: const Color(0xFF0EA5A4),
+                  ),
+                );
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: esDeposito ? const Color(0xFF0EA5A4) : const Color(0xFFEF4444),
+                foregroundColor: Colors.white,
+              ),
+              child: Text(esDeposito ? _strings.depositar : _strings.retirar),
+            ),
+          ],
+        );
+      },
+    ).then((_) {
+      montoController.dispose();
+      notaController.dispose();
+    });
+  }
+  
+  void _mostrarHistorialMoneda(AppCurrency moneda) {
+    final codigoMoneda = moneda.toString().split('.').last;
+    final transacciones = _ahorrosMonedas[codigoMoneda] ?? [];
+    
+    // Ordenar por fecha (más recientes primero)
+    final transaccionesOrdenadas = [...transacciones]
+      ..sort((a, b) {
+        final fechaA = DateTime.parse(a['fecha']);
+        final fechaB = DateTime.parse(b['fecha']);
+        return fechaB.compareTo(fechaA);
+      });
+    
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Row(
+            children: [
+              CircleAvatar(
+                backgroundColor: const Color(0xFFE7F8F7),
+                child: Text(
+                  moneda.symbol,
+                  style: const TextStyle(
+                    color: Color(0xFF0EA5A4),
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  '${_strings.historial} - ${moneda.name}',
+                  style: const TextStyle(fontSize: 18),
+                ),
+              ),
+            ],
+          ),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: transacciones.isEmpty
+                ? Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.history, size: 64, color: Color(0xFFD1D5DB)),
+                      const SizedBox(height: 16),
+                      Text(
+                        _strings.sinTransacciones,
+                        style: const TextStyle(fontSize: 16, color: Color(0xFF6B7280)),
+                      ),
+                    ],
+                  )
+                : ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: transaccionesOrdenadas.length,
+                    itemBuilder: (context, index) {
+                      final transaccion = transaccionesOrdenadas[index];
+                      final monto = (transaccion['monto'] as num).toDouble();
+                      final fecha = DateTime.parse(transaccion['fecha']);
+                      final nota = transaccion['nota'] ?? '';
+                      final esDeposito = monto > 0;
+                      
+                      final formatoFecha = DateFormat('dd/MM/yyyy HH:mm');
+                      
+                      return Card(
+                        elevation: 0,
+                        color: const Color(0xFFF9FAFB),
+                        margin: const EdgeInsets.only(bottom: 8),
+                        child: ListTile(
+                          leading: Icon(
+                            esDeposito ? Icons.arrow_downward : Icons.arrow_upward,
+                            color: esDeposito ? const Color(0xFF0EA5A4) : const Color(0xFFEF4444),
+                          ),
+                          title: Text(
+                            moneda.formatAmount(monto.abs()),
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: esDeposito ? const Color(0xFF0EA5A4) : const Color(0xFFEF4444),
+                            ),
+                          ),
+                          subtitle: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                formatoFecha.format(fecha),
+                                style: const TextStyle(fontSize: 12, color: Color(0xFF6B7280)),
+                              ),
+                              if (nota.isNotEmpty)
+                                Text(
+                                  nota,
+                                  style: const TextStyle(fontSize: 12, color: Color(0xFF9CA3AF)),
+                                ),
+                            ],
+                          ),
+                          trailing: IconButton(
+                            icon: const Icon(Icons.delete, color: Color(0xFFEF4444)),
+                            onPressed: () {
+                              showDialog(
+                                context: context,
+                                builder: (BuildContext dialogContext) {
+                                  return AlertDialog(
+                                    title: Text(_strings.confirmarEliminacion),
+                                    content: Text(_strings.eliminarTransaccion),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () => Navigator.of(dialogContext).pop(),
+                                        child: Text(_strings.cancelar),
+                                      ),
+                                      ElevatedButton(
+                                        onPressed: () {
+                                          _eliminarTransaccionMoneda(codigoMoneda, index);
+                                          Navigator.of(dialogContext).pop();
+                                          Navigator.of(context).pop();
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            SnackBar(
+                                              content: Text(_strings.transaccionEliminada),
+                                            ),
+                                          );
+                                        },
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: const Color(0xFFEF4444),
+                                          foregroundColor: Colors.white,
+                                        ),
+                                        child: Text(_strings.eliminar),
+                                      ),
+                                    ],
+                                  );
+                                },
+                              );
+                            },
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text(_strings.cerrar),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   // ===== MÉTODOS PARA GASTOS FIJOS =====
@@ -2498,13 +4337,59 @@ Una app completa para controlar tus gastos y ahorros:
   double _calcularIngresos() {
     return _obtenerTransaccionesMes()
         .where((t) => t['tipo'] == 'Ingreso')
-        .fold(0, (sum, item) => sum + item['monto']);
+        .fold(0.0, (sum, item) {
+          final monto = (item['monto'] as num).toDouble();
+          final monedaCode = item['moneda'] as String?;
+          
+          if (monedaCode == null || monedaCode == _appCurrency.toString().split('.').last) {
+            // Misma moneda, no necesita conversión
+            return sum + monto;
+          } else {
+            // Convertir a moneda principal
+            try {
+              final moneda = AppCurrency.values.firstWhere(
+                (m) => m.toString().split('.').last == monedaCode,
+              );
+              final montoConvertido = CurrencyExchangeService.convert(
+                amount: monto,
+                from: moneda,
+                to: _appCurrency,
+              );
+              return sum + montoConvertido;
+            } catch (e) {
+              return sum + monto; // Si hay error, sumar sin convertir
+            }
+          }
+        });
   }
 
   double _calcularEgresos() {
     return _obtenerTransaccionesMes()
         .where((t) => t['tipo'] == 'Egreso')
-        .fold(0, (sum, item) => sum + item['monto'].abs());
+        .fold(0.0, (sum, item) {
+          final monto = (item['monto'] as num).toDouble().abs();
+          final monedaCode = item['moneda'] as String?;
+          
+          if (monedaCode == null || monedaCode == _appCurrency.toString().split('.').last) {
+            // Misma moneda, no necesita conversión
+            return sum + monto;
+          } else {
+            // Convertir a moneda principal
+            try {
+              final moneda = AppCurrency.values.firstWhere(
+                (m) => m.toString().split('.').last == monedaCode,
+              );
+              final montoConvertido = CurrencyExchangeService.convert(
+                amount: monto,
+                from: moneda,
+                to: _appCurrency,
+              );
+              return sum + montoConvertido;
+            } catch (e) {
+              return sum + monto; // Si hay error, sumar sin convertir
+            }
+          }
+        });
   }
 
   List<PieChartSectionData> _obtenerDatosGraficoMensual() {
@@ -2725,6 +4610,62 @@ Una app completa para controlar tus gastos y ahorros:
         AnalyticsService.propTransactionType: _tipoSeleccionado,
         AnalyticsService.propCategory: _categoriaSeleccionada,
         AnalyticsService.propAmount: monto,
+      },
+    );
+    
+    // Actualizar ahorros automáticamente
+    _actualizarAhorrosDelMes();
+
+    // Limpiar y cerrar
+    _tituloController.clear();
+    _montoController.clear();
+    _justificacionController.clear();
+    Navigator.of(context).pop();
+    
+    // Verificar si debe mostrar popup de conversión a Premium
+    _verificarPopupConversion();
+  }
+  
+  void _agregarNuevaTransaccionConMoneda(AppCurrency moneda) {
+    final nombre = _tituloController.text;
+    final monto = double.tryParse(_montoController.text) ?? 0.0;
+    final razon = _justificacionController.text;
+
+    if (nombre.isEmpty || monto <= 0) return;
+
+    final monedaCode = moneda.toString().split('.').last;
+
+    setState(() {
+      _transacciones.add({
+        'titulo': nombre,
+        'monto': _tipoSeleccionado == 'Ingreso' ? monto : -monto,
+        'tipo': _tipoSeleccionado,
+        'categoria': _tipoSeleccionado == 'Ingreso' ? '' : _categoriaSeleccionada,
+        'justificacion': razon,
+        'fecha': DateTime.now().toIso8601String(),
+        'moneda': monedaCode,
+      });
+      
+      // Incrementar contador de transacciones
+      _transaccionesCreadas++;
+      
+      // Cambiar al mes actual para mostrar la transacción recién creada
+      final ahora = DateTime.now();
+      _mesSeleccionado = DateTime(ahora.year, ahora.month);
+    });
+
+    // Guardar en SharedPreferences
+    _guardarTransacciones();
+    _prefs.setInt('transacciones_creadas', _transaccionesCreadas);
+    
+    // Track analytics
+    AnalyticsService().trackEvent(
+      AnalyticsService.eventTransactionCreated,
+      properties: {
+        AnalyticsService.propTransactionType: _tipoSeleccionado,
+        AnalyticsService.propCategory: _categoriaSeleccionada,
+        AnalyticsService.propAmount: monto,
+        'currency': monedaCode,
       },
     );
     
@@ -3025,7 +4966,242 @@ Una app completa para controlar tus gastos y ahorros:
     );
   }
 
-  // ===== MÉTODOS PARA TRANSACCIONES RECURRENTES =====
+  // ===== MÉTODOS PARA TRANSACCIONES RECURRENTES Y GASTOS FIJOS =====
+
+  void _mostrarDialogoTransaccionesFijas() {
+    showDialog(
+      context: context,
+      builder: (_) {
+        return DefaultTabController(
+          length: 2,
+          child: Dialog(
+            child: Container(
+              width: MediaQuery.of(context).size.width * 0.9,
+              height: MediaQuery.of(context).size.height * 0.8,
+              child: Column(
+                children: [
+                  AppBar(
+                    title: Text(_strings.transaccionesFijas),
+                    automaticallyImplyLeading: false,
+                    actions: [
+                      IconButton(
+                        icon: const Icon(Icons.close),
+                        onPressed: () => Navigator.pop(context),
+                      ),
+                    ],
+                    bottom: TabBar(
+                      indicatorColor: Colors.white,
+                      labelColor: Colors.white,
+                      unselectedLabelColor: Colors.white70,
+                      tabs: [
+                        Tab(
+                          icon: const Icon(Icons.repeat),
+                          text: _strings.language == AppLanguage.spanish 
+                              ? 'Recurrencias' 
+                              : 'Recurring',
+                        ),
+                        Tab(
+                          icon: const Icon(Icons.credit_card),
+                          text: _strings.language == AppLanguage.spanish 
+                              ? 'Gastos Fijos' 
+                              : 'Fixed Expenses',
+                        ),
+                      ],
+                    ),
+                  ),
+                  Expanded(
+                    child: TabBarView(
+                      children: [
+                        _buildRecurrenciasTab(),
+                        _buildGastosFijosTab(),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildRecurrenciasTab() {
+    return Column(
+      children: [
+        Expanded(
+          child: _transaccionesRecurrentes.isEmpty
+              ? Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.event_repeat, size: 64, color: Colors.grey[400]),
+                      const SizedBox(height: 16),
+                      Text(
+                        _strings.language == AppLanguage.spanish
+                            ? 'No hay transacciones recurrentes'
+                            : 'No recurring transactions',
+                        style: TextStyle(color: Colors.grey[600]),
+                      ),
+                    ],
+                  ),
+                )
+              : ListView.builder(
+                  padding: const EdgeInsets.all(12),
+                  itemCount: _transaccionesRecurrentes.length,
+                  itemBuilder: (ctx, i) {
+                    final recurrencia = _transaccionesRecurrentes[i];
+                    return Card(
+                      child: ListTile(
+                        leading: CircleAvatar(
+                          backgroundColor: recurrencia.tipo == 'Ingreso'
+                              ? Colors.green[100]
+                              : Colors.red[100],
+                          child: Text(
+                            recurrencia.tipo == 'Ingreso' ? '↓' : '↑',
+                            style: TextStyle(
+                              color: recurrencia.tipo == 'Ingreso'
+                                  ? Colors.green[700]
+                                  : Colors.red[700],
+                              fontSize: 20,
+                            ),
+                          ),
+                        ),
+                        title: Text(recurrencia.titulo),
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('${_appCurrency.symbol}${recurrencia.monto.toStringAsFixed(2)}'),
+                            Text(
+                              recurrencia.getFrecuenciaString(
+                                _strings.language == AppLanguage.spanish ? 'es' : 'en',
+                              ),
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                          ],
+                        ),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              icon: Icon(
+                                recurrencia.activa ? Icons.pause : Icons.play_arrow,
+                                color: recurrencia.activa ? Colors.orange : Colors.green,
+                              ),
+                              onPressed: () {
+                                setState(() {
+                                  _transaccionesRecurrentes[i] = recurrencia.copyWith(
+                                    activa: !recurrencia.activa,
+                                  );
+                                });
+                                _guardarRecurrencias();
+                              },
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.delete, color: Colors.red),
+                              onPressed: () {
+                                setState(() {
+                                  _transaccionesRecurrentes.removeAt(i);
+                                });
+                                _guardarRecurrencias();
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+        ),
+        Padding(
+          padding: const EdgeInsets.all(16),
+          child: ElevatedButton.icon(
+            onPressed: () {
+              Navigator.pop(context);
+              _mostrarDialogoNuevaRecurrencia();
+            },
+            icon: const Icon(Icons.add),
+            label: Text(_strings.agregar),
+            style: ElevatedButton.styleFrom(
+              minimumSize: const Size(double.infinity, 48),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildGastosFijosTab() {
+    return Column(
+      children: [
+        Expanded(
+          child: _gastosFijos.isEmpty
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.credit_card, size: 64, color: Color(0xFFD1D5DB)),
+                      const SizedBox(height: 16),
+                      Text(_strings.sinGastosFijos),
+                    ],
+                  ),
+                )
+              : ListView.builder(
+                  padding: const EdgeInsets.all(12),
+                  itemCount: _gastosFijos.length,
+                  itemBuilder: (ctx, index) {
+                    final gastoFijo = _gastosFijos[index];
+                    return Card(
+                      margin: const EdgeInsets.symmetric(vertical: 8),
+                      child: ListTile(
+                        leading: Icon(
+                          Icons.credit_card,
+                          color: gastoFijo['activo'] == true ? const Color(0xFF0EA5A4) : Colors.grey,
+                        ),
+                        title: Text(gastoFijo['nombre'] ?? 'Gasto'),
+                        subtitle: Text(
+                          'Día ${gastoFijo['diaVencimiento']} • ${_appCurrency.formatAmount(gastoFijo['monto'] as double)}',
+                        ),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              icon: const Icon(Icons.edit, color: Color(0xFF0EA5A4)),
+                              onPressed: () => _mostrarDialogoGastoFijo(index: index),
+                              tooltip: 'Editar',
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.delete, color: Colors.red),
+                              onPressed: () => _eliminarGastoFijo(index),
+                              tooltip: 'Eliminar',
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+        ),
+        Padding(
+          padding: const EdgeInsets.all(16),
+          child: ElevatedButton.icon(
+            onPressed: () {
+              Navigator.pop(context);
+              _mostrarDialogoGastoFijo();
+            },
+            icon: const Icon(Icons.add),
+            label: Text(_strings.agregarGastoFijo),
+            style: ElevatedButton.styleFrom(
+              minimumSize: const Size(double.infinity, 48),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
 
   void _mostrarDialogoRecurrencias() {
     showDialog(
@@ -3614,6 +5790,14 @@ Una app completa para controlar tus gastos y ahorros:
     _categoriaSeleccionada = 'Otro';
     bool registrarComoGastoFijo = false;
     int diaVencimientoLocal = DateTime.now().day;
+    
+    // Variables para compra de moneda extranjera
+    bool esCompraMonedaExtranjera = false;
+    AppCurrency monedaDestino = AppCurrency.usd;
+    
+    // Moneda de la transacción (por defecto la moneda principal)
+    AppCurrency monedaTransaccion = _appCurrency;
+    
     if (index != null) {
       final existing = _transacciones[index];
       _tituloController.text = existing['titulo'] ?? '';
@@ -3621,6 +5805,19 @@ Una app completa para controlar tus gastos y ahorros:
       _montoController.text = (existing['monto'] ?? 0).abs().toString();
       _justificacionController.text = existing['justificacion'] ?? '';
       _categoriaSeleccionada = existing['categoria'] ?? 'Otro';
+      
+      // Cargar moneda si existe
+      if (existing['moneda'] != null) {
+        try {
+          final monedaCode = existing['moneda'] as String;
+          monedaTransaccion = AppCurrency.values.firstWhere(
+            (m) => m.toString().split('.').last == monedaCode,
+            orElse: () => _appCurrency,
+          );
+        } catch (e) {
+          monedaTransaccion = _appCurrency;
+        }
+      }
     } else {
       _tituloController.clear();
       _montoController.clear();
@@ -3639,12 +5836,20 @@ Una app completa para controlar tus gastos y ahorros:
               if (index == null) {
                 final nombre = _tituloController.text;
                 final monto = double.tryParse(_montoController.text) ?? 0.0;
-                _agregarNuevaTransaccion();
+                
+                // Si es compra de moneda extranjera, agregar a ahorros
+                if (tipo == 'Egreso' && esCompraMonedaExtranjera) {
+                  _agregarNuevaTransaccionConMoneda(monedaTransaccion);
+                  _agregarCompraMonedaExtranjera(monedaTransaccion, monedaDestino, monto, nombre);
+                } else {
+                  _agregarNuevaTransaccionConMoneda(monedaTransaccion);
+                }
+                
                 if (tipo == 'Egreso' && registrarComoGastoFijo && nombre.isNotEmpty && monto > 0) {
                   _agregarGastoFijoDesdeEgreso(nombre, monto, diaVencimientoLocal);
                 }
               } else {
-                _guardarEdicion(index);
+                _guardarEdicionConMoneda(index, monedaTransaccion);
               }
             }
 
@@ -3667,14 +5872,243 @@ Una app completa para controlar tus gastos y ahorros:
                       decoration: const InputDecoration(labelText: 'Título (ej. Sueldo, Alquiler)'),
                     ),
                     const SizedBox(height: 12),
+                    // Selector de Moneda
+                    Card(
+                      elevation: 0,
+                      color: const Color(0xFFF0F9FF),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        side: const BorderSide(color: Color(0xFF0EA5A4), width: 1),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.currency_exchange, color: Color(0xFF0EA5A4), size: 20),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    _strings.monedaTransaccion,
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      color: Color(0xFF6B7280),
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  DropdownButton<AppCurrency>(
+                                    value: monedaTransaccion,
+                                    isExpanded: true,
+                                    underline: const SizedBox(),
+                                    items: [_appCurrency, ..._monedasDisponibles].toSet().toList().map((currency) {
+                                      final esMonedaPrincipal = currency == _appCurrency;
+                                      return DropdownMenuItem(
+                                        value: currency,
+                                        child: Row(
+                                          children: [
+                                            Text(
+                                              currency.symbol,
+                                              style: const TextStyle(
+                                                fontSize: 16,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                            const SizedBox(width: 8),
+                                            Expanded(
+                                              child: Text(
+                                                currency.name.split(' - ')[0],
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ),
+                                            if (esMonedaPrincipal)
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                decoration: BoxDecoration(
+                                                  color: const Color(0xFF0EA5A4),
+                                                  borderRadius: BorderRadius.circular(4),
+                                                ),
+                                                child: Text(
+                                                  _strings.principal,
+                                                  style: const TextStyle(
+                                                    color: Colors.white,
+                                                    fontSize: 10,
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
+                                                ),
+                                              ),
+                                          ],
+                                        ),
+                                      );
+                                    }).toList(),
+                                    onChanged: (value) {
+                                      setState(() {
+                                        monedaTransaccion = value ?? _appCurrency;
+                                      });
+                                    },
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
                     TextField(
                       controller: _montoController,
                       focusNode: _montoFocus,
                       textInputAction: TextInputAction.next,
                       keyboardType: TextInputType.number,
                       onSubmitted: (_) => _justificacionFocus.requestFocus(),
-                      decoration: const InputDecoration(labelText: 'Monto \$'),
+                      decoration: InputDecoration(
+                        labelText: 'Monto ${monedaTransaccion.symbol}',
+                        hintText: '${monedaTransaccion.symbol}0.00',
+                      ),
                     ),
+                    // Mostrar conversión si no es la moneda principal
+                    if (monedaTransaccion != _appCurrency && _montoController.text.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFEF3C7),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: const Color(0xFFF59E0B), width: 1),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.info_outline, color: Color(0xFFF59E0B), size: 18),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  CurrencyExchangeService.formatConversion(
+                                    amount: double.tryParse(_montoController.text) ?? 0.0,
+                                    from: monedaTransaccion,
+                                    to: _appCurrency,
+                                  ),
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    color: Color(0xFF92400E),
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    const SizedBox(height: 12),
+                    // Opción de compra de moneda extranjera (solo para egresos)
+                    if (tipo == 'Egreso' && index == null)
+                      Column(
+                        children: [
+                          CheckboxListTile(
+                            value: esCompraMonedaExtranjera,
+                            onChanged: (value) {
+                              setState(() {
+                                esCompraMonedaExtranjera = value ?? false;
+                              });
+                            },
+                            title: Text(_strings.compraMonedaExtranjera),
+                            subtitle: Text(_strings.compraMonedaExtrajeraDesc),
+                            controlAffinity: ListTileControlAffinity.leading,
+                            contentPadding: EdgeInsets.zero,
+                          ),
+                          // Selector de moneda destino si está marcado
+                          if (esCompraMonedaExtranjera) ...[
+                            const SizedBox(height: 8),
+                            Card(
+                              elevation: 0,
+                              color: const Color(0xFFDCFCE7),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                side: const BorderSide(color: Color(0xFF22C55E), width: 1),
+                              ),
+                              child: Padding(
+                                padding: const EdgeInsets.all(12),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        const Icon(Icons.swap_horiz, color: Color(0xFF22C55E), size: 20),
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          _strings.monedaAComprar,
+                                          style: const TextStyle(
+                                            fontSize: 13,
+                                            color: Color(0xFF166534),
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 8),
+                                    DropdownButton<AppCurrency>(
+                                      value: monedaDestino,
+                                      isExpanded: true,
+                                      underline: const SizedBox(),
+                                      items: AppCurrency.values.map((currency) {
+                                        return DropdownMenuItem(
+                                          value: currency,
+                                          child: Row(
+                                            children: [
+                                              Text(
+                                                currency.symbol,
+                                                style: const TextStyle(
+                                                  fontSize: 16,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                              ),
+                                              const SizedBox(width: 8),
+                                              Text(currency.name),
+                                            ],
+                                          ),
+                                        );
+                                      }).toList(),
+                                      onChanged: (value) {
+                                        setState(() {
+                                          monedaDestino = value ?? AppCurrency.usd;
+                                        });
+                                      },
+                                    ),
+                                    // Mostrar preview de conversión
+                                    if (_montoController.text.isNotEmpty) ...[
+                                      const SizedBox(height: 8),
+                                      const Divider(),
+                                      const SizedBox(height: 8),
+                                      Row(
+                                        children: [
+                                          const Icon(Icons.info_outline, color: Color(0xFF22C55E), size: 16),
+                                          const SizedBox(width: 8),
+                                          Expanded(
+                                            child: Text(
+                                              '${_strings.recibirasAproximadamente}:\n${CurrencyExchangeService.formatConversion(
+                                                amount: double.tryParse(_montoController.text) ?? 0.0,
+                                                from: monedaTransaccion,
+                                                to: monedaDestino,
+                                              )}',
+                                              style: const TextStyle(
+                                                fontSize: 12,
+                                                color: Color(0xFF166534),
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
                     const SizedBox(height: 12),
                     // Mostrar categoría solo para egresos
                     if (tipo == 'Egreso')
@@ -3801,6 +6235,38 @@ Una app completa para controlar tus gastos y ahorros:
     _justificacionController.clear();
     Navigator.of(context).pop();
   }
+  
+  void _guardarEdicionConMoneda(int index, AppCurrency moneda) {
+    final nombre = _tituloController.text;
+    final monto = double.tryParse(_montoController.text) ?? 0.0;
+    final razon = _justificacionController.text;
+
+    if (nombre.isEmpty || monto <= 0) return;
+
+    final monedaCode = moneda.toString().split('.').last;
+
+    setState(() {
+      _transacciones[index] = {
+        'titulo': nombre,
+        'monto': _tipoSeleccionado == 'Ingreso' ? monto : -monto,
+        'tipo': _tipoSeleccionado,
+        'categoria': _tipoSeleccionado == 'Ingreso' ? '' : _categoriaSeleccionada,
+        'justificacion': razon,
+        'fecha': _transacciones[index]['fecha'] ?? DateTime.now().toIso8601String(),
+        'moneda': monedaCode,
+      };
+    });
+
+    _guardarTransacciones();
+    
+    // Actualizar ahorros automáticamente
+    _actualizarAhorrosDelMes();
+
+    _tituloController.clear();
+    _montoController.clear();
+    _justificacionController.clear();
+    Navigator.of(context).pop();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -3877,18 +6343,8 @@ Una app completa para controlar tus gastos y ahorros:
             onSelected: (value) async {
               if (value == 'presupuesto') {
                 _showPresupuestoDialog();
-              } else if (value == 'graficos') {
-                Navigator.of(context).push(MaterialPageRoute(
-                  builder: (_) => ChartsPage(
-                    transacciones: _transacciones,
-                    obtenerDatosGraficoMensual: _obtenerDatosGraficoMensual,
-                    obtenerDatosGraficoAnual: _obtenerDatosGraficoAnual,
-                    obtenerDatosEgresosPorCategoria: _obtenerDatosEgresosPorCategoria,
-                    strings: _strings,
-                  ),
-                ));
-              } else if (value == 'reportes') {
-                _showReportesDialog();
+              } else if (value == 'graficos_reportes') {
+                _mostrarDialogoGraficosReportes();
               } else if (value == 'recomendaciones') {
                 Navigator.of(context).push(
                   MaterialPageRoute(
@@ -3901,12 +6357,8 @@ Una app completa para controlar tus gastos y ahorros:
                 );
               } else if (value == 'configuracion') {
                 _showConfigurationDialog();
-              } else if (value == 'gastos_fijos') {
-                _mostrarDialogoGastosFijos();
-              } else if (value == 'recurrencias') {
-                _mostrarDialogoRecurrencias();
-              } else if (value == 'backup') {
-                _mostrarDialogoBackupRestauracion();
+              } else if (value == 'transacciones_fijas') {
+                _mostrarDialogoTransaccionesFijas();
               } else if (value == 'categorias_personalizadas') {
                 _mostrarDialogoCategoriasPersonalizadas();
               } else if (value == 'monedas_multiples') {
@@ -3926,25 +6378,18 @@ Una app completa para controlar tus gastos y ahorros:
             },
             itemBuilder: (ctx) => [
               PopupMenuItem(value: 'presupuesto', child: Text('💰 ${_strings.presupuestoMensual}')),
-              PopupMenuItem(value: 'gastos_fijos', child: Text('💳 ${_strings.gastosFijos}')),
               PopupMenuItem(
-                value: 'recurrencias', 
-                child: Text(_strings.language == AppLanguage.spanish 
-                    ? '🔄 Recurrencias' 
-                    : '🔄 Recurring'),
-              ),
-              PopupMenuItem(
-                value: 'backup', 
-                child: Text(_strings.language == AppLanguage.spanish 
-                    ? '💾 Backup' 
-                    : '💾 Backup'),
+                value: 'transacciones_fijas',
+                child: Text('🔄 ${_strings.transaccionesFijas}'),
               ),
               if (_isPremium)
                 PopupMenuItem(value: 'categorias_personalizadas', child: Text('📂 ${_strings.misCategorias}')),
               if (_isPremium)
                 PopupMenuItem(value: 'monedas_multiples', child: Text('💱 ${_strings.monedasMultiples}')),
-              PopupMenuItem(value: 'graficos', child: Text('📊 ${_strings.verGraficos}')),
-              PopupMenuItem(value: 'reportes', child: Text('📋 ${_strings.reportes}')),
+              PopupMenuItem(
+                value: 'graficos_reportes',
+                child: Text('📊 ${_strings.graficosEInformes}'),
+              ),
               if (_isPremium)
                 PopupMenuItem(value: 'recomendaciones', child: Text('🤝 ${_strings.recomendacionesFinancieras}')),
               if (!_isPremium)
@@ -4088,6 +6533,252 @@ Una app completa para controlar tus gastos y ahorros:
       },
     );
   }
+  
+  void _mostrarDialogoDesgloseMonedas() {
+    // Obtener transacciones del mes y agrupar por moneda
+    final transaccionesMes = _obtenerTransaccionesMes();
+    final Map<String, Map<String, double>> totalesPorMoneda = {};
+    
+    // Inicializar con moneda principal
+    final monedaPrincipalCode = _appCurrency.toString().split('.').last;
+    totalesPorMoneda[monedaPrincipalCode] = {'ingresos': 0.0, 'egresos': 0.0};
+    
+    // Agrupar transacciones por moneda
+    for (var t in transaccionesMes) {
+      final monedaCode = (t['moneda'] as String?) ?? monedaPrincipalCode;
+      final monto = (t['monto'] as num).toDouble();
+      
+      if (!totalesPorMoneda.containsKey(monedaCode)) {
+        totalesPorMoneda[monedaCode] = {'ingresos': 0.0, 'egresos': 0.0};
+      }
+      
+      if (t['tipo'] == 'Ingreso') {
+        totalesPorMoneda[monedaCode]!['ingresos'] = 
+            (totalesPorMoneda[monedaCode]!['ingresos'] ?? 0.0) + monto;
+      } else {
+        totalesPorMoneda[monedaCode]!['egresos'] = 
+            (totalesPorMoneda[monedaCode]!['egresos'] ?? 0.0) + monto.abs();
+      }
+    }
+    
+    // Filtrar monedas con saldo
+    final monedasConSaldo = totalesPorMoneda.entries
+        .where((entry) => 
+            (entry.value['ingresos'] ?? 0.0) > 0 || 
+            (entry.value['egresos'] ?? 0.0) > 0)
+        .toList();
+    
+    // Mostrar diálogo con desglose
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          title: Row(
+            children: [
+              const Icon(Icons.currency_exchange, color: Color(0xFFF59E0B), size: 28),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  _strings.desglosePorMoneda,
+                  style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          content: SingleChildScrollView(
+            child: SizedBox(
+              width: double.maxFinite,
+              child: monedasConSaldo.isEmpty
+                  ? Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Text(
+                        _strings.sinTransacciones,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          color: Color(0xFF6B7280),
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    )
+                  : Column(
+                      children: monedasConSaldo.map((entry) {
+                final monedaCode = entry.key;
+                final ingresos = entry.value['ingresos'] ?? 0.0;
+                final egresos = entry.value['egresos'] ?? 0.0;
+                final balance = ingresos - egresos;
+                
+                final moneda = AppCurrency.values.firstWhere(
+                  (m) => m.toString().split('.').last == monedaCode,
+                  orElse: () => _appCurrency,
+                );
+                
+                final esMonedaPrincipal = moneda == _appCurrency;
+                
+                // Si no es moneda principal, calcular conversión
+                String? conversionTexto;
+                if (!esMonedaPrincipal) {
+                  final balanceConvertido = CurrencyExchangeService.convert(
+                    amount: balance,
+                    from: moneda,
+                    to: _appCurrency,
+                  );
+                  conversionTexto = '→ ${_appCurrency.formatAmount(balanceConvertido)}';
+                }
+                
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.7),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: const Color(0xFFFBBF24).withOpacity(0.3),
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: esMonedaPrincipal 
+                                    ? const Color(0xFF0EA5A4)
+                                    : const Color(0xFFF59E0B),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    moneda.symbol,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    moneda.name.split(' - ')[0],
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            if (esMonedaPrincipal) ...[
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF0EA5A4),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  _strings.principal,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  '↑ ${moneda.formatAmount(ingresos)}',
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    color: Color(0xFF0EA5A4),
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                Text(
+                                  '↓ ${moneda.formatAmount(egresos)}',
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    color: Color(0xFFEF4444),
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              children: [
+                                Text(
+                                  moneda.formatAmount(balance),
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                    color: balance >= 0 
+                                        ? const Color(0xFF0EA5A4)
+                                        : const Color(0xFFEF4444),
+                                  ),
+                                ),
+                                if (conversionTexto != null)
+                                  Text(
+                                    conversionTexto,
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      color: Color(0xFF92400E),
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }).toList(),
+                    ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text(
+                _strings.cerrar,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
 
   Widget _buildTransaccionesTab() {
     double ingresos = _calcularIngresos();
@@ -4205,28 +6896,34 @@ Una app completa para controlar tus gastos y ahorros:
               children: [
                 // Tarjeta de Ingresos
                 Expanded(
-                  child: Card(
-                    elevation: 0,
-                    color: const Color(0xFFE7F8F7),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(20),
-                      side: const BorderSide(color: Color(0xFF0EA5A4), width: 2),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(20),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              const Icon(Icons.trending_up, color: Color(0xFF0EA5A4), size: 28),
-                              const SizedBox(width: 12),
-                              Text(_strings.ingresos, style: const TextStyle(fontSize: 16, color: Color(0xFF0EA5A4), fontWeight: FontWeight.w600)),
-                            ],
-                          ),
-                          const SizedBox(height: 12),
-                          Text(_appCurrency.formatAmount(ingresos), style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w800, color: Color(0xFF0EA5A4))),
-                        ],
+                  child: GestureDetector(
+                    onTap: _mostrarDialogoDesgloseMonedas,
+                    child: Card(
+                      elevation: 0,
+                      color: const Color(0xFFE7F8F7),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(20),
+                        side: const BorderSide(color: Color(0xFF0EA5A4), width: 2),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(20),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                const Icon(Icons.trending_up, color: Color(0xFF0EA5A4), size: 28),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Text(_strings.ingresos, style: const TextStyle(fontSize: 16, color: Color(0xFF0EA5A4), fontWeight: FontWeight.w600)),
+                                ),
+                                const Icon(Icons.touch_app, color: Color(0xFF0EA5A4), size: 18),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                            Text(_appCurrency.formatAmount(ingresos), style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w800, color: Color(0xFF0EA5A4))),
+                          ],
+                        ),
                       ),
                     ),
                   ),
@@ -4263,6 +6960,7 @@ Una app completa para controlar tus gastos y ahorros:
                 ],
               ),
             ),
+            
             // Resumen de balance
             Card(
               elevation: 0,
@@ -4560,6 +7258,107 @@ Una app completa para controlar tus gastos y ahorros:
             ),
           ),
           const SizedBox(height: 12),
+          // Botón de Ahorros en Monedas Extranjeras (Premium)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: _mostrarDialogoAhorrosMonedas,
+                icon: const Icon(Icons.currency_exchange),
+                label: Text(_strings.ahorrosMonedas),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: const Color(0xFF0EA5A4),
+                  side: const BorderSide(color: Color(0xFF0EA5A4), width: 2),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          // Resumen de Ahorros en Monedas (si hay)
+          if (_ahorrosMonedas.isNotEmpty && _isPremium)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Card(
+                elevation: 0,
+                color: const Color(0xFFFEF3C7),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  side: const BorderSide(color: Color(0xFFF59E0B), width: 2),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(Icons.account_balance_wallet, color: Color(0xFFF59E0B), size: 24),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              _strings.resumenMonedasExtranjeras,
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFF92400E),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      ..._ahorrosMonedas.keys.map((codigoMoneda) {
+                        final moneda = AppCurrency.values.firstWhere(
+                          (m) => m.toString().split('.').last == codigoMoneda,
+                        );
+                        final total = _calcularTotalMoneda(codigoMoneda);
+                        
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Row(
+                                children: [
+                                  Text(
+                                    moneda.symbol,
+                                    style: const TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      color: Color(0xFFF59E0B),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    moneda.name.split(' - ')[0],
+                                    style: const TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w600,
+                                      color: Color(0xFF92400E),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              Text(
+                                moneda.formatAmount(total),
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: total >= 0 ? const Color(0xFF0EA5A4) : const Color(0xFFEF4444),
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }).toList(),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          const SizedBox(height: 12),
           // Registros de ahorros
           if (_registrosAhorros.isEmpty)
             Padding(
@@ -4802,11 +7601,11 @@ class RecomendacionesScreen extends StatelessWidget {
     required this.isPremium,
   });
 
-  // Mapa de URLs de afiliación por tipo de servicio
+  // Mapa de URLs de servicios recomendados
   static const Map<String, String> urlsAfiliacion = {
-    'seguros': 'https://afiliados.seguros-medicos.com/ref/zentavo',
-    'tarjetas': 'https://afiliados.tarjetas-credito.com/ref/zentavo',
-    'ahorros': 'https://afiliados.cuentas-ahorro.com/ref/zentavo',
+    'seguros': 'https://www.google.com/search?q=seguros+médicos+comparación',
+    'tarjetas': 'https://www.google.com/search?q=tarjetas+de+crédito+comparación',
+    'ahorros': 'https://www.google.com/search?q=cuentas+de+ahorro+mejores+tasas',
   };
 
   Future<void> _abrirURL(String urlKey) async {

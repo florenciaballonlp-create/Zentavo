@@ -1,0 +1,27 @@
+# ⚠️ ARCHIVO DE CONFIGURACIÓN DE FIRMA - NO COMPARTIR
+# Este archivo contiene las contraseñas para firmar tu app de Android
+# NUNCA lo subas a GitHub o lo compartas públicamente
+
+# INSTRUCCIONES:
+# 1. Crea el keystore primero con el comando:
+#    keytool -genkey -v -keystore zentavo-release-key.jks -keyalg RSA -keysize 2048 -validity 10000 -alias zentavo-key
+#
+# 2. Reemplaza los valores de abajo con las contraseñas que elegiste
+
+# Contraseña del archivo keystore
+storePassword=CAMBIA_ESTO_POR_TU_CONTRASEÑA
+
+# Contraseña del alias/key
+keyPassword=CAMBIA_ESTO_POR_TU_CONTRASEÑA
+
+# Nombre del alias (déjalo como está si usaste el comando de arriba)
+keyAlias=zentavo-key
+
+# Ubicación del archivo keystore (déjalo como está)
+storeFile=zentavo-release-key.jks
+
+# ⚠️ IMPORTANTE: 
+# - Guarda una copia de este archivo en lugar seguro
+# - SI PIERDES ESTE ARCHIVO, NO PODRÁS ACTUALIZAR TU APP NUNCA
+# - Haz backup del archivo .jks también
+# - No lo subas a GitHub (ya está en .gitignore)
