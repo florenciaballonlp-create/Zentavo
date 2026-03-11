@@ -53,7 +53,9 @@ jobs:
       - name: � Create App Store Connect API Key
         run: |
           mkdir -p ~/private_keys
-          echo -e "${{ secrets.APP_STORE_CONNECT_API_KEY_CONTENT }}" > ~/private_keys/AuthKey_${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}.p8
+          cat > ~/private_keys/AuthKey_${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}.p8 << 'EOF'
+          ${{ secrets.APP_STORE_CONNECT_API_KEY_CONTENT }}
+          EOF
           chmod 600 ~/private_keys/AuthKey_${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}.p8
       
       - name: 🔐 Configure Fastlane Match
