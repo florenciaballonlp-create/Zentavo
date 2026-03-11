@@ -47,6 +47,10 @@
 	<true/>
 	<key>NSFaceIDUsageDescription</key>
 	<string>Usamos Face ID para proteger el acceso a tu app.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Necesitamos acceso a tu galería para adjuntar recibos y documentos a tus transacciones.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Necesitamos acceso a la cámara para fotografiar recibos y documentos de tus transacciones.</string>
 	<key>GADApplicationIdentifier</key>
 	<string>ca-app-pub-3940256099942544~1458002511</string>
 	<key>SKAdNetworkItems</key>
