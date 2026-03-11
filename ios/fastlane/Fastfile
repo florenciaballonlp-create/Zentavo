@@ -39,11 +39,18 @@ platform :ios do
       git_basic_authorization: ENV['MATCH_GIT_BASIC_AUTHORIZATION']
     )
     
+    update_code_signing_settings(
+      use_automatic_signing: false,
+      team_id: ENV['TEAM_ID'],
+      bundle_identifier: "com.zentavo.controlgastos",
+      profile_name: "match AppStore com.zentavo.controlgastos",
+      code_sign_identity: "Apple Distribution"
+    )
+    
     build_app(
       scheme: "Runner",
       export_method: "app-store",
       export_team_id: ENV['TEAM_ID'],
-      xcargs: "DEVELOPMENT_TEAM=#{ENV['TEAM_ID']}",
       export_options: {
         provisioningProfiles: {
           "com.zentavo.controlgastos" => "match AppStore com.zentavo.controlgastos"
