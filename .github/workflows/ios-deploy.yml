@@ -1,0 +1,99 @@
+name: 🍎 iOS Build & Deploy
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+    paths:
+      - 'lib/**'
+      - 'ios/**'
+      - 'assets/**'
+      - 'pubspec.yaml'
+
+env:
+  FLUTTER_ CHANNEL: 'stable'
+
+jobs:
+  build-and-deploy-ios:
+    name: Build & Deploy iOS to TestFlight
+    runs-on: macos-latest
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+      
+      - name: 🔧 Setup Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+      
+      - name: 📱 Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: ${{ env.FLUTTER_CHANNEL }}
+          cache: true
+      
+      - name: 📦 Install Flutter dependencies
+        run: flutter pub get
+      
+      - name: 🔧 Setup Ruby and Fastlane
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.2'
+          bundler-cache: true
+          working-directory: ios
+      
+      - name: 📦 Install Fastlane
+        run: |
+          cd ios
+          gem install bundler
+          bundle install
+      
+      - name: 🔐 Configure Fastlane Match
+        env:
+          MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
+          MATCH_GIT_BASIC_AUTHORIZATION: ${{ secrets.MATCH_GIT_BASIC_AUTHORIZATION }}
+          FASTLANE_USER: ${{ secrets.APPLE_ID }}
+          FASTLANE_APPLE_APPLICATION_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          FASTLANE_SESSION: ${{ secrets.FASTLANE_SESSION }}
+          MATCH_GIT_URL: ${{ secrets.MATCH_GIT_URL }}
+          TEAM_ID: ${{ secrets.TEAM_ID }}
+        run: |
+          cd ios
+          bundle exec fastlane match appstore --readonly false
+      
+      - name: 🏗️ Build iOS App
+        env:
+          MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
+          FASTLANE_USER: ${{ secrets.APPLE_ID }}
+          FASTLANE_APPLE_APPLICATION_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          TEAM_ID: ${{ secrets.TEAM_ID }}
+        run: |
+          cd ios
+          bundle exec fastlane build_testflight
+      
+      - name: 📤 Upload to TestFlight
+        env:
+          APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          APP_STORE_CONNECT_API_KEY_CONTENT: ${{ secrets.APP_STORE_CONNECT_API_KEY_CONTENT }}
+        run: |
+          cd ios
+          bundle exec fastlane upload_testflight
+      
+      - name: 📤 Upload IPA artifact
+        if: success() || failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Zentavo-iOS-signed
+          path: ios/*.ipa
+          retention-days: 90
+      
+      - name: 📋 Upload build logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-build-logs
+          path: ios/fastlane/logs/
+          retention-days: 30

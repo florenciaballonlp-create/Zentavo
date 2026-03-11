@@ -1,0 +1,6 @@
+git_url("https://github.com/florenciaballonlp-create/zentavo-certificates")
+storage_mode("git")
+type("appstore")
+app_identifier(["com.zentavo.controlgastos"])
+username("florenciaballonlp@gmail.com")
+team_id("9PC7H336M6")

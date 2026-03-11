@@ -4701,6 +4701,317 @@ Una app completa para controlar tus gastos y ahorros:
     }
   }
   
+  // ===== MÉTODO PARA CARGAR DATOS DEMO (SCREENSHOTS) =====
+  void _cargarDatosDemo() async {
+    // Mostrar confirmación
+    final confirmacion = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('📸 Cargar Datos Demo'),
+        content: const Text(
+          'Esto agregará:\n\n'
+          '• 20 transacciones variadas\n'
+          '• 3 presupuestos de ejemplo\n'
+          '• 2 cuentas de ahorro\n'
+          '• 3 gastos fijos\n\n'
+          'Perfecto para tomar screenshots profesionales.',
+          style: TextStyle(fontSize: 14),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text(_strings.cancelar),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF0EA5A4),
+            ),
+            child: const Text('Cargar Datos'),
+          ),
+        ],
+      ),
+    );
+    
+    if (confirmacion != true) return;
+    
+    setState(() {
+      // ===== TRANSACCIONES =====
+      final ahora = DateTime.now();
+      final mesActual = DateTime(ahora.year, ahora.month);
+      final mesAnterior = DateTime(ahora.year, ahora.month - 1);
+      
+      // Ingresos
+      _transacciones.add({
+        'titulo': 'Salario Mensual',
+        'monto': 3500.00,
+        'tipo': 'Ingreso',
+        'categoria': '',
+        'justificacion': 'Pago del mes',
+        'fecha': DateTime(ahora.year, ahora.month, 1).toIso8601String(),
+      });
+      
+      _transacciones.add({
+        'titulo': 'Freelance Proyecto Web',
+        'monto': 850.00,
+        'tipo': 'Ingreso',
+        'categoria': '',
+        'justificacion': 'Desarrollo de página web para cliente',
+        'fecha': DateTime(ahora.year, ahora.month, 15).toIso8601String(),
+      });
+      
+      _transacciones.add({
+        'titulo': 'Venta en Marketplace',
+        'monto': 120.00,
+        'tipo': 'Ingreso',
+        'categoria': '',
+        'justificacion': 'Venta de artículos usados',
+        'fecha': DateTime(ahora.year, ahora.month, 8).toIso8601String(),
+      });
+      
+      // Egresos - Comida
+      _transacciones.add({
+        'titulo': 'Supermercado',
+        'monto': -245.50,
+        'tipo': 'Egreso',
+        'categoria': 'Comida',
+        'justificacion': 'Compra semanal',
+        'fecha': DateTime(ahora.year, ahora.month, 3).toIso8601String(),
+      });
+      
+      _transacciones.add({
+        'titulo': 'Restaurante',
+        'monto': -68.00,
+        'tipo': 'Egreso',
+        'categoria': 'Comida',
+        'justificacion': 'Cena con amigos',
+        'fecha': DateTime(ahora.year, ahora.month, 10).toIso8601String(),
+      });
+      
+      _transacciones.add({
+        'titulo': 'Delivery Pizza',
+        'monto': -32.50,
+        'tipo': 'Egreso',
+        'categoria': 'Comida',
+        'justificacion': 'Cena rápida',
+        'fecha': DateTime(ahora.year, ahora.month, 17).toIso8601String(),
+      });
+      
+      // Egresos - Transporte
+      _transacciones.add({
+        'titulo': 'Gasolina',
+        'monto': -85.00,
+        'tipo': 'Egreso',
+        'categoria': 'Transporte',
+        'justificacion': 'Tanque completo',
+        'fecha': DateTime(ahora.year, ahora.month, 5).toIso8601String(),
+      });
+      
+      _transacciones.add({
+        'titulo': 'Uber',
+        'monto': -18.50,
+        'tipo': 'Egreso',
+        'categoria': 'Transporte',
+        'justificacion': 'Viaje al centro',
+        'fecha': DateTime(ahora.year, ahora.month, 12).toIso8601String(),
+      });
+      
+      // Egresos - Entretenimiento
+      _transacciones.add({
+        'titulo': 'Cine',
+        'monto': -24.00,
+        'tipo': 'Egreso',
+        'categoria': 'Entretenimiento',
+        'justificacion': '2 entradas + palomitas',
+        'fecha': DateTime(ahora.year, ahora.month, 14).toIso8601String(),
+      });
+      
+      _transacciones.add({
+        'titulo': 'Netflix',
+        'monto': -15.99,
+        'tipo': 'Egreso',
+        'categoria': 'Entretenimiento',
+        'justificacion': 'Suscripción mensual',
+        'fecha': DateTime(ahora.year, ahora.month, 1).toIso8601String(),
+      });
+      
+      _transacciones.add({
+        'titulo': 'Spotify Premium',
+        'monto': -9.99,
+        'tipo': 'Egreso',
+        'categoria': 'Entretenimiento',
+        'justificacion': 'Música sin anuncios',
+        'fecha': DateTime(ahora.year, ahora.month, 1).toIso8601String(),
+      });
+      
+      // Egresos - Servicios
+      _transacciones.add({
+        'titulo': 'Electricidad',
+        'monto': -78.50,
+        'tipo': 'Egreso',
+        'categoria': 'Servicios',
+        'justificacion': 'Factura mensual',
+        'fecha': DateTime(ahora.year, ahora.month, 7).toIso8601String(),
+      });
+      
+      _transacciones.add({
+        'titulo': 'Internet',
+        'monto': -55.00,
+        'tipo': 'Egreso',
+        'categoria': 'Servicios',
+        'justificacion': 'Plan fibra óptica',
+        'fecha': DateTime(ahora.year, ahora.month, 10).toIso8601String(),
+      });
+      
+      // Egresos - Salud
+      _transacciones.add({
+        'titulo': 'Farmacia',
+        'monto': -42.80,
+        'tipo': 'Egreso',
+        'categoria': 'Salud',
+        'justificacion': 'Medicamentos',
+        'fecha': DateTime(ahora.year, ahora.month, 6).toIso8601String(),
+      });
+      
+      _transacciones.add({
+        'titulo': 'Gimnasio',
+        'monto': -45.00,
+        'tipo': 'Egreso',
+        'categoria': 'Salud',
+        'justificacion': 'Membresía mensual',
+        'fecha': DateTime(ahora.year, ahora.month, 1).toIso8601String(),
+      });
+      
+      // Egresos - Compras
+      _transacciones.add({
+        'titulo': 'Ropa',
+        'monto': -125.00,
+        'tipo': 'Egreso',
+        'categoria': 'Compras',
+        'justificacion': '2 camisas + pantalón',
+        'fecha': DateTime(ahora.year, ahora.month, 16).toIso8601String(),
+      });
+      
+      _transacciones.add({
+        'titulo': 'Zapatos Deportivos',
+        'monto': -89.99,
+        'tipo': 'Egreso',
+        'categoria': 'Compras',
+        'justificacion': 'Para correr',
+        'fecha': DateTime(ahora.year, ahora.month, 11).toIso8601String(),
+      });
+      
+      // Egresos - Educación
+      _transacciones.add({
+        'titulo': 'Curso Online',
+        'monto': -199.00,
+        'tipo': 'Egreso',
+        'categoria': 'Educacion',
+        'justificacion': 'Flutter avanzado',
+        'fecha': DateTime(ahora.year, ahora.month, 4).toIso8601String(),
+      });
+      
+      _transacciones.add({
+        'titulo': 'Libros',
+        'monto': -45.50,
+        'tipo': 'Egreso',
+        'categoria': 'Educacion',
+        'justificacion': '3 libros técnicos',
+        'fecha': DateTime(ahora.year, ahora.month, 13).toIso8601String(),
+      });
+      
+      // Egresos - Otros
+      _transacciones.add({
+        'titulo': 'Regalo Cumpleaños',
+        'monto': -65.00,
+        'tipo': 'Egreso',
+        'categoria': 'Otros',
+        'justificacion': 'Regalo para mi hermana',
+        'fecha': DateTime(ahora.year, ahora.month, 9).toIso8601String(),
+      });
+      
+      // ===== PRESUPUESTOS =====
+      _presupuestoMensual = 3000.00;
+      
+      // ===== AHORROS =====
+      _registrosAhorros = [
+        {
+          'fecha': DateTime(ahora.year, ahora.month, 1).toIso8601String(),
+          'monto': 500.00,
+          'nota': 'Meta inicial del mes',
+        },
+        {
+          'fecha': DateTime(ahora.year, ahora.month, 15).toIso8601String(),
+          'monto': 300.00,
+          'nota': 'Ahorro adicional del freelance',
+        },
+        {
+          'fecha': DateTime(mesAnterior.year, mesAnterior.month, 1).toIso8601String(),
+          'monto': 450.00,
+          'nota': 'Ahorro mes anterior',
+        },
+      ];
+      
+      // ===== GASTOS FIJOS =====
+      _gastosFijos = [
+        {
+          'id': DateTime.now().millisecondsSinceEpoch.toString(),
+          'nombre': 'Alquiler',
+          'monto': 800.00,
+          'diaVencimiento': 5,
+          'frecuencia': 'mensual',
+          'activo': true,
+          'recordatorioActivado': true,
+        },
+        {
+          'id': (DateTime.now().millisecondsSinceEpoch + 1).toString(),
+          'nombre': 'Seguro de Auto',
+          'monto': 120.00,
+          'diaVencimiento': 15,
+          'frecuencia': 'mensual',
+          'activo': true,
+          'recordatorioActivado': true,
+        },
+        {
+          'id': (DateTime.now().millisecondsSinceEpoch + 2).toString(),
+          'nombre': 'Tarjeta de Crédito',
+          'monto': 250.00,
+          'diaVencimiento': 20,
+          'frecuencia': 'mensual',
+          'activo': true,
+          'recordatorioActivado': true,
+        },
+      ];
+      
+      _mesSeleccionado = mesActual;
+    });
+    
+    // Guardar todo
+    await _guardarTransacciones();
+    await _prefs.setDouble('presupuesto_mensual', _presupuestoMensual);
+    
+    try {
+      final String ahorrosJSON = jsonEncode(_registrosAhorros);
+      await _prefs.setString('ahorros_historicos', ahorrosJSON);
+    } catch (e) {
+      print('Error al guardar ahorros demo: $e');
+    }
+    
+    await _guardarGastosFijos();
+    
+    _actualizarAhorrosDelMes();
+    
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('✅ Datos demo cargados. ¡Listo para screenshots!'),
+          backgroundColor: Color(0xFF22C55E),
+          duration: Duration(seconds: 3),
+        ),
+      );
+    }
+  }
+  
   void _mostrarPopupConversionPremium() {
     showDialog(
       context: context,
@@ -6313,6 +6624,19 @@ Una app completa para controlar tus gastos y ahorros:
                   icon: const Icon(Icons.fingerprint),
                   label: const Text('Verificar'),
                 ),
+                const SizedBox(height: 12),
+                TextButton(
+                  onPressed: () {
+                    setState(() {
+                      _isAuthenticated = true;
+                      _authChecked = true;
+                    });
+                  },
+                  child: const Text(
+                    'Continuar sin verificar',
+                    style: TextStyle(color: Color(0xFF6B7280)),
+                  ),
+                ),
               ],
             ),
           ),
@@ -6374,6 +6698,8 @@ Una app completa para controlar tus gastos y ahorros:
                 Navigator.of(context).push(
                   MaterialPageRoute(builder: (_) => ProfileScreen(strings: _strings)),
                 );
+              } else if (value == 'datos_demo') {
+                _cargarDatosDemo();
               }
             },
             itemBuilder: (ctx) => [
@@ -6395,6 +6721,13 @@ Una app completa para controlar tus gastos y ahorros:
               if (!_isPremium)
                 PopupMenuItem(value: 'premium', child: Text('⭐ Premium')),
               const PopupMenuDivider(),
+              if (kDeveloperMode)
+                const PopupMenuItem(
+                  value: 'datos_demo',
+                  child: Text('📸 Cargar Datos Demo', style: TextStyle(color: Color(0xFFF59E0B))),
+                ),
+              if (kDeveloperMode)
+                const PopupMenuDivider(),
               PopupMenuItem(value: 'perfil', child: Text('👤 ${_strings.miPerfil}')),
               PopupMenuItem(value: 'configuracion', child: Text('⚙️ ${_strings.configuracion}')),
             ],

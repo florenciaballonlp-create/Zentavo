@@ -50,7 +50,7 @@ android {
     defaultConfig {
         applicationId = "com.zentavo.control_gastos"
         minSdk = flutter.minSdkVersion
-        targetSdk = 34
+        targetSdk = 35
         versionCode = versionProperties["versionCode"].toString().toInt()
         versionName = versionProperties["versionName"].toString()
     }
