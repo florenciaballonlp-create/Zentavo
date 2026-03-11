@@ -42,6 +42,8 @@ platform :ios do
     build_app(
       scheme: "Runner",
       export_method: "app-store",
+      export_team_id: ENV['TEAM_ID'],
+      xcargs: "DEVELOPMENT_TEAM=#{ENV['TEAM_ID']}",
       export_options: {
         provisioningProfiles: {
           "com.zentavo.controlgastos" => "match AppStore com.zentavo.controlgastos"
