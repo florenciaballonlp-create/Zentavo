@@ -2,7 +2,8 @@ default_platform(:ios)
 
 platform :ios do
   def flutter_version_data
-    version_line = File.read('../pubspec.yaml').lines.find { |line| line.start_with?('version:') }
+    pubspec_path = File.expand_path('../../pubspec.yaml', __dir__)
+    version_line = File.read(pubspec_path).lines.find { |line| line.start_with?('version:') }
     UI.user_error!('No se encontró version en pubspec.yaml') if version_line.nil?
 
     version_value = version_line.split(':', 2).last.strip
