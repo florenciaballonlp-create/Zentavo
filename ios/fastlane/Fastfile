@@ -1,6 +1,20 @@
 default_platform(:ios)
 
 platform :ios do
+  def flutter_version_data
+    version_line = File.read('../pubspec.yaml').lines.find { |line| line.start_with?('version:') }
+    UI.user_error!('No se encontró version en pubspec.yaml') if version_line.nil?
+
+    version_value = version_line.split(':', 2).last.strip
+    parts = version_value.split('+')
+    build_name = parts[0]
+    build_number = parts[1]
+
+    UI.user_error!("Versión inválida en pubspec.yaml: #{version_value}") if build_name.to_s.empty? || build_number.to_s.empty?
+
+    { build_name: build_name, build_number: build_number }
+  end
+
   desc "Generate certificates and profiles"
   lane :certificates do
     api_key = app_store_connect_api_key(
@@ -23,6 +37,20 @@ platform :ios do
   desc "Build and sign iOS app for TestFlight"
   lane :build_testflight do
     setup_ci if ENV['CI']
+
+    version_data = flutter_version_data
+    run_number = ENV['GITHUB_RUN_NUMBER'].to_i
+    desired_build_number = [version_data[:build_number].to_i, run_number].max.to_s
+
+    increment_version_number(
+      version_number: version_data[:build_name],
+      xcodeproj: 'Runner.xcodeproj'
+    )
+
+    increment_build_number(
+      build_number: desired_build_number,
+      xcodeproj: 'Runner.xcodeproj'
+    )
     
     api_key = app_store_connect_api_key(
       key_id: ENV['APP_STORE_CONNECT_API_KEY_ID'],

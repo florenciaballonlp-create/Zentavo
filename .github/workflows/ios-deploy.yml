@@ -11,7 +11,7 @@ on:
       - 'pubspec.yaml'
 
 env:
-  FLUTTER_ CHANNEL: 'stable'
+  FLUTTER_CHANNEL: 'stable'
 
 jobs:
   build-and-deploy-ios:
