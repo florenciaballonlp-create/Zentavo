@@ -1,5 +1,6 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -35,9 +36,20 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 // Cambiar a 'true' para tener acceso Premium ilimitado sin pagar
 // Cambiar a 'false' para la versión pública que requiere compra
 const bool kDeveloperMode = true;
+const bool kSafeStartupMode = true;
 // ================================
 
 void main() => runApp(const ExpenseApp());
+
+List<Map<String, dynamic>> _decodeMapListIsolate(String rawJson) {
+  final List<dynamic> decoded = jsonDecode(rawJson);
+  return decoded.map((item) => Map<String, dynamic>.from(item)).toList();
+}
+
+Map<String, dynamic> _decodeMapIsolate(String rawJson) {
+  final Map<String, dynamic> decoded = jsonDecode(rawJson);
+  return decoded;
+}
 
 class ExpenseApp extends StatefulWidget {
   const ExpenseApp({super.key});
@@ -154,9 +166,7 @@ class _ExpenseAppState extends State<ExpenseApp> {
             ),
             scaffoldBackgroundColor: _darkBackground,
           ),
-          home: SplashScreen(
-            nextScreen: HomePage(onThemeModeChanged: _setThemeMode),
-          ),
+          home: HomePage(onThemeModeChanged: _setThemeMode),
         );
       },
     );
@@ -240,12 +250,23 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   // Contador de transacciones para conversión a Premium
   int _transaccionesCreadas = 0;
   bool _mostroPopupConversion = false;
+
+  // Modo seguro: diferir contenido pesado al entrar en principal
+  bool _mainTabHeavyReady = false;
+  bool _mostrarListaCompleta = false;
+  int _lastTabIndex = 0;
+
+  // Cache de transacciones del mes para evitar recomputaciones costosas por frame
+  String? _cacheMonthKey;
+  String? _cacheDataStamp;
+  List<Map<String, dynamic>> _cacheTransaccionesMes = [];
   
   // Performance timing
   late DateTime _appStartTime;
   final Map<String, DateTime> _timingMarkers = {};
 
   void _recordTiming(String marker) {
+    if (!kDebugMode) return;
     _timingMarkers[marker] = DateTime.now();
     final elapsed = DateTime.now().difference(_appStartTime).inMilliseconds;
     print('[TIMING] $marker - ${elapsed}ms desde inicio');
@@ -266,6 +287,17 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
 
   // Categorías personalizadas (Premium)
   Map<String, String> _categoriasPersonalizadas = {};
+
+  double _parseAmountInput(String value) {
+    final normalized = value.trim().replaceAll(' ', '').replaceAll(',', '.');
+    return double.tryParse(normalized) ?? 0.0;
+  }
+
+  List<TextInputFormatter> _amountInputFormatters() {
+    return [
+      FilteringTextInputFormatter.allow(RegExp(r'^\d*[\.,]?\d{0,2}$')),
+    ];
+  }
 
   Future<void> _checkPremiumStatus() async {
     try {
@@ -313,10 +345,10 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     bool supported = false;
     bool canCheck = false;
     try {
-      supported = await _localAuth.isDeviceSupported();
+      supported = await _localAuth.isDeviceSupported().timeout(const Duration(seconds: 3));
     } catch (_) {}
     try {
-      canCheck = await _localAuth.canCheckBiometrics;
+      canCheck = await _localAuth.canCheckBiometrics.timeout(const Duration(seconds: 3));
     } catch (_) {}
 
     if (!supported && !canCheck) {
@@ -327,6 +359,12 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
       return;
     }
 
+    if (mounted && !_authChecked) {
+      setState(() {
+        _authChecked = true;
+      });
+    }
+
     bool success = false;
     try {
       success = await _localAuth.authenticate(
@@ -335,7 +373,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
           biometricOnly: false,
           stickyAuth: true,
         ),
-      );
+      ).timeout(const Duration(seconds: 15), onTimeout: () => false);
     } catch (_) {}
 
     if (mounted) {
@@ -353,28 +391,57 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     _recordTiming('initState START');
     _tabController = TabController(length: 3, vsync: this);
     _tabController.addListener(() {
-      if (mounted) {
+      if (mounted && _tabController.index != _lastTabIndex) {
+        _lastTabIndex = _tabController.index;
         setState(() {});
       }
     });
-    _autenticarConBiometria();
+    _isAuthenticated = true;
+    _authChecked = true;
     _mesSeleccionado = DateTime(DateTime.now().year, DateTime.now().month);
     _diaVencimientoSeleccionado = 1;
     _recordTiming('Vars initialized');
-    _inicializarNotificaciones();
-    _recordTiming('Notifications initialized');
-    // Inicializar Analytics
-    _initializeAnalytics();
     // Verificar onboarding
     _checkOnboarding();
     // Cargar datos de forma asincrónica para no bloquear la UI
     _cargarTransaccionesAsync();
-    // No bloquear esperando _checkPremiumStatus()
-    _checkPremiumStatus();
-    // Solo inicializar AdMob en plataformas soportadas (Android/iOS)
-    if (!kIsWeb) {
-      _initializeMobileAds();
+
+    if (!kSafeStartupMode) {
+      Future.delayed(const Duration(seconds: 3), () {
+        if (!mounted) return;
+        _inicializarNotificaciones();
+        _recordTiming('Notifications initialized (deferred)');
+      });
+
+      Future.delayed(const Duration(seconds: 4), () {
+        if (!mounted) return;
+        _initializeAnalytics();
+        _recordTiming('Analytics initialized (deferred)');
+      });
+
+      Future.delayed(const Duration(seconds: 5), () {
+        if (!mounted) return;
+        _checkPremiumStatus();
+        _recordTiming('Premium status checked (deferred)');
+      });
+
+      Future.delayed(const Duration(seconds: 6), () {
+        if (!mounted) return;
+        if (!kIsWeb) {
+          _initializeMobileAds();
+          _recordTiming('AdMob initialized (deferred)');
+        }
+      });
+    } else {
+      _recordTiming('Safe startup mode enabled');
     }
+
+    Future.delayed(const Duration(milliseconds: 1500), () {
+      if (!mounted) return;
+      setState(() {
+        _mainTabHeavyReady = true;
+      });
+    });
     _recordTiming('initState COMPLETE');
   }
 
@@ -486,11 +553,22 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
 
   Future<void> _cargarTransaccionesAsync() async {
     // Cargar datos de forma asincrónica sin bloquear la UI
-    Future.delayed(Duration.zero, () async {
-      _recordTiming('_cargarTransaccionesAsync START (non-blocking)');
-      await _cargarTransacciones();
-      _verificarYEnviarRecordatorios();
-      _recordTiming('_cargarTransaccionesAsync COMPLETE');
+    Future.delayed(const Duration(milliseconds: 800), () async {
+      try {
+        if (!mounted) return;
+        _recordTiming('_cargarTransaccionesAsync START (non-blocking)');
+        await _cargarTransacciones();
+        if (!kSafeStartupMode) {
+          Future.delayed(const Duration(seconds: 5), () {
+            if (!mounted) return;
+            _verificarYEnviarRecordatorios();
+          });
+        }
+        _recordTiming('_cargarTransaccionesAsync COMPLETE');
+      } catch (e, stackTrace) {
+        print('Error en carga inicial de datos: $e');
+        print(stackTrace);
+      }
     });
   }
 
@@ -540,10 +618,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     final String? ahorrosGuardados = _prefs.getString('ahorros_historicos');
     if (ahorrosGuardados != null) {
       try {
-        final List<dynamic> decoded = jsonDecode(ahorrosGuardados);
-        setState(() {
-          _registrosAhorros = decoded.map((item) => Map<String, dynamic>.from(item)).toList();
-        });
+        _registrosAhorros = await compute(_decodeMapListIsolate, ahorrosGuardados);
       } catch (e) {
         print('Error al cargar ahorros: $e');
       }
@@ -554,14 +629,15 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     final String? ahorrosMonedasGuardados = _prefs.getString('ahorros_monedas');
     if (ahorrosMonedasGuardados != null && _isPremium) {
       try {
-        final Map<String, dynamic> decoded = jsonDecode(ahorrosMonedasGuardados);
-        setState(() {
-          _ahorrosMonedas = decoded.map((key, value) {
-            return MapEntry(
-              key,
-              (value as List).map((item) => Map<String, dynamic>.from(item)).toList(),
-            );
-          });
+        final Map<String, dynamic> decoded = await compute(
+          _decodeMapIsolate,
+          ahorrosMonedasGuardados,
+        );
+        _ahorrosMonedas = decoded.map((key, value) {
+          return MapEntry(
+            key,
+            (value as List).map((item) => Map<String, dynamic>.from(item)).toList(),
+          );
         });
       } catch (e) {
         print('Error al cargar ahorros en monedas: $e');
@@ -573,10 +649,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     final String? gastosFijosGuardados = _prefs.getString('gastos_fijos');
     if (gastosFijosGuardados != null) {
       try {
-        final List<dynamic> decoded = jsonDecode(gastosFijosGuardados);
-        setState(() {
-          _gastosFijos = decoded.map((item) => Map<String, dynamic>.from(item)).toList();
-        });
+        _gastosFijos = await compute(_decodeMapListIsolate, gastosFijosGuardados);
       } catch (e) {
         print('Error al cargar gastos fijos: $e');
       }
@@ -587,10 +660,11 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     final String? categoriasGuardadas = _prefs.getString('categorias_personalizadas');
     if (categoriasGuardadas != null) {
       try {
-        final Map<String, dynamic> decoded = jsonDecode(categoriasGuardadas);
-        setState(() {
-          _categoriasPersonalizadas = decoded.map((key, value) => MapEntry(key, value.toString()));
-        });
+        final Map<String, dynamic> decoded = await compute(
+          _decodeMapIsolate,
+          categoriasGuardadas,
+        );
+        _categoriasPersonalizadas = decoded.map((key, value) => MapEntry(key, value.toString()));
       } catch (e) {
         print('Error al cargar categorías personalizadas: $e');
       }
@@ -602,14 +676,12 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     if (monedasGuardadas != null && _isPremium) {
       try {
         final List<dynamic> decoded = jsonDecode(monedasGuardadas);
-        setState(() {
-          _monedasDisponibles = decoded
-              .map((item) => AppCurrency.values.firstWhere(
-                    (c) => c.toString() == item,
-                    orElse: () => AppCurrency.usd,
-                  ))
-              .toList();
-        });
+        _monedasDisponibles = decoded
+            .map((item) => AppCurrency.values.firstWhere(
+                  (c) => c.toString() == item,
+                  orElse: () => AppCurrency.usd,
+                ))
+            .toList();
       } catch (e) {
         print('Error al cargar monedas adicionales: $e');
       }
@@ -619,40 +691,49 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     final String? recurrentesGuardadas = _prefs.getString('transacciones_recurrentes');
     if (recurrentesGuardadas != null) {
       try {
-        final List<dynamic> decoded = jsonDecode(recurrentesGuardadas);
-        setState(() {
-          _transaccionesRecurrentes = decoded
-              .map((item) => RecurringTransaction.fromJson(Map<String, dynamic>.from(item)))
-              .toList();
-        });
+        final List<Map<String, dynamic>> decoded = await compute(
+          _decodeMapListIsolate,
+          recurrentesGuardadas,
+        );
+        _transaccionesRecurrentes = decoded
+            .map((item) => RecurringTransaction.fromJson(item))
+            .toList();
         
         // Generar transacciones pendientes automáticamente
-        await _generarTransaccionesRecurrentes();
+        Future(() async {
+          try {
+            await _generarTransaccionesRecurrentes();
+          } catch (e) {
+            print('Error al generar recurrencias: $e');
+          }
+        });
       } catch (e) {
         print('Error al cargar recurrencias: $e');
       }
     }
     _recordTiming('Recurrencias cargadas y generadas');
     
-    // Verificar y crear backup automático
-    BackupService.verificarBackupAutomatico().catchError((e) {
-      print('Error en backup automático: $e');
-    });
-    _recordTiming('Backup automático verificado');
+    _recordTiming('Backup automático omitido en startup');
     
     if (datosGuardados != null) {
       try {
-        final List<dynamic> decoded = jsonDecode(datosGuardados);
-        setState(() {
-          _transacciones.clear();
-          _transacciones.addAll(
-            decoded.map((item) => Map<String, dynamic>.from(item)).toList(),
-          );
+        final List<Map<String, dynamic>> decoded = await compute(
+          _decodeMapListIsolate,
+          datosGuardados,
+        );
+        _transacciones.clear();
+        _transacciones.addAll(decoded);
+        Future(() {
+          if (!mounted) return;
+          _verificarPresupuesto();
         });
-        _verificarPresupuesto();
       } catch (e) {
         print('Error al cargar transacciones: $e');
       }
+    }
+
+    if (mounted) {
+      setState(() {});
     }
   }
 
@@ -2134,7 +2215,12 @@ Una app completa para controlar tus gastos y ahorros:
         .where((t) {
           final String? fechaStr = t['fecha'];
           if (fechaStr == null) return false;
-          final DateTime fechaTransaccion = DateTime.parse(fechaStr);
+          DateTime? fechaTransaccion;
+          try {
+            fechaTransaccion = DateTime.parse(fechaStr);
+          } catch (_) {
+            return false;
+          }
           return t['tipo'] == 'egreso' &&
               fechaTransaccion.year == ahora.year &&
               fechaTransaccion.month == ahora.month;
@@ -2196,6 +2282,7 @@ Una app completa para controlar tus gastos y ahorros:
           content: TextField(
             controller: presupuestoController,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            inputFormatters: _amountInputFormatters(),
             decoration: InputDecoration(
               labelText: _strings.montoPresupuesto,
               border: const OutlineInputBorder(),
@@ -2209,7 +2296,7 @@ Una app completa para controlar tus gastos y ahorros:
             ElevatedButton(
               onPressed: () {
                 final double nuevoPresupuesto =
-                    double.tryParse(presupuestoController.text) ?? 0;
+                    _parseAmountInput(presupuestoController.text);
                 _setPresupuesto(nuevoPresupuesto);
                 Navigator.of(context).pop();
               },
@@ -3014,7 +3101,7 @@ Una app completa para controlar tus gastos y ahorros:
   }
 
   void _registrarExtraccionAhorro(String motivo) {
-    final monto = double.tryParse(_ahorroController.text) ?? 0.0;
+    final monto = _parseAmountInput(_ahorroController.text);
     if (monto <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(_strings.ingresaMontoValido)),
@@ -3050,6 +3137,7 @@ Una app completa para controlar tus gastos y ahorros:
               TextField(
                 controller: _ahorroController,
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                inputFormatters: _amountInputFormatters(),
                 decoration: InputDecoration(
                   labelText: 'Monto a extraer',
                   border: const OutlineInputBorder(),
@@ -3297,6 +3385,7 @@ Una app completa para controlar tus gastos y ahorros:
               TextField(
                 controller: montoController,
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                inputFormatters: _amountInputFormatters(),
                 decoration: InputDecoration(
                   labelText: _strings.monto,
                   border: const OutlineInputBorder(),
@@ -3323,7 +3412,7 @@ Una app completa para controlar tus gastos y ahorros:
             ),
             ElevatedButton(
               onPressed: () {
-                final monto = double.tryParse(montoController.text) ?? 0.0;
+                final monto = _parseAmountInput(montoController.text);
                 if (monto <= 0) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(content: Text(_strings.ingresaMontoValido)),
@@ -3543,7 +3632,7 @@ Una app completa para controlar tus gastos y ahorros:
 
   void _agregarGastoFijo() {
     final nombre = _nombreGastoController.text;
-    final monto = double.tryParse(_montoGastoFijoController.text) ?? 0.0;
+    final monto = _parseAmountInput(_montoGastoFijoController.text);
     
     if (nombre.isEmpty || monto <= 0 || _diaVencimientoSeleccionado < 1 || _diaVencimientoSeleccionado > 31) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -3577,7 +3666,7 @@ Una app completa para controlar tus gastos y ahorros:
 
   void _editarGastoFijo(int index) {
     final nombre = _nombreGastoController.text;
-    final monto = double.tryParse(_montoGastoFijoController.text) ?? 0.0;
+    final monto = _parseAmountInput(_montoGastoFijoController.text);
     
     if (nombre.isEmpty || monto <= 0) {
       return;
@@ -4146,6 +4235,7 @@ Una app completa para controlar tus gastos y ahorros:
                     TextField(
                       controller: _montoGastoFijoController,
                       keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      inputFormatters: _amountInputFormatters(),
                       decoration: const InputDecoration(
                         labelText: 'Monto',
                         border: OutlineInputBorder(),
@@ -4311,21 +4401,41 @@ Una app completa para controlar tus gastos y ahorros:
 
   // Obtener transacciones filtradas por mes
   List<Map<String, dynamic>> _obtenerTransaccionesMes() {
-    return _transacciones.where((t) {
-      DateTime? fecha;
-      if (t['fecha'] != null) {
-        try {
-          fecha = DateTime.parse(t['fecha']);
-        } catch (e) {
-          // Si no hay fecha válida, usar fecha actual
-          fecha = DateTime.now();
-        }
-      } else {
-        // Asignar fecha actual si no existe
-        fecha = DateTime.now();
+    final String monthKey =
+        '${_mesSeleccionado.year.toString().padLeft(4, '0')}-${_mesSeleccionado.month.toString().padLeft(2, '0')}';
+
+    final String dataStamp = _transacciones.isEmpty
+        ? '0-empty'
+        : '${_transacciones.length}-${_transacciones.first['fecha']}-${_transacciones.last['fecha']}';
+
+    if (_cacheMonthKey == monthKey && _cacheDataStamp == dataStamp) {
+      return _cacheTransaccionesMes;
+    }
+
+    final filtered = _transacciones.where((t) {
+      final dynamic rawFecha = t['fecha'];
+      if (rawFecha is String && rawFecha.length >= 7) {
+        final bool sameMonth = rawFecha.substring(0, 7) == monthKey;
+        if (sameMonth) return true;
       }
-      return fecha.year == _mesSeleccionado.year && fecha.month == _mesSeleccionado.month;
+
+      if (rawFecha is String) {
+        try {
+          final fecha = DateTime.parse(rawFecha);
+          return fecha.year == _mesSeleccionado.year && fecha.month == _mesSeleccionado.month;
+        } catch (_) {
+          return false;
+        }
+      }
+
+      return false;
     }).toList();
+
+    _cacheMonthKey = monthKey;
+    _cacheDataStamp = dataStamp;
+    _cacheTransaccionesMes = filtered;
+
+    return filtered;
   }
 
   // Obtener nombre del mes según el idioma seleccionado
@@ -4576,7 +4686,7 @@ Una app completa para controlar tus gastos y ahorros:
 
   void _agregarNuevaTransaccion() {
     final nombre = _tituloController.text;
-    final monto = double.tryParse(_montoController.text) ?? 0.0;
+    final monto = _parseAmountInput(_montoController.text);
     final razon = _justificacionController.text;
 
     if (nombre.isEmpty || monto <= 0) return;
@@ -4628,7 +4738,7 @@ Una app completa para controlar tus gastos y ahorros:
   
   void _agregarNuevaTransaccionConMoneda(AppCurrency moneda) {
     final nombre = _tituloController.text;
-    final monto = double.tryParse(_montoController.text) ?? 0.0;
+    final monto = _parseAmountInput(_montoController.text);
     final razon = _justificacionController.text;
 
     if (nombre.isEmpty || monto <= 0) return;
@@ -5690,6 +5800,7 @@ Una app completa para controlar tus gastos y ahorros:
                     TextField(
                       controller: montoController,
                       keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      inputFormatters: _amountInputFormatters(),
                       decoration: InputDecoration(
                         labelText: _strings.monto,
                         border: const OutlineInputBorder(),
@@ -5794,7 +5905,7 @@ Una app completa para controlar tus gastos y ahorros:
                     final nuevaRecurrencia = RecurringTransaction(
                       id: DateTime.now().millisecondsSinceEpoch.toString(),
                       titulo: tituloController.text.trim(),
-                      monto: double.tryParse(montoController.text) ?? 0,
+                      monto: _parseAmountInput(montoController.text),
                       tipo: tipoSeleccionado,
                       categoria: categoriaSeleccionada,
                       justificacion: justificacionController.text.trim(),
@@ -6146,7 +6257,7 @@ Una app completa para controlar tus gastos y ahorros:
             void submitForm() {
               if (index == null) {
                 final nombre = _tituloController.text;
-                final monto = double.tryParse(_montoController.text) ?? 0.0;
+                final monto = _parseAmountInput(_montoController.text);
                 
                 // Si es compra de moneda extranjera, agregar a ahorros
                 if (tipo == 'Egreso' && esCompraMonedaExtranjera) {
@@ -6272,7 +6383,10 @@ Una app completa para controlar tus gastos y ahorros:
                       controller: _montoController,
                       focusNode: _montoFocus,
                       textInputAction: TextInputAction.next,
-                      keyboardType: TextInputType.number,
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      inputFormatters: [
+                        FilteringTextInputFormatter.allow(RegExp(r'^\d*[\.,]?\d{0,2}$')),
+                      ],
                       onSubmitted: (_) => _justificacionFocus.requestFocus(),
                       decoration: InputDecoration(
                         labelText: 'Monto ${monedaTransaccion.symbol}',
@@ -6297,7 +6411,7 @@ Una app completa para controlar tus gastos y ahorros:
                               Expanded(
                                 child: Text(
                                   CurrencyExchangeService.formatConversion(
-                                    amount: double.tryParse(_montoController.text) ?? 0.0,
+                                    amount: _parseAmountInput(_montoController.text),
                                     from: monedaTransaccion,
                                     to: _appCurrency,
                                   ),
@@ -6399,7 +6513,7 @@ Una app completa para controlar tus gastos y ahorros:
                                           Expanded(
                                             child: Text(
                                               '${_strings.recibirasAproximadamente}:\n${CurrencyExchangeService.formatConversion(
-                                                amount: double.tryParse(_montoController.text) ?? 0.0,
+                                                amount: _parseAmountInput(_montoController.text),
                                                 from: monedaTransaccion,
                                                 to: monedaDestino,
                                               )}',
@@ -6520,7 +6634,7 @@ Una app completa para controlar tus gastos y ahorros:
 
   void _guardarEdicion(int index) {
     final nombre = _tituloController.text;
-    final monto = double.tryParse(_montoController.text) ?? 0.0;
+    final monto = _parseAmountInput(_montoController.text);
     final razon = _justificacionController.text;
 
     if (nombre.isEmpty || monto <= 0) return;
@@ -6549,7 +6663,7 @@ Una app completa para controlar tus gastos y ahorros:
   
   void _guardarEdicionConMoneda(int index, AppCurrency moneda) {
     final nombre = _tituloController.text;
-    final monto = double.tryParse(_montoController.text) ?? 0.0;
+    final monto = _parseAmountInput(_montoController.text);
     final razon = _justificacionController.text;
 
     if (nombre.isEmpty || monto <= 0) return;
@@ -6734,19 +6848,19 @@ Una app completa para controlar tus gastos y ahorros:
           ),
         ],
       ),
-      body: TabBarView(
-        controller: _tabController,
-        children: [
-          // Pestaña de Transacciones
-          _buildTransaccionesTab(),
-          // Pestaña de Ahorros
-          _buildAhorrosTab(),
-          // Pestaña de Eventos Compartidos
-          EventosCompartidosScreen(
+      body: Builder(
+        builder: (context) {
+          if (_tabController.index == 0) {
+            return _buildTransaccionesTab();
+          }
+          if (_tabController.index == 1) {
+            return _buildAhorrosTab();
+          }
+          return EventosCompartidosScreen(
             strings: _strings,
             currency: _appCurrency,
-          ),
-        ],
+          );
+        },
       ),
       floatingActionButton: _tabController.index == 0
           ? Row(
@@ -7114,21 +7228,40 @@ Una app completa para controlar tus gastos y ahorros:
   }
 
   Widget _buildTransaccionesTab() {
-    double ingresos = _calcularIngresos();
-    double egresos = _calcularEgresos();
+    final List<Map<String, dynamic>> transaccionesMes = _obtenerTransaccionesMes();
+    final Map<Map<String, dynamic>, int> indexPorReferencia = Map.identity();
+    for (int i = 0; i < _transacciones.length; i++) {
+      indexPorReferencia[_transacciones[i]] = i;
+    }
+    final bool hayMuchasTransacciones = transaccionesMes.length > 60;
+    final List<Map<String, dynamic>> transaccionesVisibles =
+        (_mostrarListaCompleta || !hayMuchasTransacciones)
+            ? transaccionesMes
+            : transaccionesMes.take(60).toList();
+
+    double ingresos = 0;
+    double egresos = 0;
+    for (final t in transaccionesMes) {
+      final monto = (t['monto'] as num).toDouble();
+      final tipo = t['tipo'];
+      if (tipo == 'Ingreso') {
+        ingresos += monto;
+      } else if (tipo == 'Egreso') {
+        egresos += monto.abs();
+      }
+    }
+
     double balance = ingresos - egresos;
     
     // Calcular egresos del mes seleccionado para verificar presupuesto
-    final List<Map<String, dynamic>> egresosDelMes = _transacciones
-        .where((t) {
-          final String? fechaStr = t['fecha'];
-          if (fechaStr == null) return false;
-          final DateTime fechaTransaccion = DateTime.parse(fechaStr);
-          return t['tipo'] == 'egreso' &&
-              fechaTransaccion.year == _mesSeleccionado.year &&
-              fechaTransaccion.month == _mesSeleccionado.month;
-        })
+    final List<Map<String, dynamic>> egresosDelMes = transaccionesMes
+        .where((t) => t['tipo'] == 'Egreso')
         .toList();
+
+    final double egresosMesSeleccionado = egresos;
+    final double porcentajePresupuesto = _presupuestoMensual > 0
+        ? (egresosMesSeleccionado / _presupuestoMensual) * 100
+        : 0;
 
     return SingleChildScrollView(
       child: Column(
@@ -7323,6 +7456,7 @@ Una app completa para controlar tus gastos y ahorros:
                     onPressed: () {
                       setState(() {
                         _mesSeleccionado = DateTime(_mesSeleccionado.year, _mesSeleccionado.month - 1);
+                        _mostrarListaCompleta = false;
                       });
                     },
                   ),
@@ -7337,6 +7471,7 @@ Una app completa para controlar tus gastos y ahorros:
                       if (pickedDate != null) {
                         setState(() {
                           _mesSeleccionado = DateTime(pickedDate.year, pickedDate.month);
+                          _mostrarListaCompleta = false;
                         });
                       }
                     },
@@ -7350,6 +7485,7 @@ Una app completa para controlar tus gastos y ahorros:
                     onPressed: () {
                       setState(() {
                         _mesSeleccionado = DateTime(_mesSeleccionado.year, _mesSeleccionado.month + 1);
+                        _mostrarListaCompleta = false;
                       });
                     },
                   ),
@@ -7387,11 +7523,11 @@ Una app completa para controlar tus gastos y ahorros:
                         ClipRRect(
                           borderRadius: BorderRadius.circular(10),
                           child: LinearProgressIndicator(
-                            value: (_calcularEgresosMesSeleccionado() / _presupuestoMensual).clamp(0.0, 1.0),
+                            value: (egresosMesSeleccionado / _presupuestoMensual).clamp(0.0, 1.0),
                             minHeight: 12,
                             backgroundColor: const Color(0xFFE5E7EB),
                             valueColor: AlwaysStoppedAnimation<Color>(
-                              _getProgressBarColor((_calcularEgresosMesSeleccionado() / _presupuestoMensual) * 100),
+                              _getProgressBarColor(porcentajePresupuesto),
                             ),
                           ),
                         ),
@@ -7401,15 +7537,15 @@ Una app completa para controlar tus gastos y ahorros:
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Text(
-                              '${_strings.gastado}: ${_appCurrency.formatAmount(_calcularEgresosMesSeleccionado())}',
+                              '${_strings.gastado}: ${_appCurrency.formatAmount(egresosMesSeleccionado)}',
                               style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF4B5563)),
                             ),
                             Text(
-                              '${((_calcularEgresosMesSeleccionado() / _presupuestoMensual) * 100).toStringAsFixed(1)}%',
+                              '${porcentajePresupuesto.toStringAsFixed(1)}%',
                               style: TextStyle(
                                 fontSize: 13,
                                 fontWeight: FontWeight.w700,
-                                color: _getProgressBarColor((_calcularEgresosMesSeleccionado() / _presupuestoMensual) * 100),
+                                color: _getProgressBarColor(porcentajePresupuesto),
                               ),
                             ),
                           ],
@@ -7419,100 +7555,125 @@ Una app completa para controlar tus gastos y ahorros:
                   ),
                 ),
               ),
-            // Lista de movimientos
-            _obtenerTransaccionesMes().isEmpty 
-              ? const Padding(
-                  padding: EdgeInsets.all(32),
-                  child: Text('No hay movimientos en este mes. ¡Usa el botón +!'),
-                )
-              : SizedBox(
-                  height: 300,
-                  child: ListView.builder(
-                    itemCount: _obtenerTransaccionesMes().length,
-                    itemBuilder: (ctx, i) {
-                      final transaccionesMes = _obtenerTransaccionesMes();
-                      final t = transaccionesMes[i];
-                      // Encontrar el índice en la lista original
-                      final indexOriginal = _transacciones.indexOf(t);
-                      return Dismissible(
-                        key: Key('transaccion_${indexOriginal}_$i'),
-                        direction: DismissDirection.endToStart,
-                        background: Container(
-                          color: Colors.red,
-                          alignment: Alignment.centerRight,
-                          padding: const EdgeInsets.only(right: 20),
-                          child: const Icon(Icons.delete, color: Colors.white, size: 30),
-                        ),
-                        onDismissed: (direction) {
-                          setState(() {
-                            _transacciones.removeAt(indexOriginal);
-                          });
-                          _guardarTransacciones();
-                          _actualizarAhorrosDelMes();
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Movimiento eliminado')),
+            // Lista de movimientos (diferida para evitar ANR al abrir)
+            if (!_mainTabHeavyReady)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 40),
+                child: Column(
+                  children: [
+                    CircularProgressIndicator(),
+                    SizedBox(height: 12),
+                    Text('Cargando movimientos...'),
+                  ],
+                ),
+              )
+            else
+              (transaccionesVisibles.isEmpty
+                  ? const Padding(
+                      padding: EdgeInsets.all(32),
+                      child: Text('No hay movimientos en este mes. ¡Usa el botón +!'),
+                    )
+                  : SizedBox(
+                      height: 300,
+                      child: ListView.builder(
+                        itemCount: transaccionesVisibles.length,
+                        itemBuilder: (ctx, i) {
+                          final t = transaccionesVisibles[i];
+                          final indexOriginal = indexPorReferencia[t] ?? i;
+                          return Dismissible(
+                            key: Key('transaccion_${indexOriginal}_$i'),
+                            direction: DismissDirection.endToStart,
+                            background: Container(
+                              color: Colors.red,
+                              alignment: Alignment.centerRight,
+                              padding: const EdgeInsets.only(right: 20),
+                              child: const Icon(Icons.delete, color: Colors.white, size: 30),
+                            ),
+                            onDismissed: (direction) {
+                              setState(() {
+                                _transacciones.removeAt(indexOriginal);
+                              });
+                              _guardarTransacciones();
+                              _actualizarAhorrosDelMes();
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Movimiento eliminado')),
+                              );
+                            },
+                            child: ListTile(
+                              leading: t['tipo'] == 'Ingreso'
+                                  ? const CircleAvatar(
+                                      backgroundColor: Color(0xFF0EA5A4),
+                                      child: Icon(Icons.check_circle, color: Colors.white, size: 20),
+                                    )
+                                  : CircleAvatar(
+                                      backgroundColor: const Color(0xFFEF4444),
+                                      child: Text(
+                                        _categorias[t['categoria']] ?? '❓',
+                                        style: const TextStyle(fontSize: 20),
+                                      ),
+                                    ),
+                              title: Text(t['titulo'], style: const TextStyle(fontWeight: FontWeight.bold)),
+                              subtitle: Text(t['tipo'] == 'Ingreso' ? t['justificacion'] : '${t['categoria']} • ${t['justificacion']}'),
+                              trailing: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text('\$${t['monto']}', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                                  IconButton(
+                                    icon: const Icon(Icons.delete, size: 20, color: Colors.red),
+                                    onPressed: () {
+                                      showDialog(
+                                        context: context,
+                                        builder: (ctx) => AlertDialog(
+                                          title: const Text('Eliminar movimiento'),
+                                          content: Text('¿Estás seguro de que deseas eliminar "${t['titulo']}"?'),
+                                          actions: [
+                                            TextButton(
+                                              onPressed: () => Navigator.pop(ctx),
+                                              child: const Text('Cancelar'),
+                                            ),
+                                            TextButton(
+                                              onPressed: () {
+                                                setState(() {
+                                                  _transacciones.removeAt(indexOriginal);
+                                                });
+                                                _guardarTransacciones();
+                                                _actualizarAhorrosDelMes();
+                                                Navigator.pop(ctx);
+                                                ScaffoldMessenger.of(context).showSnackBar(
+                                                  const SnackBar(content: Text('Movimiento eliminado')),
+                                                );
+                                              },
+                                              child: const Text('Eliminar', style: TextStyle(color: Colors.red)),
+                                            ),
+                                          ],
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                ],
+                              ),
+                              onTap: () => _mostrarFormularioConIndice(context, t['tipo'], index: i),
+                            ),
                           );
                         },
-                        child: ListTile(
-                          leading: t['tipo'] == 'Ingreso'
-                              ? const CircleAvatar(
-                                  backgroundColor: Color(0xFF0EA5A4),
-                                  child: Icon(Icons.check_circle, color: Colors.white, size: 20),
-                                )
-                              : CircleAvatar(
-                                  backgroundColor: const Color(0xFFEF4444),
-                                  child: Text(
-                                    _categorias[t['categoria']] ?? '❓',
-                                    style: const TextStyle(fontSize: 20),
-                                  ),
-                                ),
-                          title: Text(t['titulo'], style: const TextStyle(fontWeight: FontWeight.bold)),
-                          subtitle: Text(t['tipo'] == 'Ingreso' ? t['justificacion'] : '${t['categoria']} • ${t['justificacion']}'),
-                          trailing: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text('\$${t['monto']}', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
-                              IconButton(
-                                icon: const Icon(Icons.delete, size: 20, color: Colors.red),
-                                onPressed: () {
-                                  // Confirmar eliminación
-                                  showDialog(
-                                    context: context,
-                                    builder: (ctx) => AlertDialog(
-                                      title: const Text('Eliminar movimiento'),
-                                      content: Text('¿Estás seguro de que deseas eliminar "${t['titulo']}"?'),
-                                      actions: [
-                                        TextButton(
-                                          onPressed: () => Navigator.pop(ctx),
-                                          child: const Text('Cancelar'),
-                                        ),
-                                        TextButton(
-                                          onPressed: () {
-                                            setState(() {
-                                              _transacciones.removeAt(indexOriginal);
-                                            });
-                                            _guardarTransacciones();
-                                            _actualizarAhorrosDelMes();
-                                            Navigator.pop(ctx);
-                                            ScaffoldMessenger.of(context).showSnackBar(
-                                              const SnackBar(content: Text('Movimiento eliminado')),
-                                            );
-                                          },
-                                          child: const Text('Eliminar', style: TextStyle(color: Colors.red)),
-                                        ),
-                                      ],
-                                    ),
-                                  );
-                                },
-                              ),
-                            ],
-                          ),
-                          onTap: () => _mostrarFormularioConIndice(context, t['tipo'], index: i),
-                        ),
-                      );
+                      ),
+                    )),
+            if (hayMuchasTransacciones && !_mostrarListaCompleta)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: () {
+                      setState(() {
+                        _mostrarListaCompleta = true;
+                      });
                     },
+                    icon: const Icon(Icons.expand_more),
+                    label: Text('Ver todos (${transaccionesMes.length})'),
                   ),
                 ),
+              ),
             // Banner publicitario - Solo mostrar si NO es premium
             if (!_isPremium && _isBannerTransaccionesLoaded && _bannerAdTransacciones != null)
               Container(
