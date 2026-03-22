@@ -48,6 +48,7 @@ class OnboardingScreen extends StatefulWidget {
 class _OnboardingScreenState extends State<OnboardingScreen> {
   final PageController _pageController = PageController();
   int _currentPage = 0;
+  static const int _totalPages = 6;
 
   @override
   void dispose() {
@@ -56,7 +57,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   }
 
   void _nextPage() {
-    if (_currentPage < 4) {
+    if (_currentPage < _totalPages - 1) {
       _pageController.nextPage(
         duration: const Duration(milliseconds: 300),
         curve: Curves.easeInOut,
@@ -131,6 +132,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   _buildPage3(),
                   _buildPage4(),
                   _buildPage5(),
+                  _buildPage6(),
                 ],
               ),
             ),
@@ -140,7 +142,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               padding: const EdgeInsets.all(16),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
-                children: List.generate(5, (index) {
+                children: List.generate(_totalPages, (index) {
                   return Container(
                     margin: const EdgeInsets.symmetric(horizontal: 4),
                     width: _currentPage == index ? 24 : 8,
@@ -173,7 +175,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     elevation: 0,
                   ),
                   child: Text(
-                    _currentPage < 4 ? 'Siguiente' : 'Comenzar',
+                    _currentPage < _totalPages - 1 ? 'Siguiente' : 'Comenzar',
                     style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                   ),
                 ),
@@ -235,6 +237,17 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     );
   }
 
+  Widget _buildPage6() {
+    return _buildPageTemplate(
+      icon: Icons.currency_exchange,
+      color: const Color(0xFF0EA5A4),
+      title: 'Cambia tu Moneda en segundos',
+      description:
+          'Ve a Menú > Configuración > Moneda para elegir tu divisa principal cuando quieras.',
+      illustration: _buildIllustration6(),
+    );
+  }
+
   Widget _buildPageTemplate({
     required IconData icon,
     required Color color,
@@ -242,50 +255,59 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     required String description,
     required Widget illustration,
   }) {
-    return Padding(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          // Ilustración
-          illustration,
-          const SizedBox(height: 40),
-          
-          // Icono
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
-              shape: BoxShape.circle,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final bool compactHeight = constraints.maxHeight < 650;
+        final double sidePadding = compactHeight ? 16 : 24;
+        final double titleSize = compactHeight ? 21 : 24;
+        final double bodySize = compactHeight ? 15 : 16;
+        final double spacingLarge = compactHeight ? 20 : 40;
+        final double spacingMedium = compactHeight ? 14 : 24;
+
+        return SingleChildScrollView(
+          padding: EdgeInsets.all(sidePadding),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: constraints.maxHeight - (sidePadding * 2)),
+            child: IntrinsicHeight(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  illustration,
+                  SizedBox(height: spacingLarge),
+                  Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: color.withOpacity(0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(icon, size: 60, color: color),
+                  ),
+                  SizedBox(height: spacingMedium),
+                  Text(
+                    title,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: titleSize,
+                      fontWeight: FontWeight.bold,
+                      height: 1.3,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    description,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: bodySize,
+                      color: Colors.grey[600],
+                      height: 1.5,
+                    ),
+                  ),
+                ],
+              ),
             ),
-            child: Icon(icon, size: 60, color: color),
           ),
-          const SizedBox(height: 24),
-          
-          // Título
-          Text(
-            title,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-              height: 1.3,
-            ),
-          ),
-          const SizedBox(height: 16),
-          
-          // Descripción
-          Text(
-            description,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 16,
-              color: Colors.grey[600],
-              height: 1.5,
-            ),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 
@@ -398,6 +420,27 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           size: 100,
           color: const Color(0xFF8B5CF6).withOpacity(0.6),
         ),
+      ),
+    );
+  }
+
+  Widget _buildIllustration6() {
+    return Container(
+      width: 200,
+      height: 200,
+      decoration: BoxDecoration(
+        color: const Color(0xFF0EA5A4).withOpacity(0.1),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: const [
+          Icon(Icons.settings, size: 42, color: Color(0xFF0EA5A4)),
+          SizedBox(height: 10),
+          Icon(Icons.arrow_downward, size: 24, color: Color(0xFF6B7280)),
+          SizedBox(height: 10),
+          Icon(Icons.currency_exchange, size: 56, color: Color(0xFF0EA5A4)),
+        ],
       ),
     );
   }
