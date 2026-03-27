@@ -244,7 +244,7 @@ Todas las guías están listas en tu proyecto:
 
 **Build Configuration:**
 - [x] Java 21 configurado en Gradle
-- [x] Versión actual: 1.2.0 (código 3)
+- [x] Versión actual: 1.2.0 (código 7)
 - [x] Firma de release configurada
 - [x] AAB compilation exitosa
 

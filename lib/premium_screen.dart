@@ -48,28 +48,7 @@ class _PremiumScreenState extends State<PremiumScreen> with TickerProviderStateM
     productIdYearly,
   };
 
-  // ================================
-  // SISTEMA DE CUPONES DE DESCUENTO
-  // ================================
-  // Mapa de cupones válidos: código => duración en días (-1 = ilimitado)
-  static const Map<String, int> _validCoupons = {
-    // Cupones familiares/amigos (ilimitado)
-    'FAMILIA2026': -1,
-    'REGALO2026': -1,
-    'AMIGO2026': -1,
-    
-    // Cupones promocionales (1 año)
-    'PROMO365': 365,
-    'ANUAL2026': 365,
-    
-    // Cupones de prueba (30 días)
-    'PRUEBA30': 30,
-    'TEST30': 30,
-    
-    // Cupón especial para ti
-    'ZENTAVO2026': -1,
-  };
-  // ================================
+  // ...existing code...
 
   @override
   void initState() {
@@ -126,167 +105,7 @@ class _PremiumScreenState extends State<PremiumScreen> with TickerProviderStateM
     });
   }
 
-  // ================================
-  // MÉTODOS PARA CUPONES
-  // ================================
-  
-  Future<void> _showCouponDialog() async {
-    final couponController = TextEditingController();
-    
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Row(
-          children: [
-            Icon(Icons.card_giftcard, color: Color(0xFF0EA5A4)),
-            SizedBox(width: 8),
-            Text('Canjear cupón'),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              '¿Tienes un cupón de descuento?\nIngrésalo aquí:',
-              style: TextStyle(fontSize: 14),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: couponController,
-              textCapitalization: TextCapitalization.characters,
-              decoration: InputDecoration(
-                hintText: 'Ej: FAMILIA2026',
-                prefixIcon: const Icon(Icons.confirmation_number),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-            ),
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.blue[50],
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: const Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    '💡 Tipos de cupones:',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 12,
-                    ),
-                  ),
-                  SizedBox(height: 4),
-                  Text(
-                    '• Cupones de regalo (ilimitado)\n'
-                    '• Cupones promocionales (1 año)\n'
-                    '• Cupones de prueba (30 días)',
-                    style: TextStyle(fontSize: 11),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(_strings.cerrar),
-          ),
-          ElevatedButton.icon(
-            onPressed: () async {
-              final coupon = couponController.text.trim().toUpperCase();
-              Navigator.pop(context);
-              await _validateAndApplyCoupon(coupon);
-            },
-            icon: const Icon(Icons.check_circle),
-            label: const Text('Canjear'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF0EA5A4),
-              foregroundColor: Colors.white,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _validateAndApplyCoupon(String coupon) async {
-    if (coupon.isEmpty) {
-      _showMessage('⚠️ Error', 'Por favor ingresa un cupón válido', isError: true);
-      return;
-    }
-
-    // Verificar si el cupón existe
-    if (!_validCoupons.containsKey(coupon)) {
-      _showMessage(
-        '❌ Cupón inválido',
-        'El cupón "$coupon" no existe o ya expiró.\n\n'
-        'Verifica que esté escrito correctamente.',
-        isError: true,
-      );
-      return;
-    }
-
-    // Verificar si ya fue usado
-    final prefs = await SharedPreferences.getInstance();
-    final usedCoupons = prefs.getStringList('used_coupons') ?? [];
-    
-    if (usedCoupons.contains(coupon)) {
-      _showMessage(
-        '⚠️ Cupón ya usado',
-        'Este cupón ya fue canjeado anteriormente.',
-        isError: true,
-      );
-      return;
-    }
-
-    // Aplicar cupón
-    await _activatePremiumWithCoupon(coupon);
-  }
-
-  Future<void> _activatePremiumWithCoupon(String coupon) async {
-    final prefs = await SharedPreferences.getInstance();
-    final days = _validCoupons[coupon]!;
-    
-    // Marcar como Premium
-    await prefs.setBool('is_premium', true);
-    
-    // Guardar información del cupón
-    await prefs.setString('premium_source', 'coupon');
-    await prefs.setString('premium_coupon', coupon);
-    
-    // Calcular fecha de expiración
-    if (days == -1) {
-      // Premium ilimitado
-      await prefs.setString('premium_plan', 'Ilimitado (Cupón)');
-      await prefs.remove('premium_expiration');
-    } else {
-      // Premium temporal
-      final expirationDate = DateTime.now().add(Duration(days: days));
-      await prefs.setString('premium_plan', '$days días (Cupón)');
-      await prefs.setString('premium_expiration', expirationDate.toIso8601String());
-    }
-    
-    // Marcar cupón como usado
-    final usedCoupons = prefs.getStringList('used_coupons') ?? [];
-    usedCoupons.add(coupon);
-    await prefs.setStringList('used_coupons', usedCoupons);
-    
-    // Actualizar estado
-    setState(() {
-      _isPremium = true;
-    });
-    
-    // Mostrar mensaje de éxito
-    final message = days == -1
-        ? '¡Felicidades! 🎉\n\nPremium ILIMITADO activado con el cupón "$coupon".\n\n'
-          'Disfruta de todas las funciones sin restricciones.'
-        : '¡Felicidades! 🎉\n\nPremium activado por $days días con el cupón "$coupon".\n\n'
+  // ...existing code...
           'Disfruta de todas las funciones hasta ${_formatDate(DateTime.now().add(Duration(days: days)))}.';
     
     _showMessage('✅ ¡Cupón canjeado!', message, isError: false);
@@ -779,6 +598,14 @@ class _PremiumScreenState extends State<PremiumScreen> with TickerProviderStateM
             style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: 16),
+                    // ... (resto de la UI de ofertas, planes, etc.)
+
+                    // Enlaces legales
+                    const SizedBox(height: 32),
+                    _LegalLinksWidget(),
+                    // Enlaces legales también en la vista premium activa
+                    const SizedBox(height: 32),
+                    _LegalLinksWidget(),
           _buildUseCaseCard(
             emoji: '✈️',
             title: _strings.viajeros,
@@ -950,14 +777,7 @@ class _PremiumScreenState extends State<PremiumScreen> with TickerProviderStateM
               child: Text(_strings.yaCompraste),
             ),
           const SizedBox(height: 8),
-          // Botón para canjear cupones
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: OutlinedButton.icon(
-              onPressed: _showCouponDialog,
-              icon: const Icon(Icons.card_giftcard),
-              label: const Text('¿Tienes un cupón de descuento?'),
+          // ...existing code...
               style: OutlinedButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
                 side: const BorderSide(color: Color(0xFF0EA5A4), width: 2),
@@ -1342,27 +1162,7 @@ class _PremiumScreenState extends State<PremiumScreen> with TickerProviderStateM
 
   void _showDemoActivationDialog(String planName) {
     showDialog(
-      context: context,
-      builder: (_) {
-        return AlertDialog(
-          title: const Text('Activar Premium'),
-          content: Text(
-            'Para completar la compra de "$planName", utiliza la app móvil (disponible en Google Play y App Store).\n\n'
-            '¿Deseas activar Premium en esta versión de escritorio para pruebas?',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancelar'),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                final prefs = await SharedPreferences.getInstance();
-                await prefs.setBool('is_premium', true);
-                
-                // Establecer plan y fecha de expiración basado en el plan seleccionado
-                String planKey = '';
-                DateTime? fechaExpiracion;
+      // ...existing code...
                 
                 if (planName.contains('Mensual') || planName.contains('Monthly')) {
                   planKey = 'Mensual';

@@ -1,0 +1,381 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Build APK Release",
+			"type": "shell",
+			"command": "flutter",
+			"args": [
+				"build",
+				"apk",
+				"--release"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "Build AAB Release",
+			"type": "shell",
+			"command": "flutter",
+			"args": [
+				"build",
+				"appbundle",
+				"--release"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "Build AAB Release v9",
+			"type": "shell",
+			"command": "flutter",
+			"args": [
+				"build",
+				"appbundle",
+				"--release"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "Build AAB Release after ANR fix",
+			"type": "shell",
+			"command": "flutter",
+			"args": [
+				"build",
+				"appbundle",
+				"--release"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "Check devices",
+			"type": "shell",
+			"command": "flutter",
+			"args": [
+				"devices"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "Run emulator after ANR fix v2",
+			"type": "shell",
+			"command": "flutter",
+			"args": [
+				"run",
+				"--release",
+				"-d",
+				"emulator-5554"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "Install release current",
+			"type": "shell",
+			"command": "flutter",
+			"args": [
+				"install",
+				"--release",
+				"-d",
+				"emulator-5554"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "Build AAB Release v10",
+			"type": "shell",
+			"command": "flutter",
+			"args": [
+				"build",
+				"appbundle",
+				"--release"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "Install release after ANR hotfix",
+			"type": "shell",
+			"command": "flutter",
+			"args": [
+				"install",
+				"--release",
+				"-d",
+				"emulator-5554"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "Check last ANR time",
+			"type": "shell",
+			"command": "powershell",
+			"args": [
+				"-NoProfile",
+				"-Command",
+				"$adb='C:\\Users\\flore\\AppData\\Local\\Android\\sdk\\platform-tools\\adb.exe'; $line=& $adb -s emulator-5554 shell dumpsys activity lastanr | Select-String -Pattern 'ANR time:' | Select-Object -First 1; if ($line) { 'ANR=' + $line.Line } else { 'ANR=<none>' }"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "Install release after isolate hotfix",
+			"type": "shell",
+			"command": "flutter",
+			"args": [
+				"install",
+				"--release",
+				"-d",
+				"emulator-5554"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "Build APK release after isolate fix",
+			"type": "shell",
+			"command": "flutter",
+			"args": [
+				"build",
+				"apk",
+				"--release"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "Build and install release final ANR fix",
+			"type": "shell",
+			"command": "flutter",
+			"args": [
+				"install",
+				"--release",
+				"-d",
+				"emulator-5554"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "Install release after UI lazy-load fix",
+			"type": "shell",
+			"command": "flutter",
+			"args": [
+				"install",
+				"--release",
+				"-d",
+				"emulator-5554"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "Build APK release latest",
+			"type": "shell",
+			"command": "flutter",
+			"args": [
+				"build",
+				"apk",
+				"--release"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "Build AAB Release v11",
+			"type": "shell",
+			"command": "flutter",
+			"args": [
+				"build",
+				"appbundle",
+				"--release"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "Install release after main-screen perf fix",
+			"type": "shell",
+			"command": "flutter",
+			"args": [
+				"install",
+				"--release",
+				"-d",
+				"emulator-5554"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "Install release after month-filter fix",
+			"type": "shell",
+			"command": "flutter",
+			"args": [
+				"install",
+				"--release",
+				"-d",
+				"emulator-5554"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "Install release after timing-log fix",
+			"type": "shell",
+			"command": "flutter",
+			"args": [
+				"install",
+				"--release",
+				"-d",
+				"emulator-5554"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "Install release with safe-mode main",
+			"type": "shell",
+			"command": "flutter",
+			"args": [
+				"install",
+				"--release",
+				"-d",
+				"emulator-5554"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "Install release bypass splash",
+			"type": "shell",
+			"command": "flutter",
+			"args": [
+				"install",
+				"--release",
+				"-d",
+				"emulator-5554"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "Check devices after reboot",
+			"type": "shell",
+			"command": "flutter",
+			"args": [
+				"devices"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "Install and launch emulator app",
+			"type": "shell",
+			"command": "powershell",
+			"args": [
+				"-NoProfile",
+				"-Command",
+				"flutter install --release -d emulator-5554; & 'C:\\Users\\flore\\AppData\\Local\\Android\\sdk\\platform-tools\\adb.exe' -s emulator-5554 shell am start -n com.zentavo.control_gastos/.MainActivity"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "Launch clean emulator",
+			"type": "shell",
+			"command": "flutter",
+			"args": [
+				"emulators",
+				"--launch",
+				"Medium_Phone_API_36.1"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "List emulators",
+			"type": "shell",
+			"command": "flutter",
+			"args": [
+				"emulators"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "Build final AAB v12",
+			"type": "shell",
+			"command": "flutter",
+			"args": [
+				"build",
+				"appbundle",
+				"--release"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "Install and launch after aggressive startup fix",
+			"type": "shell",
+			"command": "powershell",
+			"args": [
+				"-NoProfile",
+				"-Command",
+				"flutter install --release -d emulator-5554; & 'C:\\Users\\flore\\AppData\\Local\\Android\\sdk\\platform-tools\\adb.exe' -s emulator-5554 shell am start -n com.zentavo.control_gastos/.MainActivity"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "Build final AAB latest fixes",
+			"type": "shell",
+			"command": "flutter",
+			"args": [
+				"build",
+				"appbundle",
+				"--release"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "Check clean emulator devices",
+			"type": "shell",
+			"command": "flutter",
+			"args": [
+				"devices"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "Install on clean emulator",
+			"type": "shell",
+			"command": "flutter",
+			"args": [
+				"install",
+				"--release",
+				"-d",
+				"emulator-5554"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "Check API34 packages",
+			"type": "shell",
+			"command": "powershell",
+			"args": [
+				"-NoProfile",
+				"-Command",
+				"$env:JAVA_HOME='C:\\Program Files\\Android\\Android Studio\\jbr'; $env:Path=\"$env:JAVA_HOME\\bin;$env:Path\"; $sdk='C:\\Users\\flore\\AppData\\Local\\Android\\sdk'; & \"$sdk\\cmdline-tools\\latest\\bin\\sdkmanager.bat\" --list_installed | Select-String 'system-images;android-34;google_apis;x86_64|platforms;android-34' | Out-String"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "Check devices swiftshader",
+			"type": "shell",
+			"command": "flutter",
+			"args": [
+				"devices"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "Validate ANR swiftshader",
+			"type": "shell",
+			"command": "powershell",
+			"args": [
+				"-NoProfile",
+				"-Command",
+				"flutter install --release -d emulator-5554; $adb='C:\\Users\\flore\\AppData\\Local\\Android\\sdk\\platform-tools\\adb.exe'; & $adb -s emulator-5554 shell pm clear com.zentavo.control_gastos; & $adb -s emulator-5554 logcat -c; & $adb -s emulator-5554 shell am start -n com.zentavo.control_gastos/.MainActivity; Start-Sleep -Seconds 18; & $adb -s emulator-5554 shell dumpsys activity lastanr | Select-String -Pattern 'ANR time|Reason' -CaseSensitive:$false | Out-String"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "Build final Play AAB now",
+			"type": "shell",
+			"command": "flutter",
+			"args": [
+				"build",
+				"appbundle",
+				"--release"
+			],
+			"isBackground": false
+		}
+	]
+}

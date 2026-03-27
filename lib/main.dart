@@ -31,13 +31,7 @@ import 'package:qr_flutter/qr_flutter.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
 // ================================
-// MODO DESARROLLADOR
-// ================================
-// Cambiar a 'true' para tener acceso Premium ilimitado sin pagar
-// Cambiar a 'false' para la versión pública que requiere compra
-const bool kDeveloperMode = true;
-const bool kSafeStartupMode = true;
-// ================================
+// ...existing code...
 
 void main() => runApp(const ExpenseApp());
 
@@ -288,6 +282,84 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   // Categorías personalizadas (Premium)
   Map<String, String> _categoriasPersonalizadas = {};
 
+  AppLanguage _getDefaultLanguageFromDeviceLocale(Locale locale) {
+    switch (locale.languageCode.toLowerCase()) {
+      case 'en':
+        return AppLanguage.english;
+      case 'pt':
+        return AppLanguage.portuguese;
+      case 'it':
+        return AppLanguage.italian;
+      case 'zh':
+        return AppLanguage.chinese;
+      case 'ja':
+        return AppLanguage.japanese;
+      case 'es':
+      default:
+        return AppLanguage.spanish;
+    }
+  }
+
+  AppCurrency _getDefaultCurrencyFromDeviceLocale(Locale locale) {
+    final countryCode = (locale.countryCode ?? '').toUpperCase();
+
+    switch (countryCode) {
+      case 'US':
+        return AppCurrency.usd;
+      case 'MX':
+        return AppCurrency.mxn;
+      case 'AR':
+        return AppCurrency.ars;
+      case 'CL':
+        return AppCurrency.clp;
+      case 'BR':
+        return AppCurrency.brl;
+      case 'GB':
+        return AppCurrency.gbp;
+      case 'IN':
+        return AppCurrency.inr;
+      case 'JP':
+        return AppCurrency.jpy;
+      case 'CA':
+        return AppCurrency.cad;
+      case 'AU':
+        return AppCurrency.aud;
+      case 'CH':
+        return AppCurrency.chf;
+      case 'CN':
+        return AppCurrency.cny;
+      case 'SE':
+        return AppCurrency.sek;
+      case 'NO':
+        return AppCurrency.nok;
+      case 'ZA':
+        return AppCurrency.zar;
+      case 'ES':
+      case 'IT':
+      case 'PT':
+      case 'FR':
+      case 'DE':
+      case 'NL':
+      case 'BE':
+      case 'AT':
+      case 'IE':
+      case 'FI':
+      case 'GR':
+      case 'LU':
+      case 'SI':
+      case 'SK':
+      case 'EE':
+      case 'LV':
+      case 'LT':
+      case 'CY':
+      case 'MT':
+      case 'HR':
+        return AppCurrency.eur;
+      default:
+        return AppCurrency.usd;
+    }
+  }
+
   double _parseAmountInput(String value) {
     final normalized = value.trim().replaceAll(' ', '').replaceAll(',', '.');
     return double.tryParse(normalized) ?? 0.0;
@@ -303,19 +375,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     try {
       final prefs = await SharedPreferences.getInstance();
       
-      // Si está en modo desarrollador, siempre es Premium
-      if (kDeveloperMode) {
-        if (mounted) {
-          setState(() {
-            _isPremium = true;
-          });
-        }
-        // También guardar en preferencias para consistencia
-        await prefs.setBool('is_premium', true);
-        return;
-      }
-      
-      // Modo normal: verificar si compró Premium
+      // Solo verificar si compró Premium
       final isPremium = prefs.getBool('is_premium') ?? false;
       if (mounted) {
         setState(() {
@@ -324,12 +384,6 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
       }
     } catch (e) {
       print('Error al verificar estado premium: $e');
-      // En caso de error en modo desarrollador, activar Premium de todos modos
-      if (kDeveloperMode && mounted) {
-        setState(() {
-          _isPremium = true;
-        });
-      }
     }
   }
 
@@ -579,19 +633,31 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     final String? datosGuardados = _prefs.getString('transacciones');
     _recordTiming('Transacciones cargadas de prefs');
     
-    // Cargar idioma y moneda
-    final String languageCode = _prefs.getString('app_language') ?? 'spanish';
-    _appLanguage = AppLanguage.values.firstWhere(
-      (lang) => lang.toString().split('.').last == languageCode,
-      orElse: () => AppLanguage.spanish,
-    );
+    // Cargar idioma y moneda (por defecto según locale del dispositivo en primera instalación)
+    final deviceLocale = WidgetsBinding.instance.platformDispatcher.locale;
+
+    if (_prefs.containsKey('app_language')) {
+      final String languageCode = _prefs.getString('app_language') ?? 'spanish';
+      _appLanguage = AppLanguage.values.firstWhere(
+        (lang) => lang.toString().split('.').last == languageCode,
+        orElse: () => AppLanguage.spanish,
+      );
+    } else {
+      _appLanguage = _getDefaultLanguageFromDeviceLocale(deviceLocale);
+      await _prefs.setString('app_language', _appLanguage.toString().split('.').last);
+    }
     _recordTiming('Idioma cargado');
-    
-    final String currencyCode = _prefs.getString('app_currency') ?? 'usd';
-    _appCurrency = AppCurrency.values.firstWhere(
-      (curr) => curr.toString().split('.').last == currencyCode,
-      orElse: () => AppCurrency.usd,
-    );
+
+    if (_prefs.containsKey('app_currency')) {
+      final String currencyCode = _prefs.getString('app_currency') ?? 'usd';
+      _appCurrency = AppCurrency.values.firstWhere(
+        (curr) => curr.toString().split('.').last == currencyCode,
+        orElse: () => AppCurrency.usd,
+      );
+    } else {
+      _appCurrency = _getDefaultCurrencyFromDeviceLocale(deviceLocale);
+      await _prefs.setString('app_currency', _appCurrency.toString().split('.').last);
+    }
     _recordTiming('Moneda cargada');
     
     // Solo recrear AppStrings si el idioma cambió
@@ -3969,7 +4035,7 @@ Una app completa para controlar tus gastos y ahorros:
     setState(() {
       _appCurrency = moneda;
     });
-    _prefs.setString('currency', moneda.name);
+    _prefs.setString('app_currency', moneda.toString().split('.').last);
     
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('${_strings.monedaCambiada} ${moneda.symbol} ${moneda.name.toUpperCase()}')),
@@ -3999,8 +4065,12 @@ Una app completa para controlar tus gastos y ahorros:
                       actions: [
                         IconButton(
                           icon: const Icon(Icons.add),
-                          onPressed: () {
-                            _mostrarDialogoAgregarMoneda();
+                          onPressed: () async {
+                            final monedaSeleccionada = await _mostrarDialogoAgregarMoneda();
+                            if (monedaSeleccionada != null) {
+                              _agregarMoneda(monedaSeleccionada);
+                              setState(() {});
+                            }
                           },
                         ),
                       ],
@@ -4114,7 +4184,7 @@ Una app completa para controlar tus gastos y ahorros:
     );
   }
 
-  void _mostrarDialogoAgregarMoneda() {
+  Future<AppCurrency?> _mostrarDialogoAgregarMoneda() async {
     final monedasNoAgregadas = AppCurrency.values
         .where((m) => !_monedasDisponibles.contains(m) && m != _appCurrency)
         .toList();
@@ -4123,10 +4193,10 @@ Una app completa para controlar tus gastos y ahorros:
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(_strings.noObtieneMonedasDisponibles)),
       );
-      return;
+      return null;
     }
 
-    showDialog(
+    return showDialog<AppCurrency>(
       context: context,
       builder: (_) {
         return AlertDialog(
@@ -4146,8 +4216,7 @@ Una app completa para controlar tus gastos y ahorros:
                   title: Text(moneda.name.toUpperCase()),
                   subtitle: Text(_getNombreMoneda(moneda)),
                   onTap: () {
-                    Navigator.pop(context);
-                    _agregarMoneda(moneda);
+                    Navigator.pop(context, moneda);
                   },
                 );
               },
@@ -6835,13 +6904,6 @@ Una app completa para controlar tus gastos y ahorros:
               if (!_isPremium)
                 PopupMenuItem(value: 'premium', child: Text('⭐ Premium')),
               const PopupMenuDivider(),
-              if (kDeveloperMode)
-                const PopupMenuItem(
-                  value: 'datos_demo',
-                  child: Text('📸 Cargar Datos Demo', style: TextStyle(color: Color(0xFFF59E0B))),
-                ),
-              if (kDeveloperMode)
-                const PopupMenuDivider(),
               PopupMenuItem(value: 'perfil', child: Text('👤 ${_strings.miPerfil}')),
               PopupMenuItem(value: 'configuracion', child: Text('⚙️ ${_strings.configuracion}')),
             ],

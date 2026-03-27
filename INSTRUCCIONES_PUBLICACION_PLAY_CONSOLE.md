@@ -2,7 +2,7 @@
 
 **Fecha:** 10 de marzo de 2026  
 **App:** Zentavo - Control Financiero  
-**Versión para revisión:** 1.2.0 (código 3)
+**Versión para revisión:** 1.2.0 (código 7)
 
 ---
 
@@ -204,7 +204,7 @@ Antes de hacer click en "Enviar para revisión":
 
 2. Incrementar versión en `android/version.properties`:
    ```
-   versionCode=4
+   versionCode=8
    versionName=1.2.1
    ```
 
@@ -267,7 +267,7 @@ C:\Users\flore\control_gastos\build\app\outputs\bundle\release\app-release.aab
 
 **Características:**
 - Versión: 1.2.0
-- Código: 3
+- Código: 7
 - Tamaño: 54.7 MB
 - Firmado con: zentavo-release-key.jks
 - Modo desarrollador: ✅ ACTIVADO

@@ -257,52 +257,82 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   }) {
     return LayoutBuilder(
       builder: (context, constraints) {
+        // Detectar iPad: pantallas con ancho >= 600dp se consideran tablet
+        final bool isTablet = constraints.maxWidth >= 600;
         final bool compactHeight = constraints.maxHeight < 650;
-        final double sidePadding = compactHeight ? 16 : 24;
-        final double titleSize = compactHeight ? 21 : 24;
-        final double bodySize = compactHeight ? 15 : 16;
-        final double spacingLarge = compactHeight ? 20 : 40;
-        final double spacingMedium = compactHeight ? 14 : 24;
+
+        final double sidePadding = isTablet ? 64 : (compactHeight ? 16 : 24);
+        final double titleSize = isTablet ? 26 : (compactHeight ? 21 : 24);
+        final double bodySize = isTablet ? 17 : (compactHeight ? 15 : 16);
+        // En iPad reducimos el espaciado para que el texto no quede cortado
+        final double spacingLarge = isTablet ? 16 : (compactHeight ? 20 : 40);
+        final double spacingMedium = isTablet ? 12 : (compactHeight ? 14 : 24);
+        // Ilustración más pequeña en iPad para dejar espacio al texto
+        final double illustrationSize = isTablet
+            ? constraints.maxHeight * 0.22
+            : (compactHeight ? 140 : 200);
 
         return SingleChildScrollView(
-          padding: EdgeInsets.all(sidePadding),
-          child: ConstrainedBox(
-            constraints: BoxConstraints(minHeight: constraints.maxHeight - (sidePadding * 2)),
-            child: IntrinsicHeight(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  illustration,
-                  SizedBox(height: spacingLarge),
-                  Container(
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: color.withOpacity(0.1),
-                      shape: BoxShape.circle,
+          padding: EdgeInsets.symmetric(
+            horizontal: sidePadding,
+            vertical: isTablet ? 8 : sidePadding,
+          ),
+          child: Center(
+            child: ConstrainedBox(
+              // En iPad limitamos el ancho del contenido para mejor legibilidad
+              constraints: BoxConstraints(
+                maxWidth: isTablet ? 600 : double.infinity,
+                minHeight: constraints.maxHeight -
+                    (isTablet ? 16 : sidePadding * 2),
+              ),
+              child: IntrinsicHeight(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    // Adaptar la ilustración al tamaño calculado
+                    SizedBox(
+                      width: illustrationSize,
+                      height: illustrationSize,
+                      child: FittedBox(
+                        fit: BoxFit.contain,
+                        child: illustration,
+                      ),
                     ),
-                    child: Icon(icon, size: 60, color: color),
-                  ),
-                  SizedBox(height: spacingMedium),
-                  Text(
-                    title,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: titleSize,
-                      fontWeight: FontWeight.bold,
-                      height: 1.3,
+                    SizedBox(height: spacingLarge),
+                    Container(
+                      padding: EdgeInsets.all(isTablet ? 16 : 20),
+                      decoration: BoxDecoration(
+                        color: color.withOpacity(0.1),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        icon,
+                        size: isTablet ? 48 : 60,
+                        color: color,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    description,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: bodySize,
-                      color: Colors.grey[600],
-                      height: 1.5,
+                    SizedBox(height: spacingMedium),
+                    Text(
+                      title,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: titleSize,
+                        fontWeight: FontWeight.bold,
+                        height: 1.3,
+                      ),
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 16),
+                    Text(
+                      description,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: bodySize,
+                        color: Colors.grey[600],
+                        height: 1.5,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
