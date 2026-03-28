@@ -12,7 +12,7 @@ import 'export_utils.dart';
 import 'localization.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:local_auth/local_auth.dart';
-import 'splash_screen.dart';
+
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'premium_screen.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -20,15 +20,19 @@ import 'shared_events_screen.dart';
 import 'analytics_service.dart';
 import 'onboarding_screen.dart';
 import 'notifications_service.dart';
-import 'social_share_service.dart';
+
 import 'profile_screen.dart';
 import 'recurring_transactions.dart';
 import 'backup_service.dart';
 import 'package:intl/intl.dart';
 import 'package:file_picker/file_picker.dart';
 import 'currency_exchange_service.dart';
+
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
+
+// Modo seguro de inicio: desactiva inicializaciones pesadas para pruebas o builds especiales
+const bool kSafeStartupMode = false;
 
 // ================================
 // ...existing code...
