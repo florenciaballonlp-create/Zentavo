@@ -106,10 +106,7 @@ class _PremiumScreenState extends State<PremiumScreen> with TickerProviderStateM
   }
 
   // ...existing code...
-          'Disfruta de todas las funciones hasta ${_formatDate(DateTime.now().add(Duration(days: days)))}.';
-    
-    _showMessage('✅ ¡Cupón canjeado!', message, isError: false);
-  }
+
 
   void _showMessage(String title, String message, {required bool isError}) {
     showDialog(
