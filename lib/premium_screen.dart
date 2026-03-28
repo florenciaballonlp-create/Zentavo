@@ -774,18 +774,6 @@ class _PremiumScreenState extends State<PremiumScreen> with TickerProviderStateM
               child: Text(_strings.yaCompraste),
             ),
           const SizedBox(height: 8),
-          // ...existing code...
-              style: OutlinedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
-                side: const BorderSide(color: Color(0xFF0EA5A4), width: 2),
-                foregroundColor: const Color(0xFF0EA5A4),
-                textStyle: const TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          ),
         ],
       ),
     );
@@ -1159,8 +1147,20 @@ class _PremiumScreenState extends State<PremiumScreen> with TickerProviderStateM
 
   void _showDemoActivationDialog(String planName) {
     showDialog(
-      // ...existing code...
-                
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text('Activar Premium de prueba'),
+          content: Text('¿Quieres activar Premium para pruebas con el plan $planName?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancelar'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                String planKey;
+                DateTime fechaExpiracion;
                 if (planName.contains('Mensual') || planName.contains('Monthly')) {
                   planKey = 'Mensual';
                   fechaExpiracion = DateTime.now().add(const Duration(days: 30));
@@ -1171,16 +1171,14 @@ class _PremiumScreenState extends State<PremiumScreen> with TickerProviderStateM
                   planKey = 'De por vida';
                   fechaExpiracion = DateTime(2099, 12, 31);
                 }
-                
+                final prefs = await SharedPreferences.getInstance();
                 await prefs.setString('premium_plan', planKey);
                 await prefs.setString('premium_expiration', fechaExpiracion.toIso8601String());
                 await prefs.setString('premium_purchase_date', DateTime.now().toIso8601String());
-                
                 setState(() {
                   _isPremium = true;
                 });
                 Navigator.pop(context);
-                Navigator.pop(context, true);
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
                     content: Text('¡Premium activado! 🎉'),
@@ -1197,6 +1195,29 @@ class _PremiumScreenState extends State<PremiumScreen> with TickerProviderStateM
         );
       },
     );
+  }
+  }
+
+  class _LegalLinksWidget extends StatelessWidget {
+    @override
+    Widget build(BuildContext context) {
+      return Column(
+        children: [
+          TextButton(
+            onPressed: () {
+              // TODO: Navegar a política de privacidad
+            },
+            child: const Text('Política de Privacidad'),
+          ),
+          TextButton(
+            onPressed: () {
+              // TODO: Navegar a términos y condiciones
+            },
+            child: const Text('Términos y Condiciones'),
+          ),
+        ],
+      );
+    }
   }
   
   Widget _buildUseCaseCard({
