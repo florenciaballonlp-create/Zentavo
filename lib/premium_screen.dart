@@ -1446,4 +1446,3 @@ class _PremiumScreenState extends State<PremiumScreen> with TickerProviderStateM
       ),
     );
   }
-}
