@@ -40,6 +40,7 @@ class _PremiumScreenState extends State<PremiumScreen> with TickerProviderStateM
   // Scroll controller para navegación programática
   final ScrollController _scrollController = ScrollController();
   final GlobalKey _planesKey = GlobalKey();
+  final GlobalKey _planesKey = GlobalKey();
 
   // IDs de productos (estos deben coincidir con los configurados en Google Play y App Store)
   static const String productIdMonthly = 'premium_monthly';
@@ -98,93 +99,7 @@ class _PremiumScreenState extends State<PremiumScreen> with TickerProviderStateM
       );
     }
 
-    Widget _buildTestimonialCard({
-      required String name,
-      required String role,
-      required int rating,
-      required String comment,
-    }) {
-      return Card(
-        margin: const EdgeInsets.only(bottom: 16),
-        elevation: 2,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  CircleAvatar(
-                    backgroundColor: const Color(0xFF0EA5A4),
-                    child: Text(
-                      name[0],
-                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          name,
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        Text(
-                          role,
-                          style: const TextStyle(
-                            fontSize: 13,
-                            color: Color(0xFF6B7280),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Row(
-                    children: List.generate(
-                      rating,
-                      (index) => const Icon(
-                        Icons.star,
-                        color: Color(0xFFF59E0B),
-                        size: 18,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Text(
-                comment,
-                style: const TextStyle(
-                  fontSize: 14,
-                  color: Color(0xFF374151),
-                  height: 1.5,
-                ),
-              ),
-              const SizedBox(height: 8),
-              const Row(
-                children: [
-                  Icon(Icons.verified, color: Color(0xFF0EA5A4), size: 16),
-                  SizedBox(width: 4),
-                  Text(
-                    'Usuario verificado',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Color(0xFF0EA5A4),
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      );
-    }
+    // ...otros widgets y métodos auxiliares...
 
     Widget _buildSavingsCalculator() {
       return Container(
@@ -643,10 +558,8 @@ class _PremiumScreenState extends State<PremiumScreen> with TickerProviderStateM
   }
 
   void _scrollToPlanes() {
-    // Intentar obtener el contexto del GlobalKey
     final context = _planesKey.currentContext;
     if (context != null) {
-      // Si existe el key, hacer scroll a su posición
       Scrollable.ensureVisible(
         context,
         duration: const Duration(milliseconds: 600),
@@ -1256,6 +1169,50 @@ class _PremiumScreenState extends State<PremiumScreen> with TickerProviderStateM
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
                       content: Text('Descarga la app móvil para comprar Premium'),
+                    ),
+                  );
+                }
+              : null,
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                Icon(plan['icon'], size: 32, color: const Color(0xFF0EA5A4)),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(plan['title'], style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                      Text(plan['description'], style: const TextStyle(fontSize: 14)),
+                      Row(
+                        children: [
+                          Text(plan['price'], style: const TextStyle(fontSize: 16, color: Color(0xFF0EA5A4), fontWeight: FontWeight.bold)),
+                          const SizedBox(width: 8),
+                          if (plan['originalPrice'] != null && plan['originalPrice'] != '')
+                            Text(plan['originalPrice'], style: const TextStyle(fontSize: 14, color: Colors.grey, decoration: TextDecoration.lineThrough)),
+                          if (badge.isNotEmpty)
+                            Container(
+                              margin: const EdgeInsets.only(left: 8),
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: badgeColor,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(badge, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                            ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
                     ),
                   );
                 }
