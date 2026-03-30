@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-class _LegalLinksWidget extends StatelessWidget {
-  const _LegalLinksWidget({Key? key}) : super(key: key);
+class LegalLinksWidget extends StatelessWidget {
+  const LegalLinksWidget({Key? key}) : super(key: key);
 
   static const String privacyUrl = 'https://zentavo.com/privacidad';
   static const String termsUrl = 'https://zentavo.com/terminos';

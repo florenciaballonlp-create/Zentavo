@@ -376,6 +376,17 @@
 				"--release"
 			],
 			"isBackground": false
+		},
+		{
+			"label": "flutter build apk --debug",
+			"type": "shell",
+			"command": "flutter",
+			"args": [
+				"build",
+				"apk",
+				"--debug"
+			],
+			"isBackground": false
 		}
 	]
 }

@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:in_app_purchase/in_app_purchase.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'localization.dart';
+import 'legal_links_widget.dart';
 
 class PremiumScreen extends StatefulWidget {
   final AppStrings? strings;
@@ -16,6 +17,7 @@ class PremiumScreen extends StatefulWidget {
   State<PremiumScreen> createState() => _PremiumScreenState();
 }
 
+// Declaración única de la clase _PremiumScreenState a nivel superior
 class _PremiumScreenState extends State<PremiumScreen> with TickerProviderStateMixin {
   late AppStrings _strings;
   final InAppPurchase _inAppPurchase = InAppPurchase.instance;
@@ -24,17 +26,17 @@ class _PremiumScreenState extends State<PremiumScreen> with TickerProviderStateM
   bool _isAvailable = false;
   bool _loading = true;
   bool _isPremium = false;
-  
+
   // Performance timing
   late DateTime _screenOpenTime;
-  
+
   // Timer de oferta
   late Timer _offerTimer;
   Duration _timeRemaining = const Duration(hours: 24);
-  
+
   // Animaciones
   late AnimationController _pulseController;
-  
+
   // Scroll controller para navegación programática
   final ScrollController _scrollController = ScrollController();
   final GlobalKey _planesKey = GlobalKey();
@@ -42,49 +44,263 @@ class _PremiumScreenState extends State<PremiumScreen> with TickerProviderStateM
   // IDs de productos (estos deben coincidir con los configurados en Google Play y App Store)
   static const String productIdMonthly = 'premium_monthly';
   static const String productIdYearly = 'premium_yearly';
-
   static const Set<String> _kProductIds = {
     productIdMonthly,
     productIdYearly,
   };
 
+  // ...todos los métodos y widgets auxiliares aquí dentro...
   // ...existing code...
 
-  @override
-  void initState() {
-    super.initState();
-    _screenOpenTime = DateTime.now();
-    print('[TIMING] PremiumScreen OPENED from: ${widget.source ?? "unknown"}');
-    
-    // Inicializar animaciones
-    _pulseController = AnimationController(
-      duration: const Duration(seconds: 2),
-      vsync: this,
-    )..repeat(reverse: true);
-    
-    // Inicializar timer de oferta
-    _startOfferTimer();
-    
-    // Inicializar strings: usar las proporcionadas o crear una por defecto
-    if (widget.strings != null) {
-      _strings = widget.strings!;
-    } else {
-      _strings = AppStrings(language: AppLanguage.spanish);
+    // Eliminado duplicado de _buildFeatureCard
+
+    Widget _buildUseCaseCard({
+      required String emoji,
+      required String title,
+      required String description,
+    }) {
+      return Card(
+        margin: const EdgeInsets.only(bottom: 12),
+        elevation: 2,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Text(emoji, style: const TextStyle(fontSize: 40)),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      description,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: Color(0xFF6B7280),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(Icons.arrow_forward_ios, size: 16, color: Color(0xFF0EA5A4)),
+            ],
+          ),
+        ),
+      );
     }
-    
-    _checkPremiumStatus();
-    // En Web o Windows, mostrar directamente los planes mockeados sin intentar InAppPurchase
-    if (kIsWeb || Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
-      setState(() {
-        _loading = false;
-        _isAvailable = false; // Las compras no están disponibles en estos SO
-      });
-      print('[TIMING] PremiumScreen ready (Desktop/Web) - ${DateTime.now().difference(_screenOpenTime).inMilliseconds}ms');
-    } else {
-      _initStoreInfo();
+
+    Widget _buildTestimonialCard({
+      required String name,
+      required String role,
+      required int rating,
+      required String comment,
+    }) {
+      return Card(
+        margin: const EdgeInsets.only(bottom: 16),
+        elevation: 2,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  CircleAvatar(
+                    backgroundColor: const Color(0xFF0EA5A4),
+                    child: Text(
+                      name[0],
+                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          name,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        Text(
+                          role,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: Color(0xFF6B7280),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Row(
+                    children: List.generate(
+                      rating,
+                      (index) => const Icon(
+                        Icons.star,
+                        color: Color(0xFFF59E0B),
+                        size: 18,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Text(
+                comment,
+                style: const TextStyle(
+                  fontSize: 14,
+                  color: Color(0xFF374151),
+                  height: 1.5,
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Row(
+                children: [
+                  Icon(Icons.verified, color: Color(0xFF0EA5A4), size: 16),
+                  SizedBox(width: 4),
+                  Text(
+                    'Usuario verificado',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Color(0xFF0EA5A4),
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      );
     }
-  }
-  
+
+    Widget _buildSavingsCalculator() {
+      return Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [Color(0xFFDCFCE7), Color(0xFFF0FDF4)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: const Color(0xFF22C55E), width: 2),
+        ),
+        child: Column(
+          children: [
+            const Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.trending_up, color: Color(0xFF22C55E), size: 32),
+                SizedBox(width: 12),
+                Text(
+                  'Usuarios Premium ahorran',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF22C55E),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              '\$247',
+              style: TextStyle(
+                fontSize: 48,
+                fontWeight: FontWeight.w900,
+                color: Color(0xFF22C55E),
+              ),
+            ),
+            const Text(
+              'en promedio por mes',
+              style: TextStyle(
+                fontSize: 16,
+                color: Color(0xFF059669),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Column(
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('📊 Análisis IA', style: TextStyle(fontSize: 14)),
+                      Text('+\$120/mes', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF22C55E))),
+                    ],
+                  ),
+                  SizedBox(height: 8),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('💡 Alertas inteligentes', style: TextStyle(fontSize: 14)),
+                      Text('+\$87/mes', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF22C55E))),
+                    ],
+                  ),
+                  SizedBox(height: 8),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('📂 Categorías custom', style: TextStyle(fontSize: 14)),
+                      Text('+\$40/mes', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF22C55E))),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              'Invierte \$4.99/mes → Ahorra \$247/mes',
+              style: TextStyle(
+                fontSize: 13,
+                color: Color(0xFF059669),
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    Widget _buildLegalLinksWidget() {
+      return Column(
+        children: [
+          TextButton(
+            onPressed: () {
+              // TODO: Navegar a política de privacidad
+            },
+            child: const Text('Política de Privacidad'),
+          ),
+          TextButton(
+            onPressed: () {
+              // TODO: Navegar a términos y condiciones
+            },
+            child: const Text('Términos y Condiciones'),
+          ),
+        ],
+      );
+    }
+    // ...existing code...
+
   void _startOfferTimer() {
     _offerTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (_timeRemaining.inSeconds > 0) {
@@ -599,10 +815,10 @@ class _PremiumScreenState extends State<PremiumScreen> with TickerProviderStateM
 
                     // Enlaces legales
                     const SizedBox(height: 32),
-                    _LegalLinksWidget(),
+                    LegalLinksWidget(),
                     // Enlaces legales también en la vista premium activa
                     const SizedBox(height: 32),
-                    _LegalLinksWidget(),
+                    LegalLinksWidget(),
           _buildUseCaseCard(
             emoji: '✈️',
             title: _strings.viajeros,
@@ -1186,9 +1402,6 @@ class _PremiumScreenState extends State<PremiumScreen> with TickerProviderStateM
                   ),
                 );
               },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF0EA5A4),
-              ),
               child: const Text('Activar para pruebas'),
             ),
           ],
@@ -1196,253 +1409,5 @@ class _PremiumScreenState extends State<PremiumScreen> with TickerProviderStateM
       },
     );
   }
-  }
 
-  class _LegalLinksWidget extends StatelessWidget {
-    @override
-    Widget build(BuildContext context) {
-      return Column(
-        children: [
-          TextButton(
-            onPressed: () {
-              // TODO: Navegar a política de privacidad
-            },
-            child: const Text('Política de Privacidad'),
-          ),
-          TextButton(
-            onPressed: () {
-              // TODO: Navegar a términos y condiciones
-            },
-            child: const Text('Términos y Condiciones'),
-          ),
-        ],
-      );
-    }
-  }
-  
-  Widget _buildUseCaseCard({
-    required String emoji,
-    required String title,
-    required String description,
-  }) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          children: [
-            Text(emoji, style: const TextStyle(fontSize: 40)),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    description,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      color: Color(0xFF6B7280),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const Icon(Icons.arrow_forward_ios, size: 16, color: Color(0xFF0EA5A4)),
-          ],
-        ),
-      ),
-    );
-  }
-  
-  Widget _buildTestimonialCard({
-    required String name,
-    required String role,
-    required int rating,
-    required String comment,
-  }) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 16),
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                CircleAvatar(
-                  backgroundColor: const Color(0xFF0EA5A4),
-                  child: Text(
-                    name[0],
-                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        name,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      Text(
-                        role,
-                        style: const TextStyle(
-                          fontSize: 13,
-                          color: Color(0xFF6B7280),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Row(
-                  children: List.generate(
-                    rating,
-                    (index) => const Icon(
-                      Icons.star,
-                      color: Color(0xFFF59E0B),
-                      size: 18,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Text(
-              comment,
-              style: const TextStyle(
-                fontSize: 14,
-                color: Color(0xFF374151),
-                height: 1.5,
-              ),
-            ),
-            const SizedBox(height: 8),
-            const Row(
-              children: [
-                Icon(Icons.verified, color: Color(0xFF0EA5A4), size: 16),
-                SizedBox(width: 4),
-                Text(
-                  'Usuario verificado',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Color(0xFF0EA5A4),
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-  
-  Widget _buildSavingsCalculator() {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFFDCFCE7), Color(0xFFF0FDF4)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFF22C55E), width: 2),
-      ),
-      child: Column(
-        children: [
-          const Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.trending_up, color: Color(0xFF22C55E), size: 32),
-              SizedBox(width: 12),
-              Text(
-                'Usuarios Premium ahorran',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                  color: Color(0xFF22C55E),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          const Text(
-            '\$247',
-            style: TextStyle(
-              fontSize: 48,
-              fontWeight: FontWeight.w900,
-              color: Color(0xFF22C55E),
-            ),
-          ),
-          const Text(
-            'en promedio por mes',
-            style: TextStyle(
-              fontSize: 16,
-              color: Color(0xFF059669),
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 16),
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: const Column(
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text('📊 Análisis IA', style: TextStyle(fontSize: 14)),
-                    Text('+\$120/mes', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF22C55E))),
-                  ],
-                ),
-                SizedBox(height: 8),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text('💡 Alertas inteligentes', style: TextStyle(fontSize: 14)),
-                    Text('+\$87/mes', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF22C55E))),
-                  ],
-                ),
-                SizedBox(height: 8),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text('📂 Categorías custom', style: TextStyle(fontSize: 14)),
-                    Text('+\$40/mes', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF22C55E))),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 12),
-          const Text(
-            'Invierte \$4.99/mes → Ahorra \$247/mes',
-            style: TextStyle(
-              fontSize: 13,
-              color: Color(0xFF059669),
-              fontStyle: FontStyle.italic,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+}
