@@ -51,7 +51,271 @@ class _PremiumScreenState extends State<PremiumScreen> with TickerProviderStateM
   };
 
   // ...todos los métodos y widgets auxiliares aquí dentro...
-  // ...existing code...
+  import 'dart:async';
+  import 'dart:io';
+  import 'package:flutter/foundation.dart';
+  import 'package:flutter/material.dart';
+  import 'package:in_app_purchase/in_app_purchase.dart';
+  import 'package:shared_preferences/shared_preferences.dart';
+  import 'package:flutter/services.dart';
+  import 'localization.dart';
+
+  class PremiumScreen extends StatefulWidget {
+    final AppStrings? strings;
+    final String? source;
+
+    const PremiumScreen({this.strings, this.source, super.key});
+
+    @override
+    State<PremiumScreen> createState() => _PremiumScreenState();
+  }
+
+  class _PremiumScreenState extends State<PremiumScreen> with TickerProviderStateMixin {
+    late AppStrings _strings;
+    final InAppPurchase _inAppPurchase = InAppPurchase.instance;
+    late StreamSubscription<List<PurchaseDetails>> _subscription;
+    List<ProductDetails> _products = [];
+    bool _isAvailable = false;
+    bool _loading = true;
+    bool _isPremium = false;
+    late DateTime _screenOpenTime;
+    late Timer _offerTimer;
+    Duration _timeRemaining = const Duration(hours: 24);
+    late AnimationController _pulseController;
+    final ScrollController _scrollController = ScrollController();
+    final GlobalKey _planesKey = GlobalKey();
+    static const String productIdMonthly = 'premium_monthly';
+    static const String productIdYearly = 'premium_yearly';
+    static const Set<String> _kProductIds = {
+      productIdMonthly,
+      productIdYearly,
+    };
+
+    @override
+    void initState() {
+      super.initState();
+      _strings = widget.strings ?? AppStrings.es();
+      _screenOpenTime = DateTime.now();
+      _pulseController = AnimationController(
+        vsync: this,
+        duration: const Duration(milliseconds: 1200),
+      )..repeat(reverse: true);
+      _startOfferTimer();
+      _initStoreInfo();
+      _checkPremiumStatus();
+    }
+
+    void _startOfferTimer() {
+      _offerTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+        if (_timeRemaining.inSeconds > 0) {
+          setState(() {
+            _timeRemaining = _timeRemaining - const Duration(seconds: 1);
+          });
+        }
+      });
+    }
+
+    Future<void> _checkPremiumStatus() async {
+      final prefs = await SharedPreferences.getInstance();
+      final isPremium = prefs.getBool('is_premium') ?? false;
+      setState(() {
+        _isPremium = isPremium;
+      });
+    }
+
+    void _showMessage(String title, String message, {required bool isError}) {
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Row(
+            children: [
+              Icon(
+                isError ? Icons.error_outline : Icons.check_circle,
+                color: isError ? Colors.red : Colors.green,
+              ),
+              const SizedBox(width: 8),
+              Expanded(child: Text(title)),
+            ],
+          ),
+          content: Text(message),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+    }
+
+    String _formatDate(DateTime date) {
+      final months = [
+        'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
+        'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'
+      ];
+      return '${date.day} de ${months[date.month - 1]} de ${date.year}';
+    }
+
+    Future<void> _initStoreInfo() async {
+      final bool available = await _inAppPurchase.isAvailable();
+      if (!available) {
+        setState(() {
+          _isAvailable = false;
+          _loading = false;
+        });
+        return;
+      }
+      final Stream<List<PurchaseDetails>> purchaseUpdated =
+          _inAppPurchase.purchaseStream;
+      _subscription = purchaseUpdated.listen((purchaseDetailsList) {
+        _listenToPurchaseUpdated(purchaseDetailsList);
+      }, onDone: () {
+        _subscription.cancel();
+      }, onError: (error) {
+        print('Error en compras: $error');
+      });
+      final ProductDetailsResponse productDetailResponse =
+          await _inAppPurchase.queryProductDetails(_kProductIds);
+      if (productDetailResponse.error != null) {
+        setState(() {
+          _isAvailable = false;
+          _loading = false;
+        });
+        return;
+      }
+      if (productDetailResponse.productDetails.isEmpty) {
+        setState(() {
+          _isAvailable = false;
+          _loading = false;
+        });
+        return;
+      }
+      setState(() {
+        _isAvailable = true;
+        _products = productDetailResponse.productDetails;
+        _loading = false;
+      });
+    }
+
+    void _listenToPurchaseUpdated(List<PurchaseDetails> purchaseDetailsList) {
+      for (var purchaseDetails in purchaseDetailsList) {
+        if (purchaseDetails.status == PurchaseStatus.pending) {
+          _showPendingUI();
+        } else {
+          if (purchaseDetails.status == PurchaseStatus.error) {
+            _handleError(purchaseDetails.error!);
+          } else if (purchaseDetails.status == PurchaseStatus.purchased ||
+              purchaseDetails.status == PurchaseStatus.restored) {
+            _deliverProduct(purchaseDetails);
+          }
+          if (purchaseDetails.pendingCompletePurchase) {
+            _inAppPurchase.completePurchase(purchaseDetails);
+          }
+        }
+      }
+    }
+
+    void _showPendingUI() {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Procesando compra...')),
+      );
+    }
+
+    void _handleError(IAPError error) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: ${error.message}')),
+      );
+    }
+
+    Future<void> _deliverProduct(PurchaseDetails purchaseDetails) async {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('is_premium', true);
+      await prefs.setString('premium_product_id', purchaseDetails.productID);
+      await prefs.setString('premium_purchase_date', DateTime.now().toIso8601String());
+      String planNombre = '';
+      DateTime? fechaExpiracion;
+      if (purchaseDetails.productID == productIdMonthly) {
+        planNombre = 'Mensual';
+        fechaExpiracion = DateTime.now().add(const Duration(days: 30));
+      } else if (purchaseDetails.productID == productIdYearly) {
+        planNombre = 'Anual';
+        fechaExpiracion = DateTime.now().add(const Duration(days: 365));
+      }
+      await prefs.setString('premium_plan', planNombre);
+      if (fechaExpiracion != null) {
+        await prefs.setString('premium_expiration', fechaExpiracion.toIso8601String());
+      }
+      setState(() {
+        _isPremium = true;
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('¡Bienvenido a Premium! 🎉'),
+            backgroundColor: Color(0xFF0EA5A4),
+          ),
+        );
+      }
+    }
+
+    void _buyProduct(ProductDetails productDetails) {
+      final PurchaseParam purchaseParam = PurchaseParam(
+        productDetails: productDetails,
+      );
+      _inAppPurchase.buyNonConsumable(purchaseParam: purchaseParam);
+    }
+
+    Future<void> _restorePurchases() async {
+      try {
+        await _inAppPurchase.restorePurchases();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Compras restauradas')),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error al restaurar: $e')),
+          );
+        }
+      }
+    }
+
+    @override
+    void dispose() {
+      _offerTimer.cancel();
+      _pulseController.dispose();
+      _scrollController.dispose();
+      if (!kIsWeb && !Platform.isWindows && !Platform.isLinux && !Platform.isMacOS) {
+        _subscription.cancel();
+      }
+      super.dispose();
+    }
+
+    @override
+    Widget build(BuildContext context) {
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text(
+            'Premium',
+            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 22),
+          ),
+          centerTitle: true,
+          elevation: 0,
+        ),
+        body: _loading
+            ? const Center(child: CircularProgressIndicator())
+            : _isPremium
+                ? _buildPremiumActiveUI()
+                : _buildPremiumOffersUI(),
+      );
+    }
+
+    // ...
+    // Aquí puedes pegar los métodos _buildPremiumActiveUI, _buildPremiumOffersUI, _buildFeatureCard, _buildUseCaseCard, _buildSavingsCalculator, _buildTestimonialCard, _buildPurchaseOptions, _buildPurchaseCard, _buildUnavailableNotice, _scrollToPlanes, _buildLegalLinksWidget
+    // que ya están bien estructurados en tu archivo actual.
+  }
 
     // Eliminado duplicado de _buildFeatureCard
 
