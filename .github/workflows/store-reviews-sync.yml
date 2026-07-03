@@ -36,14 +36,17 @@ jobs:
           APPLE_APP_ID: ${{ github.event.inputs.apple_app_id || vars.APPLE_APP_ID }}
           GOOGLE_PLAY_APP_ID: ${{ github.event.inputs.google_play_app_id || vars.GOOGLE_PLAY_APP_ID || 'com.zentavo.control_gastos' }}
         run: |
-          if [ -z "$APPLE_APP_ID" ]; then
-            echo "ERROR: falta APPLE_APP_ID. Cargalo en Run workflow (apple_app_id) o en Settings > Secrets and variables > Actions > Variables"
+          if [ -z "$APPLE_APP_ID" ] && [ -z "$GOOGLE_PLAY_APP_ID" ]; then
+            echo "ERROR: faltan APPLE_APP_ID y GOOGLE_PLAY_APP_ID. Carga al menos uno en Run workflow o en Variables"
             exit 1
           fi
 
+          if [ -z "$APPLE_APP_ID" ]; then
+            echo "INFO: APPLE_APP_ID no configurado. Se sincronizan solo reseñas de Google Play"
+          fi
+
           if [ -z "$GOOGLE_PLAY_APP_ID" ]; then
-            echo "ERROR: falta GOOGLE_PLAY_APP_ID. Cargalo en Run workflow o en Variables"
-            exit 1
+            echo "INFO: GOOGLE_PLAY_APP_ID no configurado. Se sincronizan solo reseñas de App Store"
           fi
 
       - name: Install sync dependencies
