@@ -50,7 +50,7 @@ jobs:
           fi
 
       - name: Install sync dependencies
-        run: npm ci
+        run: npm install --no-audit --no-fund
         working-directory: scripts/review-sync
 
       - name: Pull reviews from stores
