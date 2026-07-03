@@ -64,13 +64,19 @@ jobs:
 
       - name: Commit updated reviews
         run: |
-          if git diff --quiet docs/assets/reviews.json; then
+          mkdir -p docs/assets
+
+          if [ ! -f docs/assets/reviews.json ]; then
+            echo '{"reviews":[]}' > docs/assets/reviews.json
+          fi
+
+          if git diff --quiet -- docs/assets/reviews.json; then
             echo "Sin cambios en reseñas"
             exit 0
           fi
 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add docs/assets/reviews.json
+          git add -- docs/assets/reviews.json
           git commit -m "chore: sync store reviews"
           git push
