@@ -1,0 +1,12 @@
+{
+  "name": "zentavo-review-sync",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "sync": "node update-reviews.mjs"
+  },
+  "dependencies": {
+    "google-play-scraper": "^9.1.1"
+  }
+}
