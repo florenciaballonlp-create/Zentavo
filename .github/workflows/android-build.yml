@@ -122,19 +122,18 @@ jobs:
             -keystore android/app/upload-keystore.jks \
             -storepass "${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" \
             -alias "${{ secrets.ANDROID_KEY_ALIAS }}" | grep 'SHA1:' || true
-      
-      - name: 🏗️ Build signed APK
-        run: flutter build apk --release --split-per-abi
+
+      - name: ✅ Validate signing credentials
+        run: |
+          keytool -list -v \
+            -keystore android/app/upload-keystore.jks \
+            -storepass "${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" \
+            -alias "${{ secrets.ANDROID_KEY_ALIAS }}" \
+            -keypass "${{ secrets.ANDROID_KEY_PASSWORD }}" > /tmp/keytool_check.txt
+          grep 'SHA1:' /tmp/keytool_check.txt
       
       - name: 🏗️ Build signed App Bundle
         run: flutter build appbundle --release
-      
-      - name: 📤 Upload signed APKs
-        uses: actions/upload-artifact@v4
-        with:
-          name: Zentavo-Android-APKs-Signed
-          path: build/app/outputs/flutter-apk/*.apk
-          retention-days: 90
       
       - name: 📤 Upload signed App Bundle
         uses: actions/upload-artifact@v4
