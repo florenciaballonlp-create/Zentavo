@@ -1,15 +1,17 @@
-import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:async';
 import 'dart:io';
-import 'package:in_app_purchase/in_app_purchase.dart';
+
 import 'package:flutter/foundation.dart' show kIsWeb;
-import 'localization.dart';
+import 'package:flutter/material.dart';
+import 'package:in_app_purchase/in_app_purchase.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
 import 'legal_links_widget.dart';
+import 'localization.dart';
 
 class PremiumScreen extends StatefulWidget {
   final AppStrings? strings;
-  final String? source; // Para saber de dónde viene el usuario
+  final String? source;
 
   const PremiumScreen({this.strings, this.source, super.key});
 
@@ -17,692 +19,283 @@ class PremiumScreen extends StatefulWidget {
   State<PremiumScreen> createState() => _PremiumScreenState();
 }
 
-// Declaración única de la clase _PremiumScreenState a nivel superior
-class _PremiumScreenState extends State<PremiumScreen> with TickerProviderStateMixin {
-  late AppStrings _strings;
-  final InAppPurchase _inAppPurchase = InAppPurchase.instance;
-  late StreamSubscription<List<PurchaseDetails>> _subscription;
-  List<ProductDetails> _products = [];
-  bool _isAvailable = false;
-  bool _loading = true;
-  bool _isPremium = false;
-
-  // Performance timing
-  late DateTime _screenOpenTime;
-
-  // Timer de oferta
-  late Timer _offerTimer;
-  Duration _timeRemaining = const Duration(hours: 24);
-
-  // Animaciones
-  late AnimationController _pulseController;
-
-  // Scroll controller para navegación programática
-  final ScrollController _scrollController = ScrollController();
-  final GlobalKey _planesKey = GlobalKey();
-  final GlobalKey _planesKey = GlobalKey();
-
-  // IDs de productos (estos deben coincidir con los configurados en Google Play y App Store)
+class _PremiumScreenState extends State<PremiumScreen> {
   static const String productIdMonthly = 'premium_monthly';
   static const String productIdYearly = 'premium_yearly';
-  static const Set<String> _kProductIds = {
+  static const String productIdMonthlyScoped =
+      'com.zentavo.controlgastos.premium_monthly';
+  static const String productIdYearlyScoped =
+      'com.zentavo.controlgastos.premium_yearly';
+    static const String productIdMonthlyV2 = 'premium_monthly_v2';
+    static const String productIdYearlyV2 = 'premium_yearly_v2';
+    static const String productIdMonthlyMain = 'premium_monthly_main';
+    static const String productIdYearlyMain = 'premium_yearly_main';
+    static const String productIdMonthlyDotV2 =
+      'com.zentavo.controlgastos.premium.monthly.v2';
+    static const String productIdYearlyDotV2 =
+      'com.zentavo.controlgastos.premium.yearly.v2';
+
+  static const Set<String> _productIds = {
     productIdMonthly,
     productIdYearly,
+    productIdMonthlyScoped,
+    productIdYearlyScoped,
+    productIdMonthlyV2,
+    productIdYearlyV2,
+    productIdMonthlyMain,
+    productIdYearlyMain,
+    productIdMonthlyDotV2,
+    productIdYearlyDotV2,
   };
 
-  // ...todos los métodos y widgets auxiliares aquí dentro...
-  import 'dart:async';
-  import 'dart:io';
-  import 'package:flutter/foundation.dart';
-  import 'package:flutter/material.dart';
-  import 'package:in_app_purchase/in_app_purchase.dart';
-  import 'package:shared_preferences/shared_preferences.dart';
-  import 'package:flutter/services.dart';
-  import 'localization.dart';
+  final InAppPurchase _inAppPurchase = InAppPurchase.instance;
+  StreamSubscription<List<PurchaseDetails>>? _purchaseSubscription;
 
-  class PremiumScreen extends StatefulWidget {
-    final AppStrings? strings;
-    final String? source;
+  bool _loading = true;
+  bool _isPremium = false;
+  bool _storeAvailable = false;
+  List<ProductDetails> _products = <ProductDetails>[];
+  String? _storeErrorMessage;
+  List<String> _notFoundProductIds = <String>[];
 
-    const PremiumScreen({this.strings, this.source, super.key});
+  AppStrings get _strings => widget.strings ?? AppStrings();
 
-    @override
-    State<PremiumScreen> createState() => _PremiumScreenState();
+  String _tr({
+    required String es,
+    String? en,
+    String? pt,
+    String? it,
+    String? zh,
+    String? ja,
+  }) {
+    switch (_strings.language) {
+      case AppLanguage.english:
+        return en ?? es;
+      case AppLanguage.portuguese:
+        return pt ?? es;
+      case AppLanguage.italian:
+        return it ?? es;
+      case AppLanguage.chinese:
+        return zh ?? es;
+      case AppLanguage.japanese:
+        return ja ?? es;
+      case AppLanguage.spanish:
+        return es;
+    }
   }
 
-  class _PremiumScreenState extends State<PremiumScreen> with TickerProviderStateMixin {
-    late AppStrings _strings;
-    final InAppPurchase _inAppPurchase = InAppPurchase.instance;
-    late StreamSubscription<List<PurchaseDetails>> _subscription;
-    List<ProductDetails> _products = [];
-    bool _isAvailable = false;
-    bool _loading = true;
-    bool _isPremium = false;
-    late DateTime _screenOpenTime;
-    late Timer _offerTimer;
-    Duration _timeRemaining = const Duration(hours: 24);
-    late AnimationController _pulseController;
-    final ScrollController _scrollController = ScrollController();
-    final GlobalKey _planesKey = GlobalKey();
-    static const String productIdMonthly = 'premium_monthly';
-    static const String productIdYearly = 'premium_yearly';
-    static const Set<String> _kProductIds = {
-      productIdMonthly,
-      productIdYearly,
-    };
-
-    @override
-    void initState() {
-      super.initState();
-      _strings = widget.strings ?? AppStrings.es();
-      _screenOpenTime = DateTime.now();
-      _pulseController = AnimationController(
-        vsync: this,
-        duration: const Duration(milliseconds: 1200),
-      )..repeat(reverse: true);
-      _startOfferTimer();
-      _initStoreInfo();
-      _checkPremiumStatus();
+  bool get _supportsNativeStore {
+    if (kIsWeb) {
+      return false;
     }
+    return Platform.isAndroid || Platform.isIOS;
+  }
 
-    void _startOfferTimer() {
-      _offerTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-        if (_timeRemaining.inSeconds > 0) {
-          setState(() {
-            _timeRemaining = _timeRemaining - const Duration(seconds: 1);
-          });
-        }
-      });
-    }
+  @override
+  void initState() {
+    super.initState();
+    _initialize();
+  }
 
-    Future<void> _checkPremiumStatus() async {
-      final prefs = await SharedPreferences.getInstance();
-      final isPremium = prefs.getBool('is_premium') ?? false;
+  Future<void> _initialize() async {
+    await _loadPremiumStatus();
+
+    if (_supportsNativeStore) {
+      await _initStoreInfo();
+    } else if (mounted) {
       setState(() {
-        _isPremium = isPremium;
-      });
-    }
-
-    void _showMessage(String title, String message, {required bool isError}) {
-      showDialog(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: Row(
-            children: [
-              Icon(
-                isError ? Icons.error_outline : Icons.check_circle,
-                color: isError ? Colors.red : Colors.green,
-              ),
-              const SizedBox(width: 8),
-              Expanded(child: Text(title)),
-            ],
-          ),
-          content: Text(message),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('OK'),
-            ),
-          ],
-        ),
-      );
-    }
-
-    String _formatDate(DateTime date) {
-      final months = [
-        'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
-        'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'
-      ];
-      return '${date.day} de ${months[date.month - 1]} de ${date.year}';
-    }
-
-    Future<void> _initStoreInfo() async {
-      final bool available = await _inAppPurchase.isAvailable();
-      if (!available) {
-        setState(() {
-          _isAvailable = false;
-          _loading = false;
-        });
-        return;
-      }
-      final Stream<List<PurchaseDetails>> purchaseUpdated =
-          _inAppPurchase.purchaseStream;
-      _subscription = purchaseUpdated.listen((purchaseDetailsList) {
-        _listenToPurchaseUpdated(purchaseDetailsList);
-      }, onDone: () {
-        _subscription.cancel();
-      }, onError: (error) {
-        print('Error en compras: $error');
-      });
-      final ProductDetailsResponse productDetailResponse =
-          await _inAppPurchase.queryProductDetails(_kProductIds);
-      if (productDetailResponse.error != null) {
-        setState(() {
-          _isAvailable = false;
-          _loading = false;
-        });
-        return;
-      }
-      if (productDetailResponse.productDetails.isEmpty) {
-        setState(() {
-          _isAvailable = false;
-          _loading = false;
-        });
-        return;
-      }
-      setState(() {
-        _isAvailable = true;
-        _products = productDetailResponse.productDetails;
         _loading = false;
       });
     }
-
-    void _listenToPurchaseUpdated(List<PurchaseDetails> purchaseDetailsList) {
-      for (var purchaseDetails in purchaseDetailsList) {
-        if (purchaseDetails.status == PurchaseStatus.pending) {
-          _showPendingUI();
-        } else {
-          if (purchaseDetails.status == PurchaseStatus.error) {
-            _handleError(purchaseDetails.error!);
-          } else if (purchaseDetails.status == PurchaseStatus.purchased ||
-              purchaseDetails.status == PurchaseStatus.restored) {
-            _deliverProduct(purchaseDetails);
-          }
-          if (purchaseDetails.pendingCompletePurchase) {
-            _inAppPurchase.completePurchase(purchaseDetails);
-          }
-        }
-      }
-    }
-
-    void _showPendingUI() {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Procesando compra...')),
-      );
-    }
-
-    void _handleError(IAPError error) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: ${error.message}')),
-      );
-    }
-
-    Future<void> _deliverProduct(PurchaseDetails purchaseDetails) async {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setBool('is_premium', true);
-      await prefs.setString('premium_product_id', purchaseDetails.productID);
-      await prefs.setString('premium_purchase_date', DateTime.now().toIso8601String());
-      String planNombre = '';
-      DateTime? fechaExpiracion;
-      if (purchaseDetails.productID == productIdMonthly) {
-        planNombre = 'Mensual';
-        fechaExpiracion = DateTime.now().add(const Duration(days: 30));
-      } else if (purchaseDetails.productID == productIdYearly) {
-        planNombre = 'Anual';
-        fechaExpiracion = DateTime.now().add(const Duration(days: 365));
-      }
-      await prefs.setString('premium_plan', planNombre);
-      if (fechaExpiracion != null) {
-        await prefs.setString('premium_expiration', fechaExpiracion.toIso8601String());
-      }
-      setState(() {
-        _isPremium = true;
-      });
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('¡Bienvenido a Premium! 🎉'),
-            backgroundColor: Color(0xFF0EA5A4),
-          ),
-        );
-      }
-    }
-
-    void _buyProduct(ProductDetails productDetails) {
-      final PurchaseParam purchaseParam = PurchaseParam(
-        productDetails: productDetails,
-      );
-      _inAppPurchase.buyNonConsumable(purchaseParam: purchaseParam);
-    }
-
-    Future<void> _restorePurchases() async {
-      try {
-        await _inAppPurchase.restorePurchases();
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Compras restauradas')),
-          );
-        }
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error al restaurar: $e')),
-          );
-        }
-      }
-    }
-
-    @override
-    void dispose() {
-      _offerTimer.cancel();
-      _pulseController.dispose();
-      _scrollController.dispose();
-      if (!kIsWeb && !Platform.isWindows && !Platform.isLinux && !Platform.isMacOS) {
-        _subscription.cancel();
-      }
-      super.dispose();
-    }
-
-    @override
-    Widget build(BuildContext context) {
-      return Scaffold(
-        appBar: AppBar(
-          title: const Text(
-            'Premium',
-            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 22),
-          ),
-          centerTitle: true,
-          elevation: 0,
-        ),
-        body: _loading
-            ? const Center(child: CircularProgressIndicator())
-            : _isPremium
-                ? _buildPremiumActiveUI()
-                : _buildPremiumOffersUI(),
-      );
-    }
-
-    // ...
-    // Aquí puedes pegar los métodos _buildPremiumActiveUI, _buildPremiumOffersUI, _buildFeatureCard, _buildUseCaseCard, _buildSavingsCalculator, _buildTestimonialCard, _buildPurchaseOptions, _buildPurchaseCard, _buildUnavailableNotice, _scrollToPlanes, _buildLegalLinksWidget
-    // que ya están bien estructurados en tu archivo actual.
   }
 
-    // Eliminado duplicado de _buildFeatureCard
-
-    Widget _buildUseCaseCard({
-      required String emoji,
-      required String title,
-      required String description,
-    }) {
-      return Card(
-        margin: const EdgeInsets.only(bottom: 12),
-        elevation: 2,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            children: [
-              Text(emoji, style: const TextStyle(fontSize: 40)),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      description,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        color: Color(0xFF6B7280),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const Icon(Icons.arrow_forward_ios, size: 16, color: Color(0xFF0EA5A4)),
-            ],
-          ),
-        ),
-      );
-    }
-
-    // ...otros widgets y métodos auxiliares...
-
-    Widget _buildSavingsCalculator() {
-      return Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [Color(0xFFDCFCE7), Color(0xFFF0FDF4)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: const Color(0xFF22C55E), width: 2),
-        ),
-        child: Column(
-          children: [
-            const Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.trending_up, color: Color(0xFF22C55E), size: 32),
-                SizedBox(width: 12),
-                Text(
-                  'Usuarios Premium ahorran',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFF22C55E),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            const Text(
-              '\$247',
-              style: TextStyle(
-                fontSize: 48,
-                fontWeight: FontWeight.w900,
-                color: Color(0xFF22C55E),
-              ),
-            ),
-            const Text(
-              'en promedio por mes',
-              style: TextStyle(
-                fontSize: 16,
-                color: Color(0xFF059669),
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Column(
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text('📊 Análisis IA', style: TextStyle(fontSize: 14)),
-                      Text('+\$120/mes', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF22C55E))),
-                    ],
-                  ),
-                  SizedBox(height: 8),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text('💡 Alertas inteligentes', style: TextStyle(fontSize: 14)),
-                      Text('+\$87/mes', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF22C55E))),
-                    ],
-                  ),
-                  SizedBox(height: 8),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text('📂 Categorías custom', style: TextStyle(fontSize: 14)),
-                      Text('+\$40/mes', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF22C55E))),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 12),
-            const Text(
-              'Invierte \$4.99/mes → Ahorra \$247/mes',
-              style: TextStyle(
-                fontSize: 13,
-                color: Color(0xFF059669),
-                fontStyle: FontStyle.italic,
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
-    Widget _buildLegalLinksWidget() {
-      return Column(
-        children: [
-          TextButton(
-            onPressed: () {
-              // TODO: Navegar a política de privacidad
-            },
-            child: const Text('Política de Privacidad'),
-          ),
-          TextButton(
-            onPressed: () {
-              // TODO: Navegar a términos y condiciones
-            },
-            child: const Text('Términos y Condiciones'),
-          ),
-        ],
-      );
-    }
-    // ...existing code...
-
-  void _startOfferTimer() {
-    _offerTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (_timeRemaining.inSeconds > 0) {
-        setState(() {
-          _timeRemaining = _timeRemaining - const Duration(seconds: 1);
-        });
-      }
-    });
-  }
-
-  Future<void> _checkPremiumStatus() async {
-    print('[TIMING] _checkPremiumStatus START');
+  Future<void> _loadPremiumStatus() async {
     final prefs = await SharedPreferences.getInstance();
     final isPremium = prefs.getBool('is_premium') ?? false;
-    print('[TIMING] _checkPremiumStatus COMPLETE - ${DateTime.now().difference(_screenOpenTime).inMilliseconds}ms');
+
+    if (!mounted) {
+      return;
+    }
+
     setState(() {
       _isPremium = isPremium;
     });
   }
 
-  // ...existing code...
-
-
-  void _showMessage(String title, String message, {required bool isError}) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Row(
-          children: [
-            Icon(
-              isError ? Icons.error_outline : Icons.check_circle,
-              color: isError ? Colors.red : Colors.green,
-            ),
-            const SizedBox(width: 8),
-            Expanded(child: Text(title)),
-          ],
-        ),
-        content: Text(message),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('OK'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  String _formatDate(DateTime date) {
-    final months = [
-      'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
-      'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'
-    ];
-    return '${date.day} de ${months[date.month - 1]} de ${date.year}';
-  }
-  
-  // ================================
-
   Future<void> _initStoreInfo() async {
-    final bool available = await _inAppPurchase.isAvailable();
+    final available = await _inAppPurchase.isAvailable();
+
+    if (!mounted) {
+      return;
+    }
+
     if (!available) {
       setState(() {
-        _isAvailable = false;
+        _storeAvailable = false;
+        _storeErrorMessage = _tr(
+          es: 'La tienda no está disponible en este momento.',
+          en: 'The store is currently unavailable.',
+          pt: 'A loja não está disponível no momento.',
+          it: 'Lo store non è disponibile in questo momento.',
+          zh: '商店当前不可用。',
+          ja: '現在ストアを利用できません。',
+        );
         _loading = false;
       });
       return;
     }
 
-    // Escuchar cambios en las compras
-    final Stream<List<PurchaseDetails>> purchaseUpdated =
-        _inAppPurchase.purchaseStream;
-    _subscription = purchaseUpdated.listen((purchaseDetailsList) {
-      _listenToPurchaseUpdated(purchaseDetailsList);
-    }, onDone: () {
-      _subscription.cancel();
-    }, onError: (error) {
-      print('Error en compras: $error');
-    });
+    _purchaseSubscription ??= _inAppPurchase.purchaseStream.listen(
+      _listenToPurchaseUpdated,
+      onError: (_) {
+        if (!mounted) {
+          return;
+        }
+        setState(() {
+          _storeAvailable = false;
+          _storeErrorMessage = _tr(
+            es: 'Error al escuchar actualizaciones de compra.',
+            en: 'Error while listening for purchase updates.',
+            pt: 'Erro ao ouvir atualizações de compra.',
+            it: 'Errore durante l’ascolto degli aggiornamenti di acquisto.',
+            zh: '监听购买更新时出错。',
+            ja: '購入更新の監視中にエラーが発生しました。',
+          );
+        });
+      },
+    );
 
-    // Obtener productos disponibles
-    final ProductDetailsResponse productDetailResponse =
-        await _inAppPurchase.queryProductDetails(_kProductIds);
-    
-    if (productDetailResponse.error != null) {
-      print('[TIMING] _initStoreInfo ERROR - ${DateTime.now().difference(_screenOpenTime).inMilliseconds}ms');
-      setState(() {
-        _isAvailable = false;
-        _loading = false;
-      });
+    final response = await _inAppPurchase.queryProductDetails(_productIds);
+    final products = response.productDetails.toList();
+    final hasProducts = products.isNotEmpty;
+    final notFound = response.notFoundIDs.toList();
+    final storeError = response.error?.message;
+
+    String? friendlyError;
+    if (storeError != null && storeError.isNotEmpty) {
+      friendlyError = storeError;
+    } else if (!hasProducts) {
+      friendlyError = _tr(
+        es: 'No se pudieron cargar las suscripciones. Verifica los IDs de productos en App Store Connect.',
+        en: 'Subscriptions could not be loaded. Verify product IDs in App Store Connect.',
+        pt: 'Não foi possível carregar as assinaturas. Verifique os IDs dos produtos no App Store Connect.',
+        it: 'Impossibile caricare gli abbonamenti. Verifica gli ID prodotto in App Store Connect.',
+        zh: '无法加载订阅。请检查 App Store Connect 中的产品 ID。',
+        ja: 'サブスクリプションを読み込めませんでした。App Store Connect の製品IDを確認してください。',
+      );
+    }
+
+    if (!mounted) {
       return;
     }
 
-    if (productDetailResponse.productDetails.isEmpty) {
-      print('[TIMING] _initStoreInfo NO PRODUCTS - ${DateTime.now().difference(_screenOpenTime).inMilliseconds}ms');
-      setState(() {
-        _isAvailable = false;
-        _loading = false;
-      });
-      return;
-    }
-
-    print('[TIMING] _initStoreInfo COMPLETE - ${DateTime.now().difference(_screenOpenTime).inMilliseconds}ms');
     setState(() {
-      _isAvailable = true;
-      _products = productDetailResponse.productDetails;
+      _storeAvailable = response.error == null && hasProducts;
+      _products = products;
+      _notFoundProductIds = notFound;
+      _storeErrorMessage = friendlyError;
       _loading = false;
     });
   }
 
-  void _listenToPurchaseUpdated(List<PurchaseDetails> purchaseDetailsList) {
-    for (var purchaseDetails in purchaseDetailsList) {
-      if (purchaseDetails.status == PurchaseStatus.pending) {
-        _showPendingUI();
-      } else {
-        if (purchaseDetails.status == PurchaseStatus.error) {
-          _handleError(purchaseDetails.error!);
-        } else if (purchaseDetails.status == PurchaseStatus.purchased ||
-            purchaseDetails.status == PurchaseStatus.restored) {
-          _deliverProduct(purchaseDetails);
-        }
-        if (purchaseDetails.pendingCompletePurchase) {
-          _inAppPurchase.completePurchase(purchaseDetails);
-        }
+  Future<void> _retryLoadProducts() async {
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _loading = true;
+      _storeErrorMessage = null;
+    });
+
+    await _initStoreInfo();
+  }
+
+  Future<void> _activatePremium({String? planName}) async {
+    final prefs = await SharedPreferences.getInstance();
+    final now = DateTime.now();
+    DateTime? expiration;
+
+    if (planName != null) {
+      if (planName.contains('Mensual') || planName.contains('Monthly')) {
+        expiration = now.add(const Duration(days: 30));
+      } else if (planName.contains('Anual') || planName.contains('Yearly')) {
+        expiration = now.add(const Duration(days: 365));
       }
     }
-  }
 
-  void _showPendingUI() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Procesando compra...')),
-    );
-  }
-
-  void _handleError(IAPError error) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Error: ${error.message}')),
-    );
-  }
-
-  Future<void> _deliverProduct(PurchaseDetails purchaseDetails) async {
-    // Guardar estado premium
-    final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('is_premium', true);
-    await prefs.setString('premium_product_id', purchaseDetails.productID);
-    await prefs.setString('premium_purchase_date', DateTime.now().toIso8601String());
-    
-    // Determinar plan y fecha de expiración
-    String planNombre = '';
-    DateTime? fechaExpiracion;
-    
-    if (purchaseDetails.productID == productIdMonthly) {
-      planNombre = 'Mensual';
-      fechaExpiracion = DateTime.now().add(const Duration(days: 30));
-    } else if (purchaseDetails.productID == productIdYearly) {
-      planNombre = 'Anual';
-      fechaExpiracion = DateTime.now().add(const Duration(days: 365));
+    await prefs.setString('premium_purchase_date', now.toIso8601String());
+    if (planName != null) {
+      await prefs.setString('premium_plan', planName);
     }
-    
-    await prefs.setString('premium_plan', planNombre);
-    if (fechaExpiracion != null) {
-      await prefs.setString('premium_expiration', fechaExpiracion.toIso8601String());
+    if (expiration != null) {
+      await prefs.setString('premium_expiration', expiration.toIso8601String());
     }
-    
+
+    if (!mounted) {
+      return;
+    }
+
     setState(() {
       _isPremium = true;
     });
+  }
 
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('¡Bienvenido a Premium! 🎉'),
-          backgroundColor: Color(0xFF0EA5A4),
-        ),
-      );
+  void _listenToPurchaseUpdated(List<PurchaseDetails> purchaseDetailsList) {
+    for (final purchaseDetails in purchaseDetailsList) {
+      if (purchaseDetails.status == PurchaseStatus.purchased ||
+          purchaseDetails.status == PurchaseStatus.restored) {
+        final planName = purchaseDetails.productID == productIdYearly
+            ? 'Premium Anual'
+            : 'Premium Mensual';
+        _activatePremium(planName: planName);
+      }
+
+      if (purchaseDetails.pendingCompletePurchase) {
+        _inAppPurchase.completePurchase(purchaseDetails);
+      }
     }
   }
 
   void _buyProduct(ProductDetails productDetails) {
-    final PurchaseParam purchaseParam = PurchaseParam(
-      productDetails: productDetails,
-    );
+    final purchaseParam = PurchaseParam(productDetails: productDetails);
     _inAppPurchase.buyNonConsumable(purchaseParam: purchaseParam);
   }
 
   Future<void> _restorePurchases() async {
-    try {
-      await _inAppPurchase.restorePurchases();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Compras restauradas')),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error al restaurar: $e')),
-        );
-      }
+    await _inAppPurchase.restorePurchases();
+
+    if (!mounted) {
+      return;
     }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          _tr(
+            es: 'Se restauraron las compras.',
+            en: 'Purchases were restored.',
+            pt: 'As compras foram restauradas.',
+            it: 'Gli acquisti sono stati ripristinati.',
+            zh: '购买已恢复。',
+            ja: '購入が復元されました。',
+          ),
+        ),
+      ),
+    );
   }
 
   @override
   void dispose() {
-    _offerTimer.cancel();
-    _pulseController.dispose();
-    _scrollController.dispose();
-    if (!kIsWeb && !Platform.isWindows && !Platform.isLinux && !Platform.isMacOS) {
-      _subscription.cancel();
-    }
+    _purchaseSubscription?.cancel();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text(
-          'Premium',
-          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 22),
-        ),
-        centerTitle: true,
-        elevation: 0,
-      ),
+      appBar: AppBar(title: Text(_tr(es: 'Premium'))),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _isPremium
@@ -712,622 +305,153 @@ class _PremiumScreenState extends State<PremiumScreen> with TickerProviderStateM
   }
 
   Widget _buildPremiumActiveUI() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        children: [
-          const SizedBox(height: 20),
-          Container(
-            padding: const EdgeInsets.all(32),
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFF0EA5A4), Color(0xFF06B6D4)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(24),
-            ),
-            child: Column(
-              children: [
-                const Icon(Icons.workspace_premium, size: 80, color: Colors.white),
-                const SizedBox(height: 16),
-                const Text(
-                  '¡Eres Premium!',
-                  style: TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.w800,
-                    color: Colors.white,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  'Disfruta de todas las funciones',
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: Colors.white70,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 32),
-          Text(
-            _strings.funcionesPremiumActivas,
-            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
-          ),
-          const SizedBox(height: 20),
-          _buildFeatureCard(
-            icon: Icons.payment,
-            title: _strings.solicitudesDePago,
-            description: 'Solicita y rastrea pagos en eventos compartidos con un solo toque',
-          ),
-          _buildFeatureCard(
-            icon: Icons.qr_code_2,
-            title: _strings.codigosQRPago,
-            description: 'Genera QR codes para recibir pagos al instante',
-          ),
-          _buildFeatureCard(
-            icon: Icons.open_in_new,
-            title: _strings.deepLinksAPago,
-            description: 'Integración directa con Mercado Pago, PayPal, Venmo, Cash App y Zelle',
-          ),
-          _buildFeatureCard(
-            icon: Icons.block,
-            title: _strings.sinPublicidad,
-            description: _strings.sinPublicidadDesc,
-          ),
-          _buildFeatureCard(
-            icon: Icons.cloud_upload,
-            title: _strings.backupNube,
-            description: _strings.backupNubeDesc,
-          ),
-          _buildFeatureCard(
-            icon: Icons.analytics,
-            title: _strings.analisisAvanzados,
-            description: _strings.analisisAvanzadosDesc,
-          ),
-          _buildFeatureCard(
-            icon: Icons.attach_money,
-            title: _strings.monedasMultiples,
-            description: _strings.monedasMultiples,
-          ),
-          _buildFeatureCard(
-            icon: Icons.category,
-            title: _strings.misCategorias,
-            description: _strings.misCategorias,
-          ),
-          _buildFeatureCard(
-            icon: Icons.trending_up,
-            title: _strings.marketingAfiliacion,
-            description: _strings.marketingAfiliacion,
-          ),
-          _buildFeatureCard(
-            icon: Icons.support_agent,
-            title: _strings.soportePrioritario,
-            description: _strings.soportePrioritarioDesc,
-          ),
-          const SizedBox(height: 32),
-          if (!kIsWeb)
-            OutlinedButton.icon(
-              onPressed: _restorePurchases,
-              icon: const Icon(Icons.refresh),
-              label: Text(_strings.restaurarCompras),
-              style: OutlinedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-
-  void _scrollToPlanes() {
-    final context = _planesKey.currentContext;
-    if (context != null) {
-      Scrollable.ensureVisible(
-        context,
-        duration: const Duration(milliseconds: 600),
-        curve: Curves.easeInOut,
-      );
-    } else {
-      // Si no existe el key, hacer scroll a una posición estimada
-      _scrollController.animateTo(
-        600, // Posición aproximada de los planes
-        duration: const Duration(milliseconds: 600),
-        curve: Curves.easeInOut,
-      );
-    }
-  }
-
-  Widget _buildPremiumOffersUI() {
-    final hours = _timeRemaining.inHours;
-    final minutes = _timeRemaining.inMinutes % 60;
-    final seconds = _timeRemaining.inSeconds % 60;
-    
-    return SingleChildScrollView(
-      controller: _scrollController,
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        children: [
-          // Timer de oferta especial
-          ScaleTransition(
-            scale: Tween<double>(begin: 0.95, end: 1.05).animate(_pulseController),
-            child: Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFFEF4444), Color(0xFFF59E0B)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFFEF4444).withOpacity(0.3),
-                    blurRadius: 12,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: Column(
-                children: [
-                  const Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.local_fire_department, color: Colors.white, size: 24),
-                      SizedBox(width: 8),
-                      Text(
-                        '¡OFERTA ESPECIAL!',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 20,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 1.2,
-                        ),
-                      ),
-                      SizedBox(width: 8),
-                      Icon(Icons.local_fire_department, color: Colors.white, size: 24),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    '50% DE DESCUENTO',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(Icons.timer, color: Colors.white, size: 20),
-                        const SizedBox(width: 8),
-                        Text(
-                          '${hours.toString().padLeft(2, '0')}:${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 24,
-                            fontWeight: FontWeight.w900,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  GestureDetector(
-                    onTap: _scrollToPlanes,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: const Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            '¡Aprovecha ahora!',
-                            style: TextStyle(
-                              color: Color(0xFFEF4444),
-                              fontSize: 13,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          SizedBox(width: 4),
-                          Icon(
-                            Icons.arrow_downward,
-                            color: Color(0xFFEF4444),
-                            size: 16,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 32),
-          
-          // Héroe visual
-          const Icon(
-            Icons.workspace_premium,
-            size: 80,
-            color: Color(0xFF0EA5A4),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            _strings.mejoraAPremium,
-            style: const TextStyle(fontSize: 32, fontWeight: FontWeight.w800),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            _strings.desbloqueaFunciones,
-            style: TextStyle(fontSize: 16, color: Color(0xFF6B7280)),
-            textAlign: TextAlign.center,
-          ),
-          
-          const SizedBox(height: 24),
-          
-          // Ahorro simulado
-          _buildSavingsCalculator(),
-          
-          const SizedBox(height: 32),
-          
-          // Casos de uso
-          Text(
-            _strings.perfectoPara,
-            style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
-          ),
-          const SizedBox(height: 16),
-                    // ... (resto de la UI de ofertas, planes, etc.)
-
-                    // Enlaces legales
-                    const SizedBox(height: 32),
-                    LegalLinksWidget(),
-                    // Enlaces legales también en la vista premium activa
-                    const SizedBox(height: 32),
-                    LegalLinksWidget(),
-          _buildUseCaseCard(
-            emoji: '✈️',
-            title: _strings.viajeros,
-            description: 'Organiza gastos grupales y solicita pagos con QR o enlaces directos',
-          ),
-          _buildUseCaseCard(
-            emoji: '🏠',
-            title: _strings.roommates,
-            description: 'Divide servicios, compras y cobra con solicitudes de pago automáticas',
-          ),
-          _buildUseCaseCard(
-            emoji: '🎓',
-            title: _strings.estudiantes,
-            description: 'Controla tu presupuesto y comparte gastos con tu grupo de estudio',
-          ),
-          _buildUseCaseCard(
-            emoji: '💑',
-            title: _strings.parejas,
-            description: 'Gestionen finanzas juntos y dividan gastos sin complicaciones',
-          ),
-          
-          const SizedBox(height: 32),
-          
-          // Funciones Premium
-          Text(
-            _strings.funcionesPremium,
-            style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
-          ),
-          const SizedBox(height: 20),
-          _buildFeatureCard(
-            icon: Icons.group,
-            title: _strings.eventosIlimitados,
-            description: 'Crea todos los eventos compartidos que necesites',
-          ),
-          _buildFeatureCard(
-            icon: Icons.payment,
-            title: _strings.solicitudesDePago,
-            description: 'Solicita y rastrea pagos en eventos compartidos con un solo toque',
-          ),
-          _buildFeatureCard(
-            icon: Icons.qr_code_2,
-            title: _strings.codigosQRPago,
-            description: 'Genera QR codes con tu info de pago para recibir dinero al instante',
-          ),
-          _buildFeatureCard(
-            icon: Icons.open_in_new,
-            title: _strings.deepLinksAPago,
-            description: 'Abre directamente Mercado Pago, PayPal, Venmo, Cash App y Zelle desde la app',
-          ),
-          _buildFeatureCard(
-            icon: Icons.block,
-            title: _strings.sinPublicidad,
-            description: 'Experiencia completamente libre de anuncios',
-          ),
-          _buildFeatureCard(
-            icon: Icons.cloud_upload,
-            title: _strings.backupNube,
-            description: 'Sincroniza tus datos en todos tus dispositivos',
-          ),
-          _buildFeatureCard(
-            icon: Icons.analytics,
-            title: 'Análisis Avanzados con IA',
-            description: 'Predicciones y recomendaciones personalizadas',
-          ),
-          _buildFeatureCard(
-            icon: Icons.attach_money,
-            title: _strings.monedasMultiples,
-            description: '16+ monedas y conversión automática',
-          ),
-          _buildFeatureCard(
-            icon: Icons.category,
-            title: _strings.misCategorias,
-            description: 'Crea categorías personalizadas ilimitadas',
-          ),
-          _buildFeatureCard(
-            icon: Icons.file_download,
-            title: 'Exportar Informes PDF',
-            description: 'Descarga informes profesionales para tu contador',
-          ),
-          _buildFeatureCard(
-            icon: Icons.support_agent,
-            title: _strings.soportePrioritario,
-            description: 'Respuesta prioritaria en menos de 24 horas',
-          ),
-          
-          const SizedBox(height: 32),
-          
-          // Testimonios
-          const Text(
-            'Lo que dicen nuestros usuarios',
-            style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
-          ),
-          const SizedBox(height: 16),
-          _buildTestimonialCard(
-            name: 'María G.',
-            role: 'Viajera frecuente',
-            rating: 5,
-            comment: 'La función de eventos compartidos con solicitudes de pago por QR es increíble. Organicé un viaje con 8 amigos y todos pagaron al instante. ¡Sin peleas ni cuentas confusas!',
-          ),
-          _buildTestimonialCard(
-            name: 'Carlos R.',
-            role: 'Estudiante universitario',
-            rating: 5,
-            comment: 'Antes gastaba sin control. Con Zentavo Premium ahorro \$200 al mes. El análisis IA me ayudó a identificar gastos innecesarios.',
-          ),
-          _buildTestimonialCard(
-            name: 'Ana & Pedro',
-            role: 'Pareja',
-            rating: 5,
-            comment: 'Perfecta para manejar finanzas en pareja. Todo es transparente y fácil. Las categorías personalizadas son un plus.',
-          ),
-          
-          const SizedBox(height: 32),
-          
-          // Garantía
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF0FDF4),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: const Color(0xFF22C55E), width: 2),
-            ),
-            child: Column(
-              children: [
-                const Icon(Icons.verified_user, color: Color(0xFF22C55E), size: 48),
-                const SizedBox(height: 12),
-                const Text(
-                  'Garantía de 30 días',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFF22C55E),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Si no estás satisfecho, te devolvemos tu dinero sin preguntas',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey[700],
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              ],
-            ),
-          ),
-          
-          const SizedBox(height: 32),
-          
-          // Planes
-          Container(
-            key: _planesKey,
-            child: const Text(
-              'Elige tu Plan',
-              style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
-            ),
-          ),
-          const SizedBox(height: 20),
-          if (kIsWeb || (!_isAvailable))
-            _buildMockPurchaseOptions()
-          else if (_products.isNotEmpty)
-            _buildPurchaseOptions()
-          else
-            _buildUnavailableNotice(),
-          const SizedBox(height: 24),
-          if (!kIsWeb)
-            TextButton(
-              onPressed: _restorePurchases,
-              child: Text(_strings.yaCompraste),
-            ),
-          const SizedBox(height: 8),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildUnavailableNotice() {
-    return Card(
-      color: const Color(0xFFFEF2F2),
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          children: [
-            const Icon(Icons.error_outline, size: 48, color: Color(0xFFEF4444)),
-            const SizedBox(height: 12),
-            const Text(
-              'Las compras no están disponibles en este momento',
-              style: TextStyle(fontSize: 16),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 12),
-            ElevatedButton.icon(
-              onPressed: () {
-                setState(() {
-                  _loading = true;
-                });
-                _initStoreInfo();
-              },
-              icon: const Icon(Icons.refresh),
-              label: const Text('Reintentar'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildPurchaseOptions() {
-    // Ordenar productos: monthly, yearly, lifetime
-    _products.sort((a, b) {
-      if (a.id == productIdMonthly) return -1;
-      if (b.id == productIdMonthly) return 1;
-      if (a.id == productIdYearly) return -1;
-      if (b.id == productIdYearly) return 1;
-      return 0;
-    });
-
-    return Column(
-      children: _products.map((product) {
-        return _buildPurchaseCard(product);
-      }).toList(),
-    );
-  }
-
-  Widget _buildPurchaseCard(ProductDetails product) {
-    String title = '';
-    String description = '';
-    String badge = '';
-    Color badgeColor = const Color(0xFF0EA5A4);
-    IconData icon = Icons.star;
-
-    if (product.id == productIdMonthly) {
-      title = 'Premium Mensual';
-      description = 'Acceso completo por 1 mes';
-      badge = '';
-      icon = Icons.calendar_month;
-    } else if (product.id == productIdYearly) {
-      title = 'Premium Anual';
-      description = 'Acceso completo por 1 año';
-      badge = 'MÁS POPULAR';
-      badgeColor = const Color(0xFFEF4444);
-      icon = Icons.calendar_today;
-    }
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      child: Card(
-        elevation: 4,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-          side: product.id == productIdYearly
-              ? const BorderSide(color: Color(0xFF0EA5A4), width: 3)
-              : BorderSide.none,
-        ),
-        child: InkWell(
-          onTap: () => _buyProduct(product),
-          borderRadius: BorderRadius.circular(16),
+    return ListView(
+      padding: const EdgeInsets.all(20),
+      children: [
+        Card(
           child: Padding(
             padding: const EdgeInsets.all(20),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                if (badge.isNotEmpty)
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: badgeColor,
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Text(
-                      badge,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 12,
-                      ),
-                    ),
+                Text(
+                  _tr(
+                    es: 'Premium activo',
+                    en: 'Premium active',
+                    pt: 'Premium ativo',
+                    it: 'Premium attivo',
+                    zh: '高级版已激活',
+                    ja: 'プレミアム有効',
                   ),
-                if (badge.isNotEmpty) const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Icon(icon, size: 32, color: const Color(0xFF0EA5A4)),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            title,
-                            style: const TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                          Text(
-                            description,
-                            style: const TextStyle(
-                              fontSize: 14,
-                              color: Color(0xFF6B7280),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Text(
-                          product.price,
-                          style: const TextStyle(
-                            fontSize: 24,
-                            fontWeight: FontWeight.w800,
-                            color: Color(0xFF0EA5A4),
-                          ),
-                        ),
-                        if (product.id == productIdYearly)
-                          const Text(
-                            '~\$4.17/mes',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Color(0xFF6B7280),
-                            ),
-                          ),
-                      ],
-                    ),
-                  ],
+                  style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  _tr(
+                    es: 'Tu cuenta ya tiene acceso a las funciones premium.',
+                    en: 'Your account already has access to premium features.',
+                    pt: 'Sua conta já tem acesso aos recursos premium.',
+                    it: 'Il tuo account ha già accesso alle funzioni premium.',
+                    zh: '你的账户已可使用高级功能。',
+                    ja: 'あなたのアカウントはプレミアム機能を利用できます。',
+                  ),
                 ),
               ],
             ),
           ),
         ),
-      ),
+        const SizedBox(height: 16),
+        const LegalLinksWidget(),
+      ],
+    );
+  }
+
+  Widget _buildPremiumOffersUI() {
+    return ListView(
+      padding: const EdgeInsets.all(20),
+      children: [
+        Text(
+          _tr(
+            es: 'Desbloquea Zentavo Premium',
+            en: 'Unlock Zentavo Premium',
+            pt: 'Desbloqueie o Zentavo Premium',
+            it: 'Sblocca Zentavo Premium',
+            zh: '解锁 Zentavo Premium',
+            ja: 'Zentavo Premiumをアンロック',
+          ),
+          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                fontWeight: FontWeight.w800,
+              ),
+        ),
+        const SizedBox(height: 12),
+        Text(
+          widget.source == null
+              ? _tr(
+                  es: 'Accede a herramientas avanzadas para exportar, compartir y organizar tus gastos.',
+                  en: 'Access advanced tools to export, share and organize your expenses.',
+                  pt: 'Acesse ferramentas avançadas para exportar, compartilhar e organizar seus gastos.',
+                  it: 'Accedi a strumenti avanzati per esportare, condividere e organizzare le tue spese.',
+                  zh: '使用高级工具来导出、分享和管理你的支出。',
+                  ja: '支出をエクスポート・共有・整理するための高度な機能を利用できます。',
+                )
+              : _tr(
+                  es: 'Continúa desde ${widget.source} con acceso a funciones avanzadas.',
+                  en: 'Continue from ${widget.source} with access to advanced features.',
+                  pt: 'Continue de ${widget.source} com acesso a recursos avançados.',
+                  it: 'Continua da ${widget.source} con accesso alle funzioni avanzate.',
+                  zh: '从 ${widget.source} 继续，并使用高级功能。',
+                  ja: '${widget.source} から続けて高度な機能を利用できます。',
+                ),
+        ),
+        const SizedBox(height: 24),
+        _buildFeatureCard(
+          icon: Icons.picture_as_pdf,
+          title: _tr(
+            es: 'Exportaciones avanzadas',
+            en: 'Advanced exports',
+            pt: 'Exportações avançadas',
+            it: 'Esportazioni avanzate',
+            zh: '高级导出',
+            ja: '高度なエクスポート',
+          ),
+          description: _tr(
+            es: 'Genera reportes y comparte información con mejor control.',
+            en: 'Generate reports and share information with better control.',
+            pt: 'Gere relatórios e compartilhe informações com mais controle.',
+            it: 'Genera report e condividi informazioni con maggiore controllo.',
+            zh: '生成报告并更好地掌控分享信息。',
+            ja: 'レポートを作成し、情報共有をより細かく管理できます。',
+          ),
+        ),
+        _buildFeatureCard(
+          icon: Icons.people_alt_outlined,
+          title: _strings.eventosCompartidos,
+          description: _tr(
+            es: 'Coordina gastos entre varias personas de forma más clara.',
+            en: 'Coordinate expenses among multiple people more clearly.',
+            pt: 'Coordene gastos entre várias pessoas com mais clareza.',
+            it: 'Coordina le spese tra più persone in modo più chiaro.',
+            zh: '更清晰地协调多人共同支出。',
+            ja: '複数人の支出をより分かりやすく管理できます。',
+          ),
+        ),
+        _buildFeatureCard(
+          icon: Icons.workspace_premium_outlined,
+          title: _tr(
+            es: 'Experiencia completa',
+            en: 'Full experience',
+            pt: 'Experiência completa',
+            it: 'Esperienza completa',
+            zh: '完整体验',
+            ja: 'フル体験',
+          ),
+          description: _tr(
+            es: 'Mantén acceso a funciones premium desde una sola cuenta.',
+            en: 'Keep access to premium features from a single account.',
+            pt: 'Mantenha acesso aos recursos premium com uma única conta.',
+            it: 'Mantieni l’accesso alle funzioni premium da un unico account.',
+            zh: '通过一个账户持续使用高级功能。',
+            ja: '1つのアカウントでプレミアム機能を利用できます。',
+          ),
+        ),
+        const SizedBox(height: 24),
+        if (_supportsNativeStore && _storeAvailable && _products.isNotEmpty)
+          ..._products.map(_buildProductCard),
+        if (_supportsNativeStore && !_storeAvailable)
+          _buildStoreUnavailableCard(),
+        if (!_supportsNativeStore)
+          ..._buildCatalogOnlyPlans(),
+        if (_supportsNativeStore)
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton(
+              onPressed: _restorePurchases,
+              child: Text(_strings.restaurarCompras),
+            ),
+          ),
+        const SizedBox(height: 12),
+        const LegalLinksWidget(),
+      ],
     );
   }
 
@@ -1338,297 +462,178 @@ class _PremiumScreenState extends State<PremiumScreen> with TickerProviderStateM
   }) {
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
-      elevation: 0,
-      color: const Color(0xFFF9FAFB),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: const Color(0xFFE7F8F7),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(icon, color: const Color(0xFF0EA5A4), size: 28),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    description,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      color: Color(0xFF6B7280),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
+      child: ListTile(
+        leading: CircleAvatar(
+          backgroundColor: const Color(0xFFE6FFFB),
+          child: Icon(icon, color: const Color(0xFF0EA5A4)),
         ),
+        title: Text(title),
+        subtitle: Text(description),
       ),
     );
   }
 
-  Widget _buildMockPurchaseOptions() {
-    // Mostrar planes premium en Windows/Web con descuento del 50%
+  List<Widget> _buildCatalogOnlyPlans() {
     final plans = [
       {
-        'id': productIdMonthly,
-        'title': 'Premium Mensual',
-        'description': 'Acceso completo por 1 mes',
+        'title': _tr(
+          es: 'Premium Mensual',
+          en: 'Premium Monthly',
+          pt: 'Premium Mensal',
+          it: 'Premium Mensile',
+          zh: '高级版（月付）',
+          ja: 'プレミアム（月額）',
+        ),
+        'description': _tr(
+          es: 'Acceso completo por 1 mes',
+          en: 'Full access for 1 month',
+          pt: 'Acesso completo por 1 mês',
+          it: 'Accesso completo per 1 mese',
+          zh: '1个月完整访问权限',
+          ja: '1か月間フルアクセス',
+        ),
         'price': '\$2.49',
-        'originalPrice': '\$4.99',
-        'badge': '',
-        'icon': Icons.calendar_month,
       },
       {
-        'id': productIdYearly,
-        'title': 'Premium Anual',
-        'description': 'Acceso completo por 1 año',
+        'title': _tr(
+          es: 'Premium Anual',
+          en: 'Premium Yearly',
+          pt: 'Premium Anual',
+          it: 'Premium Annuale',
+          zh: '高级版（年付）',
+          ja: 'プレミアム（年額）',
+        ),
+        'description': _tr(
+          es: 'Acceso completo por 1 año',
+          en: 'Full access for 1 year',
+          pt: 'Acesso completo por 1 ano',
+          it: 'Accesso completo per 1 anno',
+          zh: '1年完整访问权限',
+          ja: '1年間フルアクセス',
+        ),
         'price': '\$14.99',
-        'originalPrice': '\$29.99',
-        'badge': 'MÁS POPULAR',
-        'icon': Icons.calendar_today,
       },
     ];
 
-    return Column(
-      children: plans.map((plan) {
-        return _buildMockPurchaseCard(plan);
-      }).toList(),
-    );
-  }
-
-  Widget _buildMockPurchaseCard(Map<String, dynamic> plan) {
-    String badge = plan['badge'] ?? '';
-    Color badgeColor = badge == 'MÁS POPULAR'
-        ? const Color(0xFFEF4444)
-        : const Color(0xFF0EA5A4);
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      child: Card(
-        elevation: 4,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-          side: plan['id'] == productIdYearly
-              ? const BorderSide(color: Color(0xFF0EA5A4), width: 3)
-              : BorderSide.none,
-        ),
-        child: InkWell(
-          onTap: kIsWeb
-              ? () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Descarga la app móvil para comprar Premium'),
-                    ),
-                  );
-                }
-              : null,
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              children: [
-                Icon(plan['icon'], size: 32, color: const Color(0xFF0EA5A4)),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(plan['title'], style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                      Text(plan['description'], style: const TextStyle(fontSize: 14)),
-                      Row(
-                        children: [
-                          Text(plan['price'], style: const TextStyle(fontSize: 16, color: Color(0xFF0EA5A4), fontWeight: FontWeight.bold)),
-                          const SizedBox(width: 8),
-                          if (plan['originalPrice'] != null && plan['originalPrice'] != '')
-                            Text(plan['originalPrice'], style: const TextStyle(fontSize: 14, color: Colors.grey, decoration: TextDecoration.lineThrough)),
-                          if (badge.isNotEmpty)
-                            Container(
-                              margin: const EdgeInsets.only(left: 8),
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: badgeColor,
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Text(badge, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                            ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+    return plans
+        .map(
+          (plan) => Card(
+            margin: const EdgeInsets.only(bottom: 12),
+            child: ListTile(
+              title: Text(plan['title']!),
+              subtitle: Text(plan['description']!),
+              trailing: Text(
+                plan['price']!,
+                style: const TextStyle(fontWeight: FontWeight.w700),
+              ),
+              onTap: null,
             ),
           ),
-        ),
-      ),
-    );
-  }
-                    ),
-                  );
-                }
-              : () => _showDemoActivationDialog(plan['title']),
-          borderRadius: BorderRadius.circular(16),
-          child: Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (badge.isNotEmpty)
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: badgeColor,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      badge,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                if (badge.isNotEmpty) const SizedBox(height: 12),
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Icon(
-                      plan['icon'] as IconData,
-                      size: 32,
-                      color: const Color(0xFF0EA5A4),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            plan['title'] as String,
-                            style: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            plan['description'] as String,
-                            style: const TextStyle(
-                              fontSize: 14,
-                              color: Color(0xFF6B7280),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        if (plan['originalPrice'] != null)
-                          Text(
-                            plan['originalPrice'] as String,
-                            style: const TextStyle(
-                              fontSize: 16,
-                              decoration: TextDecoration.lineThrough,
-                              color: Color(0xFF9CA3AF),
-                            ),
-                          ),
-                        Text(
-                          plan['price'] as String,
-                          style: const TextStyle(
-                            fontSize: 28,
-                            fontWeight: FontWeight.w900,
-                            color: Color(0xFF0EA5A4),
-                          ),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFEF4444),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: const Text(
-                            '50% OFF',
-                            style: TextStyle(
-                              fontSize: 10,
-                              color: Colors.white,
-                              fontWeight: FontWeight.w900,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
+        )
+        .toList();
   }
 
-  void _showDemoActivationDialog(String planName) {
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: Text('Activar Premium de prueba'),
-          content: Text('¿Quieres activar Premium para pruebas con el plan $planName?'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancelar'),
+  Widget _buildStoreUnavailableCard() {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              _tr(
+                es: 'Compras no disponibles temporalmente',
+                en: 'Purchases temporarily unavailable',
+                pt: 'Compras temporariamente indisponíveis',
+                it: 'Acquisti temporaneamente non disponibili',
+                zh: '购买暂时不可用',
+                ja: '購入は一時的に利用できません',
+              ),
+              style: TextStyle(fontWeight: FontWeight.w700),
             ),
-            ElevatedButton(
-              onPressed: () async {
-                String planKey;
-                DateTime fechaExpiracion;
-                if (planName.contains('Mensual') || planName.contains('Monthly')) {
-                  planKey = 'Mensual';
-                  fechaExpiracion = DateTime.now().add(const Duration(days: 30));
-                } else if (planName.contains('Anual') || planName.contains('Yearly')) {
-                  planKey = 'Anual';
-                  fechaExpiracion = DateTime.now().add(const Duration(days: 365));
-                } else {
-                  planKey = 'De por vida';
-                  fechaExpiracion = DateTime(2099, 12, 31);
-                }
-                final prefs = await SharedPreferences.getInstance();
-                await prefs.setString('premium_plan', planKey);
-                await prefs.setString('premium_expiration', fechaExpiracion.toIso8601String());
-                await prefs.setString('premium_purchase_date', DateTime.now().toIso8601String());
-                setState(() {
-                  _isPremium = true;
-                });
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('¡Premium activado! 🎉'),
-                    backgroundColor: Color(0xFF0EA5A4),
+            const SizedBox(height: 8),
+            Text(
+              _storeErrorMessage ??
+                  _tr(
+                es: 'Intenta nuevamente en unos minutos o usa Restaurar compras si ya tienes una suscripcion activa.',
+                en: 'Try again in a few minutes or use Restore purchases if you already have an active subscription.',
+                pt: 'Tente novamente em alguns minutos ou use Restaurar compras se já tiver uma assinatura ativa.',
+                it: 'Riprova tra qualche minuto oppure usa Ripristina acquisti se hai già un abbonamento attivo.',
+                zh: '请稍后再试，若你已有有效订阅，请使用“恢复购买”。',
+                ja: '数分後に再試行するか、有効なサブスクリプションがある場合は「購入を復元」を使用してください。',
+              ),
+            ),
+            if (_notFoundProductIds.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              Text(
+                '${_tr(es: 'IDs no encontrados', en: 'Missing IDs', pt: 'IDs não encontrados', it: 'ID non trovati', zh: '未找到的ID', ja: '見つからないID')}: ${_notFoundProductIds.join(', ')}',
+                style: const TextStyle(fontSize: 12, color: Colors.grey),
+              ),
+            ],
+            const SizedBox(height: 12),
+            Align(
+              alignment: Alignment.centerRight,
+              child: OutlinedButton.icon(
+                onPressed: _retryLoadProducts,
+                icon: const Icon(Icons.refresh),
+                label: Text(
+                  _tr(
+                    es: 'Reintentar',
+                    en: 'Retry',
+                    pt: 'Tentar novamente',
+                    it: 'Riprova',
+                    zh: '重试',
+                    ja: '再試行',
                   ),
-                );
-              },
-              child: const Text('Activar para pruebas'),
+                ),
+              ),
             ),
           ],
-        );
-      },
+        ),
+      ),
     );
   }
 
+  Widget _buildProductCard(ProductDetails product) {
+    final isYearly =
+        product.id == productIdYearly || product.id == productIdYearlyScoped;
+    final termText = isYearly
+        ? _tr(
+            es: 'Duración: 1 año',
+            en: 'Length: 1 year',
+            pt: 'Duração: 1 ano',
+            it: 'Durata: 1 anno',
+            zh: '时长：1年',
+            ja: '期間: 1年',
+          )
+        : _tr(
+            es: 'Duración: 1 mes',
+            en: 'Length: 1 month',
+            pt: 'Duração: 1 mês',
+            it: 'Durata: 1 mese',
+            zh: '时长：1个月',
+            ja: '期間: 1か月',
+          );
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: isYearly
+            ? const BorderSide(color: Color(0xFF0EA5A4), width: 2)
+            : BorderSide.none,
+      ),
+      child: ListTile(
+        title: Text(product.title),
+        subtitle: Text('${product.description}\n$termText'),
+        isThreeLine: true,
+        trailing: Text(
+          product.price,
+          style: const TextStyle(fontWeight: FontWeight.w700),
+        ),
+        onTap: () => _buyProduct(product),
+      ),
+    );
+  }
 }
