@@ -1,0 +1,78 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Reglas públicas para MVP sin auth.
+    // Endurecidas para validar estructura y limitar payloads inválidos.
+    match /shared_events/{code} {
+      function isValidCode() {
+        return code.matches('^[A-Z0-9]{6}$');
+      }
+
+      function hasValidTopLevelShape() {
+        return request.resource.data.keys().hasOnly(['code', 'event', 'updatedAt']) &&
+          request.resource.data.code is string &&
+          request.resource.data.code == code &&
+          request.resource.data.event is map;
+      }
+
+      function eventPayload() {
+        return request.resource.data.event;
+      }
+
+      function hasValidEventShape() {
+        return eventPayload().keys().hasAll([
+            'id',
+            'nombre',
+            'presupuesto',
+            'fechaInicio',
+            'participantes',
+            'gastos',
+            'colorHex',
+            'codigoCompartir'
+          ]) &&
+          eventPayload().keys().hasOnly([
+            'id',
+            'nombre',
+            'descripcion',
+            'presupuesto',
+            'fechaInicio',
+            'fechaFin',
+            'participantes',
+            'gastos',
+            'colorHex',
+            'codigoCompartir'
+          ]) &&
+          eventPayload().id is string &&
+          eventPayload().id.size() > 0 &&
+          eventPayload().id.size() <= 120 &&
+          eventPayload().nombre is string &&
+          eventPayload().nombre.size() > 0 &&
+          eventPayload().nombre.size() <= 120 &&
+          (!('descripcion' in eventPayload()) || eventPayload().descripcion is string) &&
+          (!('fechaFin' in eventPayload()) || eventPayload().fechaFin == null || eventPayload().fechaFin is string) &&
+          eventPayload().presupuesto is number &&
+          eventPayload().presupuesto >= 0 &&
+          eventPayload().fechaInicio is string &&
+          eventPayload().fechaInicio.size() >= 10 &&
+          eventPayload().fechaInicio.size() <= 40 &&
+          eventPayload().participantes is list &&
+          eventPayload().participantes.size() <= 200 &&
+          eventPayload().gastos is list &&
+          eventPayload().gastos.size() <= 5000 &&
+          eventPayload().colorHex is string &&
+          eventPayload().colorHex.size() >= 6 &&
+          eventPayload().colorHex.size() <= 8 &&
+          eventPayload().codigoCompartir is string &&
+          eventPayload().codigoCompartir == code;
+      }
+
+      allow read: if isValidCode();
+
+      allow create, update: if isValidCode() &&
+        hasValidTopLevelShape() &&
+        hasValidEventShape();
+
+      allow delete: if isValidCode();
+    }
+  }
+}

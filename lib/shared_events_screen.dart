@@ -8,6 +8,7 @@ import 'localization.dart';
 import 'premium_screen.dart';
 import 'payment_request_service.dart';
 import 'payment_qr_widget.dart';
+import 'firebase_shared_events_service.dart';
 
 /// Modelo de datos para un evento compartido
 class EventoCompartido {
@@ -184,6 +185,32 @@ class _EventosCompartidosScreenState extends State<EventosCompartidosScreen> {
   late SharedPreferences _prefs;
   bool _isPremium = false;
   static const int _maxEventosGratis = 5;
+  static const String _eventTokenPrefix = 'ZENTAVO_EVT:';
+  final FirebaseSharedEventsService _firebaseEventsService = FirebaseSharedEventsService();
+
+  String _tr({
+    required String es,
+    String? en,
+    String? pt,
+    String? it,
+    String? zh,
+    String? ja,
+  }) {
+    switch (widget.strings.language) {
+      case AppLanguage.english:
+        return en ?? es;
+      case AppLanguage.portuguese:
+        return pt ?? es;
+      case AppLanguage.italian:
+        return it ?? es;
+      case AppLanguage.chinese:
+        return zh ?? es;
+      case AppLanguage.japanese:
+        return ja ?? es;
+      case AppLanguage.spanish:
+        return es;
+    }
+  }
 
   @override
   void initState() {
@@ -215,6 +242,17 @@ class _EventosCompartidosScreenState extends State<EventosCompartidosScreen> {
     await _prefs.setString('eventos_compartidos', eventosJson);
   }
 
+  Future<void> _publicarEventoEnNube(EventoCompartido evento) async {
+    await _firebaseEventsService.publishEvent(
+      code: evento.codigoCompartir,
+      eventData: evento.toJson(),
+    );
+  }
+
+  Future<void> _eliminarEventoEnNube(String codigoEvento) async {
+    await _firebaseEventsService.deleteEventByCode(codigoEvento);
+  }
+
   String _generarCodigoCompartir() {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
     final random = Random();
@@ -238,6 +276,7 @@ class _EventosCompartidosScreenState extends State<EventosCompartidosScreen> {
             _eventos.add(evento);
           });
           _guardarEventos();
+          _publicarEventoEnNube(evento);
         },
         generarCodigo: _generarCodigoCompartir,
         strings: widget.strings,
@@ -249,11 +288,20 @@ class _EventosCompartidosScreenState extends State<EventosCompartidosScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Row(
+        title: Row(
           children: [
-            Icon(Icons.workspace_premium, color: Color(0xFFF59E0B), size: 28),
-            SizedBox(width: 12),
-            Text('Límite Alcanzado'),
+            const Icon(Icons.workspace_premium, color: Color(0xFFF59E0B), size: 28),
+            const SizedBox(width: 12),
+            Text(
+              _tr(
+                es: 'Límite alcanzado',
+                en: 'Limit reached',
+                pt: 'Limite atingido',
+                it: 'Limite raggiunto',
+                zh: '已达到限制',
+                ja: '上限に達しました',
+              ),
+            ),
           ],
         ),
         content: Column(
@@ -261,7 +309,14 @@ class _EventosCompartidosScreenState extends State<EventosCompartidosScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Has llegado al límite de $_maxEventosGratis eventos compartidos gratuitos.',
+              _tr(
+                es: 'Has llegado al límite de $_maxEventosGratis eventos compartidos gratuitos.',
+                en: 'You reached the limit of $_maxEventosGratis free shared events.',
+                pt: 'Você atingiu o limite de $_maxEventosGratis eventos compartilhados gratuitos.',
+                it: 'Hai raggiunto il limite di $_maxEventosGratis eventi condivisi gratuiti.',
+                zh: '你已达到 $_maxEventosGratis 个免费共享活动的上限。',
+                ja: '無料の共有イベントは $_maxEventosGratis 件までです。',
+              ),
               style: const TextStyle(fontSize: 16),
             ),
             const SizedBox(height: 16),
@@ -272,47 +327,54 @@ class _EventosCompartidosScreenState extends State<EventosCompartidosScreen> {
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: const Color(0xFFF59E0B), width: 2),
               ),
-              child: const Column(
+              child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    '✨ Con Premium obtén:',
-                    style: TextStyle(
+                    _tr(
+                      es: '✨ Con Premium obtén:',
+                      en: '✨ With Premium you get:',
+                      pt: '✨ Com Premium você tem:',
+                      it: '✨ Con Premium ottieni:',
+                      zh: '✨ 开通高级版可获得：',
+                      ja: '✨ プレミアムで利用できる機能：',
+                    ),
+                    style: const TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 16,
                       color: Color(0xFFF59E0B),
                     ),
                   ),
-                  SizedBox(height: 12),
+                  const SizedBox(height: 12),
                   Row(
                     children: [
-                      Icon(Icons.check_circle, color: Color(0xFF22C55E), size: 20),
-                      SizedBox(width: 8),
-                      Expanded(child: Text('Eventos ilimitados')),
+                      const Icon(Icons.check_circle, color: Color(0xFF22C55E), size: 20),
+                      const SizedBox(width: 8),
+                      Expanded(child: Text(widget.strings.eventosIlimitados)),
                     ],
                   ),
-                  SizedBox(height: 8),
+                  const SizedBox(height: 8),
                   Row(
                     children: [
-                      Icon(Icons.check_circle, color: Color(0xFF22C55E), size: 20),
-                      SizedBox(width: 8),
-                      Expanded(child: Text('Sin anuncios')),
+                      const Icon(Icons.check_circle, color: Color(0xFF22C55E), size: 20),
+                      const SizedBox(width: 8),
+                      Expanded(child: Text(_tr(es: 'Sin anuncios', en: 'No ads', pt: 'Sem anúncios', it: 'Senza annunci', zh: '无广告', ja: '広告なし'))),
                     ],
                   ),
-                  SizedBox(height: 8),
+                  const SizedBox(height: 8),
                   Row(
                     children: [
-                      Icon(Icons.check_circle, color: Color(0xFF22C55E), size: 20),
-                      SizedBox(width: 8),
-                      Expanded(child: Text('Backup en la nube')),
+                      const Icon(Icons.check_circle, color: Color(0xFF22C55E), size: 20),
+                      const SizedBox(width: 8),
+                      Expanded(child: Text(_tr(es: 'Backup en la nube', en: 'Cloud backup', pt: 'Backup na nuvem', it: 'Backup cloud', zh: '云备份', ja: 'クラウドバックアップ'))),
                     ],
                   ),
-                  SizedBox(height: 8),
+                  const SizedBox(height: 8),
                   Row(
                     children: [
-                      Icon(Icons.check_circle, color: Color(0xFF22C55E), size: 20),
-                      SizedBox(width: 8),
-                      Expanded(child: Text('Y mucho más...')),
+                      const Icon(Icons.check_circle, color: Color(0xFF22C55E), size: 20),
+                      const SizedBox(width: 8),
+                      Expanded(child: Text(_tr(es: 'Y mucho más...', en: 'And much more...', pt: 'E muito mais...', it: 'E molto altro...', zh: '还有更多...', ja: 'さらに多くの機能...'))),
                     ],
                   ),
                 ],
@@ -325,14 +387,21 @@ class _EventosCompartidosScreenState extends State<EventosCompartidosScreen> {
                 color: const Color(0xFFDCFCE7),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: const Row(
+              child: Row(
                 children: [
-                  Icon(Icons.local_offer, color: Color(0xFF22C55E), size: 20),
-                  SizedBox(width: 8),
+                  const Icon(Icons.local_offer, color: Color(0xFF22C55E), size: 20),
+                  const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      '🔥 50% de descuento por tiempo limitado',
-                      style: TextStyle(
+                      _tr(
+                        es: '🔥 50% de descuento por tiempo limitado',
+                        en: '🔥 50% discount for a limited time',
+                        pt: '🔥 50% de desconto por tempo limitado',
+                        it: '🔥 50% di sconto per tempo limitato',
+                        zh: '🔥 限时 5 折优惠',
+                        ja: '🔥 期間限定50%オフ',
+                      ),
+                      style: const TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.bold,
                         color: Color(0xFF22C55E),
@@ -347,7 +416,16 @@ class _EventosCompartidosScreenState extends State<EventosCompartidosScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Tal vez después'),
+            child: Text(
+              _tr(
+                es: 'Tal vez después',
+                en: 'Maybe later',
+                pt: 'Talvez depois',
+                it: 'Forse dopo',
+                zh: '稍后再说',
+                ja: '後で',
+              ),
+            ),
           ),
           ElevatedButton.icon(
             onPressed: () async {
@@ -368,7 +446,7 @@ class _EventosCompartidosScreenState extends State<EventosCompartidosScreen> {
               }
             },
             icon: const Icon(Icons.workspace_premium),
-            label: const Text('Ver Premium'),
+            label: Text(widget.strings.premiumEstrella),
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFFF59E0B),
               foregroundColor: Colors.white,
@@ -389,6 +467,7 @@ class _EventosCompartidosScreenState extends State<EventosCompartidosScreen> {
           currency: widget.currency,
           onActualizado: () {
             _guardarEventos();
+            _publicarEventoEnNube(evento);
             setState(() {});
           },
         ),
@@ -397,6 +476,10 @@ class _EventosCompartidosScreenState extends State<EventosCompartidosScreen> {
   }
 
   void _compartirEvento(EventoCompartido evento) {
+    final payload = base64UrlEncode(utf8.encode(jsonEncode(evento.toJson())));
+    final token = '$_eventTokenPrefix$payload';
+    Clipboard.setData(ClipboardData(text: token));
+
     final texto = '''
 🎉 ¡Únete a mi evento en Zentavo!
 
@@ -405,6 +488,9 @@ class _EventosCompartidosScreenState extends State<EventosCompartidosScreen> {
 👥 Participantes: ${evento.participantes.length}
 
 🔑 Código: ${evento.codigoCompartir}
+
+📦 Token de unión (cópialo completo):
+$token
 
 Descarga Zentavo y únete usando este código.
 ''';
@@ -415,17 +501,17 @@ Descarga Zentavo y únete usando este código.
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Row(
+        title: Row(
           children: [
-            Icon(Icons.share, color: Color(0xFF0EA5A4)),
-            SizedBox(width: 8),
-            Text('Compartir Evento'),
+            const Icon(Icons.share, color: Color(0xFF0EA5A4)),
+            const SizedBox(width: 8),
+            Text(widget.strings.eventosCompartidos),
           ],
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text('Comparte este código con tus amigos:', 
+            Text(_tr(es: 'Comparte este código con tus amigos:', en: 'Share this code with your friends:', pt: 'Compartilhe este código com seus amigos:', it: 'Condividi questo codice con i tuoi amici:', zh: '把这个代码分享给你的朋友：', ja: 'このコードを友だちに共有してください：'), 
               style: Theme.of(context).textTheme.bodyMedium),
             const SizedBox(height: 16),
             Container(
@@ -453,23 +539,71 @@ Descarga Zentavo y únete usando este código.
                     onPressed: () {
                       Clipboard.setData(ClipboardData(text: evento.codigoCompartir));
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Código copiado')),
+                        SnackBar(content: Text(_tr(es: 'Código copiado', en: 'Code copied', pt: 'Código copiado', it: 'Codice copiato', zh: '代码已复制', ja: 'コードをコピーしました'))),
                       );
                     },
                   ),
                 ],
               ),
             ),
+            const SizedBox(height: 12),
+            Text(
+              _tr(
+                es: 'El token completo ya quedó copiado al portapapeles.',
+                en: 'The full token was copied to clipboard.',
+                pt: 'O token completo já foi copiado para a área de transferência.',
+                it: 'Il token completo è stato copiato negli appunti.',
+                zh: '完整令牌已复制到剪贴板。',
+                ja: '完全なトークンをクリップボードにコピーしました。',
+              ),
+              style: TextStyle(color: Colors.grey[700], fontSize: 12),
+            ),
           ],
         ),
         actions: [
+          TextButton.icon(
+            onPressed: () {
+              Clipboard.setData(ClipboardData(text: token));
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text(_tr(es: 'Token copiado', en: 'Token copied', pt: 'Token copiado', it: 'Token copiato', zh: '令牌已复制', ja: 'トークンをコピーしました'))),
+              );
+            },
+            icon: const Icon(Icons.copy),
+            label: Text(_tr(es: 'Copiar token', en: 'Copy token', pt: 'Copiar token', it: 'Copia token', zh: '复制令牌', ja: 'トークンをコピー')),
+          ),
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cerrar'),
+            child: Text(_tr(es: 'Cerrar', en: 'Close', pt: 'Fechar', it: 'Chiudi', zh: '关闭', ja: '閉じる')),
           ),
         ],
       ),
     );
+  }
+
+  Future<void> _importarEvento(EventoCompartido eventoImportado) async {
+    final yaExiste = _eventos.any(
+      (e) => e.id == eventoImportado.id || e.codigoCompartir == eventoImportado.codigoCompartir,
+    );
+    if (yaExiste) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(_tr(es: 'Este evento ya está en tu lista', en: 'This event is already in your list', pt: 'Este evento já está na sua lista', it: 'Questo evento è già nella tua lista', zh: '此活动已在你的列表中', ja: 'このイベントはすでに追加済みです'))),
+        );
+      }
+      return;
+    }
+
+    eventoImportado.id = 'evento_${DateTime.now().millisecondsSinceEpoch}';
+    setState(() {
+      _eventos.add(eventoImportado);
+    });
+    await _guardarEventos();
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(_tr(es: '✅ Te uniste al evento: ${eventoImportado.nombre}', en: '✅ You joined: ${eventoImportado.nombre}', pt: '✅ Você entrou no evento: ${eventoImportado.nombre}', it: '✅ Ti sei unito all’evento: ${eventoImportado.nombre}', zh: '✅ 已加入活动: ${eventoImportado.nombre}', ja: '✅ イベントに参加しました: ${eventoImportado.nombre}'))),
+      );
+    }
   }
 
   void _unirseConCodigo() {
@@ -477,26 +611,25 @@ Descarga Zentavo y únete usando este código.
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Row(
+        title: Row(
           children: [
-            Icon(Icons.group_add, color: Color(0xFF0EA5A4)),
-            SizedBox(width: 8),
-            Text('Unirse a Evento'),
+            const Icon(Icons.group_add, color: Color(0xFF0EA5A4)),
+            const SizedBox(width: 8),
+            Text(_tr(es: 'Unirse a evento', en: 'Join event', pt: 'Entrar no evento', it: 'Partecipa all’evento', zh: '加入活动', ja: 'イベントに参加')),
           ],
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text('Ingresa el código del evento compartido:'),
+            Text(_tr(es: 'Ingresa el código del evento compartido:', en: 'Enter the shared event code:', pt: 'Digite o código do evento compartilhado:', it: 'Inserisci il codice dell’evento condiviso:', zh: '输入共享活动代码：', ja: '共有イベントコードを入力してください：')),
             const SizedBox(height: 16),
             TextField(
               controller: controller,
               textCapitalization: TextCapitalization.characters,
-              maxLength: 6,
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 border: OutlineInputBorder(),
-                labelText: 'Código',
-                hintText: 'ABC123',
+                labelText: _tr(es: 'Código o token', en: 'Code or token', pt: 'Código ou token', it: 'Codice o token', zh: '代码或令牌', ja: 'コードまたはトークン'),
+                hintText: _tr(es: 'ABC123 o ZENTAVO_EVT:...', en: 'ABC123 or ZENTAVO_EVT:...', pt: 'ABC123 ou ZENTAVO_EVT:...', it: 'ABC123 o ZENTAVO_EVT:...', zh: 'ABC123 或 ZENTAVO_EVT:...', ja: 'ABC123 または ZENTAVO_EVT:...'),
               ),
             ),
           ],
@@ -504,21 +637,71 @@ Descarga Zentavo y únete usando este código.
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancelar'),
+            child: Text(_tr(es: 'Cancelar', en: 'Cancel', pt: 'Cancelar', it: 'Annulla', zh: '取消', ja: 'キャンセル')),
           ),
           ElevatedButton(
-            onPressed: () {
-              final codigo = controller.text.trim().toUpperCase();
-              // TODO: Implementar lógica de unirse a evento compartido
-              // Por ahora, mostrar mensaje
+            onPressed: () async {
+              final raw = controller.text.trim();
+              if (raw.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text(_tr(es: 'Ingresa un código o token', en: 'Enter a code or token', pt: 'Digite um código ou token', it: 'Inserisci un codice o token', zh: '请输入代码或令牌', ja: 'コードまたはトークンを入力してください'))),
+                );
+                return;
+              }
+
+              final input = raw.toUpperCase();
+
+              if (input.startsWith(_eventTokenPrefix)) {
+                try {
+                  final payload = raw.substring(_eventTokenPrefix.length);
+                  final jsonStr = utf8.decode(base64Url.decode(payload));
+                  final Map<String, dynamic> data = jsonDecode(jsonStr);
+                  final eventoImportado = EventoCompartido.fromJson(data);
+                  Navigator.pop(context);
+                  await _importarEvento(eventoImportado);
+                } catch (_) {
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text(_tr(es: 'Token inválido. Pide que te compartan el texto completo del evento.', en: 'Invalid token. Ask for the full shared event text.', pt: 'Token inválido. Peça o texto completo do evento.', it: 'Token non valido. Chiedi il testo completo dell’evento.', zh: '令牌无效。请让对方分享完整文本。', ja: 'トークンが無効です。イベント全文を共有してもらってください。'))),
+                  );
+                }
+                return;
+              }
+
+              final codigo = input;
+              final existeLocal = _eventos.any((e) => e.codigoCompartir == codigo);
+              if (existeLocal) {
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(_tr(es: 'Ese código corresponde a un evento local de este dispositivo.', en: 'That code matches a local event on this device.', pt: 'Esse código corresponde a um evento local deste dispositivo.', it: 'Quel codice corrisponde a un evento locale di questo dispositivo.', zh: '该代码对应本机本地活动。', ja: 'このコードはこの端末のローカルイベントです。')),
+                  ),
+                );
+                return;
+              }
+
+              final remoteJson = await _firebaseEventsService.fetchEventByCode(codigo);
+              if (remoteJson != null) {
+                try {
+                  final eventoImportado = EventoCompartido.fromJson(remoteJson);
+                  Navigator.pop(context);
+                  await _importarEvento(eventoImportado);
+                  return;
+                } catch (_) {
+                  // Continúa con mensaje de fallback.
+                }
+              }
+
               Navigator.pop(context);
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
-                  content: Text('Funcionalidad de sincronización en desarrollo.\nCódigo: $codigo'),
+                  content: Text(
+                    _tr(es: 'Código no encontrado. Si no tienes Firebase activo, usa el token del evento (ZENTAVO_EVT:...).', en: 'Code not found. If Firebase is not active, use the event token (ZENTAVO_EVT:...).', pt: 'Código não encontrado. Se o Firebase não estiver ativo, use o token do evento (ZENTAVO_EVT:...).', it: 'Codice non trovato. Se Firebase non è attivo, usa il token evento (ZENTAVO_EVT:...).', zh: '未找到代码。如果 Firebase 未启用，请使用活动令牌 (ZENTAVO_EVT:...)。', ja: 'コードが見つかりません。Firebase が有効でない場合はイベントトークン (ZENTAVO_EVT:...) を使用してください。'),
+                  ),
                 ),
               );
             },
-            child: const Text('Unirse'),
+            child: Text(_tr(es: 'Unirse', en: 'Join', pt: 'Entrar', it: 'Partecipa', zh: '加入', ja: '参加')),
           ),
         ],
       ),
@@ -565,8 +748,8 @@ Descarga Zentavo y únete usando este código.
                       children: [
                         Text(
                           _eventos.length >= _maxEventosGratis
-                              ? 'Límite alcanzado'
-                              : 'Eventos: ${_eventos.length}/$_maxEventosGratis (Gratis)',
+                              ? _tr(es: 'Límite alcanzado', en: 'Limit reached', pt: 'Limite atingido', it: 'Limite raggiunto', zh: '已达到限制', ja: '上限に達しました')
+                              : _tr(es: 'Eventos: ${_eventos.length}/$_maxEventosGratis (Gratis)', en: 'Events: ${_eventos.length}/$_maxEventosGratis (Free)', pt: 'Eventos: ${_eventos.length}/$_maxEventosGratis (Grátis)', it: 'Eventi: ${_eventos.length}/$_maxEventosGratis (Gratis)', zh: '活动：${_eventos.length}/$_maxEventosGratis（免费）', ja: 'イベント: ${_eventos.length}/$_maxEventosGratis（無料）'),
                           style: TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 14,
@@ -577,7 +760,7 @@ Descarga Zentavo y únete usando este código.
                         ),
                         if (_eventos.length < _maxEventosGratis)
                           Text(
-                            'Puedes crear ${_maxEventosGratis - _eventos.length} más',
+                            _tr(es: 'Puedes crear ${_maxEventosGratis - _eventos.length} más', en: 'You can create ${_maxEventosGratis - _eventos.length} more', pt: 'Você pode criar mais ${_maxEventosGratis - _eventos.length}', it: 'Puoi crearne altri ${_maxEventosGratis - _eventos.length}', zh: '你还可以创建 ${_maxEventosGratis - _eventos.length} 个', ja: 'あと ${_maxEventosGratis - _eventos.length} 件作成できます'),
                             style: TextStyle(
                               fontSize: 12,
                               color: Colors.grey[600],
@@ -601,7 +784,7 @@ Descarga Zentavo y únete usando este código.
                       }
                     },
                     icon: const Icon(Icons.workspace_premium, size: 18),
-                    label: const Text('Premium'),
+                    label: Text(widget.strings.premiumEstrella),
                     style: TextButton.styleFrom(
                       foregroundColor: const Color(0xFFF59E0B),
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -624,13 +807,13 @@ Descarga Zentavo y únete usando este código.
                           color: Theme.of(context).colorScheme.primary.withOpacity(0.3),
                         ),
                         const SizedBox(height: 16),
-                        const Text(
-                          'No hay eventos compartidos',
+                        Text(
+                          _tr(es: 'No hay eventos compartidos', en: 'No shared events yet', pt: 'Não há eventos compartilhados', it: 'Nessun evento condiviso', zh: '暂无共享活动', ja: '共有イベントはありません'),
                           style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          'Crea un evento para viajes, juntadas\no eventos especiales',
+                          _tr(es: 'Crea un evento para viajes, juntadas\no eventos especiales', en: 'Create an event for trips, hangouts\nor special occasions', pt: 'Crie um evento para viagens, encontros\nou ocasiões especiais', it: 'Crea un evento per viaggi, uscite\no occasioni speciali', zh: '为旅行、聚会\n或特别场景创建活动', ja: '旅行や集まり\n特別なイベント用に作成しましょう'),
                           textAlign: TextAlign.center,
                           style: TextStyle(color: Colors.grey[600]),
                         ),
@@ -651,7 +834,7 @@ Descarga Zentavo y únete usando este código.
                                 const SizedBox(width: 8),
                                 Expanded(
                                   child: Text(
-                                    'Versión gratuita: hasta $_maxEventosGratis eventos',
+                                    _tr(es: 'Versión gratuita: hasta $_maxEventosGratis eventos', en: 'Free version: up to $_maxEventosGratis events', pt: 'Versão gratuita: até $_maxEventosGratis eventos', it: 'Versione gratuita: fino a $_maxEventosGratis eventi', zh: '免费版：最多 $_maxEventosGratis 个活动', ja: '無料版: 最大 $_maxEventosGratis 件'),
                                     style: const TextStyle(fontSize: 13),
                                     textAlign: TextAlign.center,
                                   ),
@@ -664,7 +847,7 @@ Descarga Zentavo y únete usando este código.
                         ElevatedButton.icon(
                           onPressed: _crearNuevoEvento,
                           icon: const Icon(Icons.add),
-                          label: const Text('Crear Evento'),
+                          label: Text(_tr(es: 'Crear evento', en: 'Create event', pt: 'Criar evento', it: 'Crea evento', zh: '创建活动', ja: 'イベントを作成')),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFF0EA5A4),
                             foregroundColor: Colors.white,
@@ -675,7 +858,7 @@ Descarga Zentavo y únete usando este código.
                         OutlinedButton.icon(
                           onPressed: _unirseConCodigo,
                           icon: const Icon(Icons.group_add),
-                          label: const Text('Unirse con Código'),
+                          label: Text(_tr(es: 'Unirse con código', en: 'Join with code', pt: 'Entrar com código', it: 'Partecipa con codice', zh: '使用代码加入', ja: 'コードで参加')),
                         ),
                       ],
                     ),
@@ -691,10 +874,12 @@ Descarga Zentavo y únete usando este código.
                         onTap: () => _verDetalleEvento(evento),
                         onCompartir: () => _compartirEvento(evento),
                         onEliminar: () {
+                          final codigoEliminar = evento.codigoCompartir;
                           setState(() {
                             _eventos.removeAt(index);
                           });
                           _guardarEventos();
+                          _eliminarEventoEnNube(codigoEliminar);
                         },
                       );
                     },
@@ -718,7 +903,7 @@ Descarga Zentavo y únete usando este código.
             backgroundColor: const Color(0xFF0EA5A4),
             onPressed: _crearNuevoEvento,
             icon: const Icon(Icons.add),
-            label: const Text('Crear Evento'),
+            label: Text(_tr(es: 'Crear evento', en: 'Create event', pt: 'Criar evento', it: 'Crea evento', zh: '创建活动', ja: 'イベント作成')),
           ),
         ],
       ),
@@ -988,6 +1173,30 @@ class _DialogoNuevoEventoState extends State<_DialogoNuevoEvento> {
     '14B8A6', // Teal
   ];
 
+  String _tr({
+    required String es,
+    String? en,
+    String? pt,
+    String? it,
+    String? zh,
+    String? ja,
+  }) {
+    switch (widget.strings.language) {
+      case AppLanguage.english:
+        return en ?? es;
+      case AppLanguage.portuguese:
+        return pt ?? es;
+      case AppLanguage.italian:
+        return it ?? es;
+      case AppLanguage.chinese:
+        return zh ?? es;
+      case AppLanguage.japanese:
+        return ja ?? es;
+      case AppLanguage.spanish:
+        return es;
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -1014,7 +1223,7 @@ class _DialogoNuevoEventoState extends State<_DialogoNuevoEvento> {
   void _crearEvento() {
     if (_nombreController.text.trim().isEmpty || _presupuestoController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Completa todos los campos requeridos')),
+        SnackBar(content: Text(_tr(es: 'Completa todos los campos requeridos', en: 'Complete all required fields', pt: 'Preencha todos os campos obrigatorios', it: 'Compila tutti i campi obbligatori', zh: '请填写所有必填项', ja: '必須項目をすべて入力してください'))),
       );
       return;
     }
@@ -1050,7 +1259,7 @@ class _DialogoNuevoEventoState extends State<_DialogoNuevoEvento> {
         child: Column(
           children: [
             AppBar(
-              title: const Text('Nuevo Evento'),
+              title: Text(_tr(es: 'Nuevo evento', en: 'New event', pt: 'Novo evento', it: 'Nuovo evento', zh: '新建活动', ja: '新しいイベント')),
               automaticallyImplyLeading: false,
               actions: [
                 IconButton(
@@ -1065,18 +1274,18 @@ class _DialogoNuevoEventoState extends State<_DialogoNuevoEvento> {
                 children: [
                   TextField(
                     controller: _nombreController,
-                    decoration: const InputDecoration(
-                      labelText: 'Nombre del evento *',
-                      hintText: 'Ej: Viaje a la playa',
+                      decoration: InputDecoration(
+                        labelText: _tr(es: 'Nombre del evento *', en: 'Event name *', pt: 'Nome do evento *', it: 'Nome evento *', zh: '活动名称 *', ja: 'イベント名 *'),
+                        hintText: _tr(es: 'Ej: Viaje a la playa', en: 'Ex: Beach trip', pt: 'Ex: Viagem a praia', it: 'Es: Viaggio al mare', zh: '例如：海边旅行', ja: '例: 海への旅行'),
                       border: OutlineInputBorder(),
                     ),
                   ),
                   const SizedBox(height: 16),
                   TextField(
                     controller: _descripcionController,
-                    decoration: const InputDecoration(
-                      labelText: 'Descripción',
-                      hintText: 'Opcional',
+                      decoration: InputDecoration(
+                        labelText: _tr(es: 'Descripción', en: 'Description', pt: 'Descricao', it: 'Descrizione', zh: '描述', ja: '説明'),
+                        hintText: _tr(es: 'Opcional', en: 'Optional', pt: 'Opcional', it: 'Opzionale', zh: '可选', ja: '任意'),
                       border: OutlineInputBorder(),
                     ),
                     maxLines: 2,
@@ -1084,16 +1293,16 @@ class _DialogoNuevoEventoState extends State<_DialogoNuevoEvento> {
                   const SizedBox(height: 16),
                   TextField(
                     controller: _presupuestoController,
-                    decoration: const InputDecoration(
-                      labelText: 'Presupuesto *',
+                      decoration: InputDecoration(
+                        labelText: _tr(es: 'Presupuesto *', en: 'Budget *', pt: 'Orcamento *', it: 'Budget *', zh: '预算 *', ja: '予算 *'),
                       hintText: '0.00',
                       border: OutlineInputBorder(),
-                      prefixIcon: Icon(Icons.attach_money),
+                        prefixIcon: const Icon(Icons.attach_money),
                     ),
                     keyboardType: TextInputType.number,
                   ),
                   const SizedBox(height: 16),
-                  const Text('Color del evento:', style: TextStyle(fontWeight: FontWeight.w600)),
+                    Text(_tr(es: 'Color del evento:', en: 'Event color:', pt: 'Cor do evento:', it: 'Colore evento:', zh: '活动颜色：', ja: 'イベントカラー:'), style: const TextStyle(fontWeight: FontWeight.w600)),
                   const SizedBox(height: 8),
                   Wrap(
                     spacing: 8,
@@ -1120,7 +1329,7 @@ class _DialogoNuevoEventoState extends State<_DialogoNuevoEvento> {
                     }).toList(),
                   ),
                   const SizedBox(height: 16),
-                  const Text('Participantes:', style: TextStyle(fontWeight: FontWeight.w600)),
+                    Text(_tr(es: 'Participantes:', en: 'Participants:', pt: 'Participantes:', it: 'Partecipanti:', zh: '参与者：', ja: '参加者:'), style: const TextStyle(fontWeight: FontWeight.w600)),
                   const SizedBox(height: 8),
                   ..._participantes.map((p) => Chip(
                         label: Text(p.nombre),
@@ -1135,8 +1344,8 @@ class _DialogoNuevoEventoState extends State<_DialogoNuevoEvento> {
                       Expanded(
                         child: TextField(
                           controller: _nombreParticipanteController,
-                          decoration: const InputDecoration(
-                            hintText: 'Nombre del participante',
+                            decoration: InputDecoration(
+                              hintText: _tr(es: 'Nombre del participante', en: 'Participant name', pt: 'Nome do participante', it: 'Nome partecipante', zh: '参与者姓名', ja: '参加者名'),
                             border: OutlineInputBorder(),
                           ),
                           onSubmitted: (_) => _agregarParticipante(),
@@ -1164,7 +1373,7 @@ class _DialogoNuevoEventoState extends State<_DialogoNuevoEvento> {
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 16),
                   ),
-                  child: const Text('Crear Evento', style: TextStyle(fontSize: 16)),
+                  child: Text(_tr(es: 'Crear evento', en: 'Create event', pt: 'Criar evento', it: 'Crea evento', zh: '创建活动', ja: 'イベント作成'), style: const TextStyle(fontSize: 16)),
                 ),
               ),
             ),
@@ -1197,6 +1406,30 @@ class DetalleEventoScreen extends StatefulWidget {
 class _DetalleEventoScreenState extends State<DetalleEventoScreen> {
   final TextEditingController _nombreParticipanteController = TextEditingController();
 
+  String _tr({
+    required String es,
+    String? en,
+    String? pt,
+    String? it,
+    String? zh,
+    String? ja,
+  }) {
+    switch (widget.strings.language) {
+      case AppLanguage.english:
+        return en ?? es;
+      case AppLanguage.portuguese:
+        return pt ?? es;
+      case AppLanguage.italian:
+        return it ?? es;
+      case AppLanguage.chinese:
+        return zh ?? es;
+      case AppLanguage.japanese:
+        return ja ?? es;
+      case AppLanguage.spanish:
+        return es;
+    }
+  }
+
   @override
   void dispose() {
     _nombreParticipanteController.dispose();
@@ -1208,6 +1441,7 @@ class _DetalleEventoScreenState extends State<DetalleEventoScreen> {
       context: context,
       builder: (context) => _DialogoNuevoGasto(
         evento: widget.evento,
+        strings: widget.strings,
         onAgregar: (gasto) {
           setState(() {
             widget.evento.gastos.add(gasto);
@@ -1221,12 +1455,12 @@ class _DetalleEventoScreenState extends State<DetalleEventoScreen> {
   void _adjuntarPersona() {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Row(
+        builder: (context) => AlertDialog(
+          title: Row(
           children: [
             Icon(Icons.person_add, color: Color(0xFF0EA5A4)),
             SizedBox(width: 8),
-            Text('Adjuntar Persona'),
+            Text(_tr(es: 'Adjuntar persona', en: 'Add person', pt: 'Adicionar pessoa', it: 'Aggiungi persona', zh: '添加人员', ja: 'メンバー追加')),
           ],
         ),
         content: Column(
@@ -1257,12 +1491,12 @@ class _DetalleEventoScreenState extends State<DetalleEventoScreen> {
               _nombreParticipanteController.clear();
               Navigator.pop(context);
             },
-            child: const Text('Cancelar'),
+            child: Text(_tr(es: 'Cancelar', en: 'Cancel', pt: 'Cancelar', it: 'Annulla', zh: '取消', ja: 'キャンセル')),
           ),
           ElevatedButton.icon(
             onPressed: _confirmarAgregarParticipante,
             icon: const Icon(Icons.person_add),
-            label: const Text('Agregar'),
+            label: Text(_tr(es: 'Agregar', en: 'Add', pt: 'Adicionar', it: 'Aggiungi', zh: '添加', ja: '追加')),
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF0EA5A4),
               foregroundColor: Colors.white,
@@ -1275,9 +1509,9 @@ class _DetalleEventoScreenState extends State<DetalleEventoScreen> {
 
   void _confirmarAgregarParticipante() {
     if (_nombreParticipanteController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Por favor ingresa un nombre'),
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+          content: Text(_tr(es: 'Por favor ingresa un nombre', en: 'Please enter a name', pt: 'Por favor, digite um nome', it: 'Inserisci un nome', zh: '请输入姓名', ja: '名前を入力してください')),
           backgroundColor: Colors.orange,
         ),
       );
@@ -1291,9 +1525,9 @@ class _DetalleEventoScreenState extends State<DetalleEventoScreen> {
     );
 
     if (yaExiste) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Ya existe un participante con ese nombre'),
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+          content: Text(_tr(es: 'Ya existe un participante con ese nombre', en: 'A participant with that name already exists', pt: 'Já existe um participante com esse nome', it: 'Esiste già un partecipante con questo nome', zh: '已存在同名参与者', ja: '同じ名前の参加者がすでにいます')),
           backgroundColor: Colors.orange,
         ),
       );
@@ -1313,7 +1547,7 @@ class _DetalleEventoScreenState extends State<DetalleEventoScreen> {
     
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('$nombreNuevo se agregó al evento'),
+        content: Text(_tr(es: '$nombreNuevo se agrego al evento', en: '$nombreNuevo was added to the event', pt: '$nombreNuevo foi adicionado ao evento', it: '$nombreNuevo è stato aggiunto all’evento', zh: '$nombreNuevo 已添加到活动', ja: '$nombreNuevo をイベントに追加しました')),
         backgroundColor: Colors.green,
         action: SnackBarAction(
           label: 'OK',
@@ -1412,37 +1646,37 @@ class _DetalleEventoScreenState extends State<DetalleEventoScreen> {
   void _mostrarDialogoPremium(String feature) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Row(
+        builder: (context) => AlertDialog(
+          title: Row(
           children: [
             Icon(Icons.workspace_premium, color: Color(0xFFF59E0B)),
             SizedBox(width: 12),
-            Text('Función Premium'),
+            Text(_tr(es: 'Funcion Premium', en: 'Premium feature', pt: 'Funcionalidade Premium', it: 'Funzione Premium', zh: '高级功能', ja: 'プレミアム機能')),
           ],
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('$feature es una función exclusiva para usuarios Premium.'),
+            Text(_tr(es: '$feature es una funcion exclusiva para usuarios Premium.', en: '$feature is an exclusive Premium feature.', pt: '$feature e um recurso exclusivo Premium.', it: '$feature e una funzione esclusiva Premium.', zh: '$feature 是高级版专属功能。', ja: '$feature はプレミアム限定機能です。')),
             const SizedBox(height: 16),
             const Text(
               'Con Premium obtienes:',
               style: TextStyle(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
-            const Text('✓ Solicitudes de pago personalizadas'),
-            const Text('✓ Códigos QR para pagos rápidos'),
-            const Text('✓ Deep links a apps de pago'),
-            const Text('✓ Eventos compartidos ilimitados'),
-            const Text('✓ Categorías personalizadas'),
-            const Text('✓ Sin anuncios'),
+            Text(_tr(es: '✓ Solicitudes de pago personalizadas', en: '✓ Custom payment requests', pt: '✓ Solicitacoes de pagamento personalizadas', it: '✓ Richieste di pagamento personalizzate', zh: '✓ 自定义收款请求', ja: '✓ カスタム支払いリクエスト')),
+            Text(_tr(es: '✓ Codigos QR para pagos rapidos', en: '✓ QR codes for fast payments', pt: '✓ Codigos QR para pagamentos rapidos', it: '✓ Codici QR per pagamenti rapidi', zh: '✓ 快速支付二维码', ja: '✓ 迅速な支払い用QRコード')),
+            Text(_tr(es: '✓ Deep links a apps de pago', en: '✓ Deep links to payment apps', pt: '✓ Deep links para apps de pagamento', it: '✓ Deep link alle app di pagamento', zh: '✓ 支付应用深度链接', ja: '✓ 支払いアプリへのディープリンク')),
+            Text(_tr(es: '✓ Eventos compartidos ilimitados', en: '✓ Unlimited shared events', pt: '✓ Eventos compartilhados ilimitados', it: '✓ Eventi condivisi illimitati', zh: '✓ 无限共享活动', ja: '✓ 無制限の共有イベント')),
+            Text(_tr(es: '✓ Categorias personalizadas', en: '✓ Custom categories', pt: '✓ Categorias personalizadas', it: '✓ Categorie personalizzate', zh: '✓ 自定义类别', ja: '✓ カスタムカテゴリ')),
+            Text(_tr(es: '✓ Sin anuncios', en: '✓ No ads', pt: '✓ Sem anuncios', it: '✓ Senza annunci', zh: '✓ 无广告', ja: '✓ 広告なし')),
           ],
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Ahora no'),
+            child: Text(_tr(es: 'Ahora no', en: 'Not now', pt: 'Agora nao', it: 'Non ora', zh: '暂不', ja: '今はしない')),
           ),
           ElevatedButton.icon(
             onPressed: () {
@@ -1453,7 +1687,7 @@ class _DetalleEventoScreenState extends State<DetalleEventoScreen> {
               );
             },
             icon: const Icon(Icons.star),
-            label: const Text('Ver Premium'),
+            label: Text(widget.strings.premiumEstrella),
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFFF59E0B),
               foregroundColor: Colors.white,
@@ -1531,12 +1765,12 @@ class _DetalleEventoScreenState extends State<DetalleEventoScreen> {
 
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Row(
+        builder: (context) => AlertDialog(
+          title: Row(
           children: [
             Icon(Icons.payment, color: Color(0xFF0EA5A4)),
             SizedBox(width: 12),
-            Text('Opciones de Pago'),
+            Text(_tr(es: 'Opciones de pago', en: 'Payment options', pt: 'Opcoes de pagamento', it: 'Opzioni di pagamento', zh: '支付选项', ja: '支払いオプション')),
           ],
         ),
         content: Column(
@@ -1563,9 +1797,9 @@ class _DetalleEventoScreenState extends State<DetalleEventoScreen> {
               onTap: () {
                 // Abrir Mercado Pago
                 Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Abriendo Mercado Pago...'),
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                    content: Text(_tr(es: 'Abriendo Mercado Pago...', en: 'Opening Mercado Pago...', pt: 'Abrindo Mercado Pago...', it: 'Apertura Mercado Pago...', zh: '正在打开 Mercado Pago...', ja: 'Mercado Pago を開いています...')),
                     duration: Duration(seconds: 1),
                   ),
                 );
@@ -1576,9 +1810,9 @@ class _DetalleEventoScreenState extends State<DetalleEventoScreen> {
               app: PaymentApp.paypal,
               onTap: () {
                 Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Abriendo PayPal...'),
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                    content: Text(_tr(es: 'Abriendo PayPal...', en: 'Opening PayPal...', pt: 'Abrindo PayPal...', it: 'Apertura PayPal...', zh: '正在打开 PayPal...', ja: 'PayPal を開いています...')),
                     duration: Duration(seconds: 1),
                   ),
                 );
@@ -1589,9 +1823,9 @@ class _DetalleEventoScreenState extends State<DetalleEventoScreen> {
               app: PaymentApp.venmo,
               onTap: () {
                 Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Abriendo Venmo...'),
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                    content: Text(_tr(es: 'Abriendo Venmo...', en: 'Opening Venmo...', pt: 'Abrindo Venmo...', it: 'Apertura Venmo...', zh: '正在打开 Venmo...', ja: 'Venmo を開いています...')),
                     duration: Duration(seconds: 1),
                   ),
                 );
@@ -1610,7 +1844,7 @@ class _DetalleEventoScreenState extends State<DetalleEventoScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancelar'),
+            child: Text(_tr(es: 'Cancelar', en: 'Cancel', pt: 'Cancelar', it: 'Annulla', zh: '取消', ja: 'キャンセル')),
           ),
         ],
       ),
@@ -1776,8 +2010,8 @@ class _DetalleEventoScreenState extends State<DetalleEventoScreen> {
                       onLongPress: () {
                         if (tieneGastos) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('No se puede eliminar a un participante con gastos registrados'),
+                              SnackBar(
+                              content: Text(_tr(es: 'No se puede eliminar a un participante con gastos registrados', en: 'You cannot remove a participant with registered expenses', pt: 'Nao e possivel remover um participante com gastos registrados', it: 'Non puoi rimuovere un partecipante con spese registrate', zh: '无法删除已有支出的参与者', ja: '支出が登録されている参加者は削除できません')),
                               backgroundColor: Colors.orange,
                             ),
                           );
@@ -1785,8 +2019,8 @@ class _DetalleEventoScreenState extends State<DetalleEventoScreen> {
                         }
                         if (widget.evento.participantes.length <= 1) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Debe haber al menos un participante'),
+                              SnackBar(
+                              content: Text(_tr(es: 'Debe haber al menos un participante', en: 'There must be at least one participant', pt: 'Deve haver pelo menos um participante', it: 'Deve esserci almeno un partecipante', zh: '至少需要一名参与者', ja: '参加者は1人以上必要です')),
                               backgroundColor: Colors.orange,
                             ),
                           );
@@ -1795,12 +2029,12 @@ class _DetalleEventoScreenState extends State<DetalleEventoScreen> {
                         showDialog(
                           context: context,
                           builder: (context) => AlertDialog(
-                            title: const Text('Eliminar participante'),
-                            content: Text('¿Deseas eliminar a ${participante.nombre} del evento?'),
+                            title: Text(_tr(es: 'Eliminar participante', en: 'Remove participant', pt: 'Remover participante', it: 'Rimuovi partecipante', zh: '删除参与者', ja: '参加者を削除')),
+                            content: Text(_tr(es: 'Deseas eliminar a ${participante.nombre} del evento?', en: 'Do you want to remove ${participante.nombre} from the event?', pt: 'Deseja remover ${participante.nombre} do evento?', it: 'Vuoi rimuovere ${participante.nombre} dall evento?', zh: '是否将 ${participante.nombre} 从活动中删除？', ja: '${participante.nombre} をイベントから削除しますか？')),
                             actions: [
                               TextButton(
                                 onPressed: () => Navigator.pop(context),
-                                child: const Text('Cancelar'),
+                                child: Text(_tr(es: 'Cancelar', en: 'Cancel', pt: 'Cancelar', it: 'Annulla', zh: '取消', ja: 'キャンセル')),
                               ),
                               TextButton(
                                 onPressed: () {
@@ -1811,12 +2045,12 @@ class _DetalleEventoScreenState extends State<DetalleEventoScreen> {
                                   Navigator.pop(context);
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
-                                      content: Text('${participante.nombre} eliminado del evento'),
+                                      content: Text(_tr(es: '${participante.nombre} eliminado del evento', en: '${participante.nombre} removed from the event', pt: '${participante.nombre} removido do evento', it: '${participante.nombre} rimosso dall evento', zh: '${participante.nombre} 已从活动中移除', ja: '${participante.nombre} をイベントから削除しました')),
                                       backgroundColor: Colors.green,
                                     ),
                                   );
                                 },
-                                child: const Text('Eliminar', style: TextStyle(color: Colors.red)),
+                                child: Text(_tr(es: 'Eliminar', en: 'Remove', pt: 'Remover', it: 'Rimuovi', zh: '删除', ja: '削除'), style: const TextStyle(color: Colors.red)),
                               ),
                             ],
                           ),
@@ -1986,7 +2220,7 @@ class _DetalleEventoScreenState extends State<DetalleEventoScreen> {
                                   child: OutlinedButton.icon(
                                     onPressed: () => _solicitarPago(acreedor.nombre, deudor.nombre, monto),
                                     icon: const Icon(Icons.message, size: 16),
-                                    label: const Text('Solicitar', style: TextStyle(fontSize: 12)),
+                                    label: Text(_tr(es: 'Solicitar', en: 'Request', pt: 'Solicitar', it: 'Richiedi', zh: '请求', ja: '請求'), style: const TextStyle(fontSize: 12)),
                                     style: OutlinedButton.styleFrom(
                                       padding: const EdgeInsets.symmetric(vertical: 8),
                                       side: const BorderSide(color: Color(0xFF0EA5A4)),
@@ -1999,7 +2233,7 @@ class _DetalleEventoScreenState extends State<DetalleEventoScreen> {
                                   child: OutlinedButton.icon(
                                     onPressed: () => _mostrarQRPago(acreedor.nombre, monto),
                                     icon: const Icon(Icons.qr_code_2, size: 16),
-                                    label: const Text('QR', style: TextStyle(fontSize: 12)),
+                                    label: Text(_tr(es: 'QR', en: 'QR', pt: 'QR', it: 'QR', zh: '二维码', ja: 'QR'), style: const TextStyle(fontSize: 12)),
                                     style: OutlinedButton.styleFrom(
                                       padding: const EdgeInsets.symmetric(vertical: 8),
                                       side: const BorderSide(color: Color(0xFFF59E0B)),
@@ -2012,7 +2246,7 @@ class _DetalleEventoScreenState extends State<DetalleEventoScreen> {
                                   child: OutlinedButton.icon(
                                     onPressed: () => _mostrarOpcionesPago(acreedor.nombre, deudor.nombre, monto),
                                     icon: const Icon(Icons.credit_card, size: 16),
-                                    label: const Text('Pagar', style: TextStyle(fontSize: 12)),
+                                    label: Text(_tr(es: 'Pagar', en: 'Pay', pt: 'Pagar', it: 'Paga', zh: '支付', ja: '支払う'), style: const TextStyle(fontSize: 12)),
                                     style: OutlinedButton.styleFrom(
                                       padding: const EdgeInsets.symmetric(vertical: 8),
                                       side: const BorderSide(color: Colors.green),
@@ -2109,12 +2343,12 @@ class _DetalleEventoScreenState extends State<DetalleEventoScreen> {
                     showDialog(
                       context: context,
                       builder: (context) => AlertDialog(
-                        title: const Text('Eliminar gasto'),
-                        content: const Text('¿Estás seguro de eliminar este gasto?'),
+                        title: Text(_tr(es: 'Eliminar gasto', en: 'Delete expense', pt: 'Excluir gasto', it: 'Elimina spesa', zh: '删除支出', ja: '支出を削除')),
+                        content: Text(_tr(es: 'Estas seguro de eliminar este gasto?', en: 'Are you sure you want to delete this expense?', pt: 'Tem certeza que deseja excluir este gasto?', it: 'Sei sicuro di voler eliminare questa spesa?', zh: '确定要删除这条支出吗？', ja: 'この支出を削除してもよろしいですか？')),
                         actions: [
                           TextButton(
                             onPressed: () => Navigator.pop(context),
-                            child: const Text('Cancelar'),
+                            child: Text(_tr(es: 'Cancelar', en: 'Cancel', pt: 'Cancelar', it: 'Annulla', zh: '取消', ja: 'キャンセル')),
                           ),
                           TextButton(
                             onPressed: () {
@@ -2124,7 +2358,7 @@ class _DetalleEventoScreenState extends State<DetalleEventoScreen> {
                               widget.onActualizado();
                               Navigator.pop(context);
                             },
-                            child: const Text('Eliminar', style: TextStyle(color: Colors.red)),
+                            child: Text(_tr(es: 'Eliminar', en: 'Delete', pt: 'Excluir', it: 'Elimina', zh: '删除', ja: '削除'), style: const TextStyle(color: Colors.red)),
                           ),
                         ],
                       ),
@@ -2139,7 +2373,7 @@ class _DetalleEventoScreenState extends State<DetalleEventoScreen> {
         onPressed: _agregarGasto,
         backgroundColor: color,
         icon: const Icon(Icons.add),
-        label: const Text('Agregar Gasto'),
+        label: Text(_tr(es: 'Agregar gasto', en: 'Add expense', pt: 'Adicionar gasto', it: 'Aggiungi spesa', zh: '添加支出', ja: '支出を追加')),
       ),
     );
   }
@@ -2187,11 +2421,13 @@ class _InfoChip extends StatelessWidget {
 /// Diálogo para agregar un nuevo gasto
 class _DialogoNuevoGasto extends StatefulWidget {
   final EventoCompartido evento;
+  final AppStrings strings;
   final Function(GastoCompartido) onAgregar;
 
   const _DialogoNuevoGasto({
     Key? key,
     required this.evento,
+    required this.strings,
     required this.onAgregar,
   }) : super(key: key);
 
@@ -2215,6 +2451,30 @@ class _DialogoNuevoGastoState extends State<_DialogoNuevoGasto> {
     'Otro',
   ];
 
+  String _tr({
+    required String es,
+    String? en,
+    String? pt,
+    String? it,
+    String? zh,
+    String? ja,
+  }) {
+    switch (widget.strings.language) {
+      case AppLanguage.english:
+        return en ?? es;
+      case AppLanguage.portuguese:
+        return pt ?? es;
+      case AppLanguage.italian:
+        return it ?? es;
+      case AppLanguage.chinese:
+        return zh ?? es;
+      case AppLanguage.japanese:
+        return ja ?? es;
+      case AppLanguage.spanish:
+        return es;
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -2225,7 +2485,7 @@ class _DialogoNuevoGastoState extends State<_DialogoNuevoGasto> {
   void _agregarGasto() {
     if (_tituloController.text.trim().isEmpty || _montoController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Completa todos los campos requeridos')),
+        SnackBar(content: Text(_tr(es: 'Completa todos los campos requeridos', en: 'Complete all required fields', pt: 'Preencha todos os campos obrigatorios', it: 'Compila tutti i campi obbligatori', zh: '请填写所有必填项', ja: '必須項目をすべて入力してください'))),
       );
       return;
     }
@@ -2252,7 +2512,7 @@ class _DialogoNuevoGastoState extends State<_DialogoNuevoGasto> {
         child: Column(
           children: [
             AppBar(
-              title: const Text('Nuevo Gasto'),
+              title: Text(_tr(es: 'Nuevo gasto', en: 'New expense', pt: 'Novo gasto', it: 'Nuova spesa', zh: '新建支出', ja: '新しい支出')),
               automaticallyImplyLeading: false,
               actions: [
                 IconButton(
@@ -2267,28 +2527,28 @@ class _DialogoNuevoGastoState extends State<_DialogoNuevoGasto> {
                 children: [
                   TextField(
                     controller: _tituloController,
-                    decoration: const InputDecoration(
-                      labelText: 'Título *',
-                      hintText: 'Ej: Cena restaurante',
+                    decoration: InputDecoration(
+                      labelText: _tr(es: 'Título *', en: 'Title *', pt: 'Titulo *', it: 'Titolo *', zh: '标题 *', ja: 'タイトル *'),
+                      hintText: _tr(es: 'Ej: Cena restaurante', en: 'Ex: Restaurant dinner', pt: 'Ex: Jantar no restaurante', it: 'Es: Cena al ristorante', zh: '例如：餐厅晚餐', ja: '例: レストランでの夕食'),
                       border: OutlineInputBorder(),
                     ),
                   ),
                   const SizedBox(height: 16),
                   TextField(
                     controller: _montoController,
-                    decoration: const InputDecoration(
-                      labelText: 'Monto *',
+                    decoration: InputDecoration(
+                      labelText: _tr(es: 'Monto *', en: 'Amount *', pt: 'Valor *', it: 'Importo *', zh: '金额 *', ja: '金額 *'),
                       hintText: '0.00',
                       border: OutlineInputBorder(),
-                      prefixIcon: Icon(Icons.attach_money),
+                      prefixIcon: const Icon(Icons.attach_money),
                     ),
                     keyboardType: TextInputType.number,
                   ),
                   const SizedBox(height: 16),
                   DropdownButtonFormField<String>(
                     value: _categoriaSeleccionada,
-                    decoration: const InputDecoration(
-                      labelText: 'Categoría',
+                    decoration: InputDecoration(
+                      labelText: _tr(es: 'Categoría', en: 'Category', pt: 'Categoria', it: 'Categoria', zh: '类别', ja: 'カテゴリ'),
                       border: OutlineInputBorder(),
                     ),
                     items: _categorias.map((cat) {
@@ -2303,8 +2563,8 @@ class _DialogoNuevoGastoState extends State<_DialogoNuevoGasto> {
                   const SizedBox(height: 16),
                   DropdownButtonFormField<String>(
                     value: _participanteSeleccionado,
-                    decoration: const InputDecoration(
-                      labelText: 'Pagado por',
+                    decoration: InputDecoration(
+                      labelText: _tr(es: 'Pagado por', en: 'Paid by', pt: 'Pago por', it: 'Pagato da', zh: '付款人', ja: '支払者'),
                       border: OutlineInputBorder(),
                     ),
                     items: widget.evento.participantes.map((p) {
@@ -2322,9 +2582,9 @@ class _DialogoNuevoGastoState extends State<_DialogoNuevoGasto> {
                   const SizedBox(height: 16),
                   TextField(
                     controller: _notasController,
-                    decoration: const InputDecoration(
-                      labelText: 'Notas',
-                      hintText: 'Opcional',
+                    decoration: InputDecoration(
+                      labelText: _tr(es: 'Notas', en: 'Notes', pt: 'Notas', it: 'Note', zh: '备注', ja: 'メモ'),
+                      hintText: _tr(es: 'Opcional', en: 'Optional', pt: 'Opcional', it: 'Opzionale', zh: '可选', ja: '任意'),
                       border: OutlineInputBorder(),
                     ),
                     maxLines: 2,
@@ -2343,7 +2603,7 @@ class _DialogoNuevoGastoState extends State<_DialogoNuevoGasto> {
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 16),
                   ),
-                  child: const Text('Agregar Gasto', style: TextStyle(fontSize: 16)),
+                  child: Text(_tr(es: 'Agregar gasto', en: 'Add expense', pt: 'Adicionar gasto', it: 'Aggiungi spesa', zh: '添加支出', ja: '支出を追加'), style: const TextStyle(fontSize: 16)),
                 ),
               ),
             ),

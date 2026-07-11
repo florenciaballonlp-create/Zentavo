@@ -23,6 +23,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
   final TextEditingController _telefonoController = TextEditingController();
   
   AppStrings get loc => widget.strings;
+
+  String _tr({required String es, String? en, String? pt, String? it}) {
+    switch (loc.language) {
+      case AppLanguage.english:
+        return en ?? es;
+      case AppLanguage.portuguese:
+        return pt ?? es;
+      case AppLanguage.italian:
+        return it ?? es;
+      case AppLanguage.chinese:
+      case AppLanguage.japanese:
+      case AppLanguage.spanish:
+        return es;
+    }
+  }
   
   String? _avatarPath;
   bool _loading = true;
@@ -402,14 +417,41 @@ class _ProfileScreenState extends State<ProfileScreen> {
         }
         
         // Verificar si ya está agregado
-        final yaAgregado = _amigos.any((amigo) => amigo['userId'] == userId);
-        if (yaAgregado) {
-          if (mounted) {
+        final int existenteIndex = _amigos.indexWhere((amigo) => amigo['userId'] == userId);
+        if (existenteIndex != -1) {
+          final String nombreActual = (_amigos[existenteIndex]['nombre'] ?? '').toString();
+          if (nombreActual.trim() != nombre.trim() && nombre.trim().isNotEmpty) {
+            setState(() {
+              _amigos[existenteIndex]['nombre'] = nombre;
+            });
+
+            final prefs = await SharedPreferences.getInstance();
+            await prefs.setString('amigos_list', jsonEncode(_amigos));
+
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    _tr(
+                      es: '✅ Nombre actualizado: $nombre',
+                      en: '✅ Name updated: $nombre',
+                      pt: '✅ Nome atualizado: $nombre',
+                      it: '✅ Nome aggiornato: $nombre',
+                    ),
+                  ),
+                  backgroundColor: Colors.green,
+                ),
+              );
+            }
+          } else if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text(loc.usuarioYaEnListaAmigos),
               ),
             );
+          }
+          if (mounted) {
+            await _mostrarDialogoVinculacionMutua(nombre);
           }
           return;
         }
@@ -434,6 +476,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
               backgroundColor: Colors.green,
             ),
           );
+
+          await _mostrarDialogoVinculacionMutua(nombre);
         }
       } catch (e) {
         if (mounted) {
@@ -446,6 +490,58 @@ class _ProfileScreenState extends State<ProfileScreen> {
         }
       }
     }
+  }
+
+  Future<void> _mostrarDialogoVinculacionMutua(String nombreAmigo) async {
+    if (!mounted) return;
+
+    await showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            const Icon(Icons.people_alt, color: Color(0xFF22C55E)),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                _tr(
+                  es: 'Conexión completada',
+                  en: 'Connection completed',
+                  pt: 'Conexão concluída',
+                  it: 'Connessione completata',
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: Text(
+          _tr(
+            es: '$nombreAmigo ya fue agregado a tu lista.\n\nPara que también te agregue en su lista, pídele que escanee ahora tu código QR.',
+            en: '$nombreAmigo was added to your list.\n\nFor mutual connection, ask them to scan your QR code now.',
+            pt: '$nombreAmigo já foi adicionado à sua lista.\n\nPara conexão mútua, peça para ele escanear seu QR agora.',
+            it: '$nombreAmigo è stato aggiunto alla tua lista.\n\nPer una connessione reciproca, chiedigli di scansionare ora il tuo QR.',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(loc.cerrar),
+          ),
+          ElevatedButton.icon(
+            onPressed: () {
+              Navigator.pop(context);
+              _mostrarCodigoQR();
+            },
+            icon: const Icon(Icons.qr_code_2),
+            label: Text(loc.miCodigoQR),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF0EA5A4),
+              foregroundColor: Colors.white,
+            ),
+          ),
+        ],
+      ),
+    );
   }
   
   Future<void> _eliminarAmigo(int index) async {

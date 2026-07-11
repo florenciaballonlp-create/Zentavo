@@ -1,6 +1,7 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -30,14 +31,40 @@ import 'currency_exchange_service.dart';
 
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
+import 'firebase_shared_events_service.dart';
 
 // Modo seguro de inicio: desactiva inicializaciones pesadas para pruebas o builds especiales
 const bool kSafeStartupMode = false;
 
+const String _debugBannerAdUnitIdAndroid =
+  'ca-app-pub-3940256099942544/6300978111';
+const String _debugBannerAdUnitIdIOS =
+  'ca-app-pub-3940256099942544/2934735716';
+const String _releaseBannerAdUnitIdAndroid =
+    String.fromEnvironment(
+      'ADMOB_BANNER_ANDROID',
+      defaultValue: 'ca-app-pub-2279654768858652/1911308078',
+    );
+const String _releaseBannerAdUnitIdIOS =
+    String.fromEnvironment(
+      'ADMOB_BANNER_IOS',
+      defaultValue: 'ca-app-pub-2279654768858652/4759086788',
+    );
+
 // ================================
 // ...existing code...
 
-void main() => runApp(const ExpenseApp());
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  if (kUseFirebaseSharedEvents) {
+    try {
+      await Firebase.initializeApp();
+    } catch (_) {
+      // Si Firebase no está configurado, la app sigue en modo local/token.
+    }
+  }
+  runApp(const ExpenseApp());
+}
 
 List<Map<String, dynamic>> _decodeMapListIsolate(String rawJson) {
   final List<dynamic> decoded = jsonDecode(rawJson);
@@ -391,6 +418,187 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     }
   }
 
+  Future<void> _openPremiumAndRefresh({String? source}) async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => PremiumScreen(
+          strings: _strings,
+          source: source,
+        ),
+      ),
+    );
+    await _checkPremiumStatus();
+  }
+
+  String _uiTr({
+    required String es,
+    String? en,
+    String? pt,
+    String? it,
+    String? zh,
+    String? ja,
+  }) {
+    switch (_strings.language) {
+      case AppLanguage.english:
+        return en ?? es;
+      case AppLanguage.portuguese:
+        return pt ?? es;
+      case AppLanguage.italian:
+        return it ?? es;
+      case AppLanguage.chinese:
+        return zh ?? es;
+      case AppLanguage.japanese:
+        return ja ?? es;
+      case AppLanguage.spanish:
+        return es;
+    }
+  }
+
+  List<Map<String, String>> _buildFaqs() {
+    return [
+      {
+        'pregunta': _uiTr(
+          es: '¿Cómo agrego una nueva transacción?',
+          en: 'How do I add a new transaction?',
+          pt: 'Como adiciono uma nova transação?',
+          it: 'Come aggiungo una nuova transazione?',
+        ),
+        'respuesta': _uiTr(
+          es: 'Toca el botón "+" en la pantalla principal y selecciona "Ingreso" o "Egreso". Completa los campos requeridos y guarda.',
+          en: 'Tap the "+" button on the main screen and choose "Income" or "Expense". Fill in the required fields and save.',
+          pt: 'Toque no botão "+" na tela principal e selecione "Receita" ou "Despesa". Preencha os campos obrigatórios e salve.',
+          it: 'Tocca il pulsante "+" nella schermata principale e seleziona "Entrata" o "Spesa". Compila i campi richiesti e salva.',
+        ),
+      },
+      {
+        'pregunta': _uiTr(
+          es: '¿Puedo usar múltiples monedas?',
+          en: 'Can I use multiple currencies?',
+          pt: 'Posso usar múltiplas moedas?',
+          it: 'Posso usare valute multiple?',
+        ),
+        'respuesta': _uiTr(
+          es: 'Sí, Zentavo soporta 16 monedas diferentes. Puedes cambiar la moneda principal en Configuración > Moneda, y registrar transacciones en cualquier moneda extranjera.',
+          en: 'Yes, Zentavo supports 16 different currencies. You can change the main currency in Settings > Currency and record transactions in any supported foreign currency.',
+          pt: 'Sim, o Zentavo suporta 16 moedas diferentes. Você pode alterar a moeda principal em Configurações > Moeda e registrar transações em qualquer moeda estrangeira suportada.',
+          it: 'Sì, Zentavo supporta 16 valute diverse. Puoi cambiare la valuta principale in Impostazioni > Valuta e registrare transazioni in qualsiasi valuta estera supportata.',
+        ),
+      },
+      {
+        'pregunta': _uiTr(
+          es: '¿Cómo configuro un presupuesto mensual?',
+          en: 'How do I set a monthly budget?',
+          pt: 'Como configuro um orçamento mensal?',
+          it: 'Come imposto un budget mensile?',
+        ),
+        'respuesta': _uiTr(
+          es: 'Ve a la pestaña "Transacciones", toca el ícono de configuración (⚙️) arriba a la derecha, y selecciona "Establecer presupuesto mensual".',
+          en: 'Go to the "Transactions" tab, tap the settings icon (⚙️) in the top-right corner, and choose "Set monthly budget".',
+          pt: 'Vá para a aba "Transações", toque no ícone de configurações (⚙️) no canto superior direito e selecione "Definir orçamento mensal".',
+          it: 'Vai alla scheda "Transazioni", tocca l\'icona impostazioni (⚙️) in alto a destra e seleziona "Imposta budget mensile".',
+        ),
+      },
+      {
+        'pregunta': _uiTr(
+          es: '¿Puedo exportar mis datos?',
+          en: 'Can I export my data?',
+          pt: 'Posso exportar meus dados?',
+          it: 'Posso esportare i miei dati?',
+        ),
+        'respuesta': _uiTr(
+          es: 'Sí, puedes exportar en múltiples formatos: PDF, Excel, CSV, JSON. Ve a la pestaña "Transacciones" y toca el botón de exportar.',
+          en: 'Yes, you can export in multiple formats: PDF, Excel, CSV, and JSON. Go to the "Transactions" tab and tap the export button.',
+          pt: 'Sim, você pode exportar em vários formatos: PDF, Excel, CSV e JSON. Vá para a aba "Transações" e toque no botão de exportar.',
+          it: 'Sì, puoi esportare in vari formati: PDF, Excel, CSV e JSON. Vai alla scheda "Transazioni" e tocca il pulsante di esportazione.',
+        ),
+      },
+      {
+        'pregunta': _uiTr(
+          es: '¿Los datos están seguros?',
+          en: 'Is my data secure?',
+          pt: 'Os dados estão seguros?',
+          it: 'I dati sono al sicuro?',
+        ),
+        'respuesta': _uiTr(
+          es: 'Todos tus datos se almacenan localmente en tu dispositivo. Puedes habilitar protección con biometría en Configuración.',
+          en: 'All your data is stored locally on your device. You can enable biometric protection in Settings.',
+          pt: 'Todos os seus dados são armazenados localmente no seu dispositivo. Você pode ativar proteção biométrica nas Configurações.',
+          it: 'Tutti i tuoi dati sono archiviati localmente sul tuo dispositivo. Puoi abilitare la protezione biometrica nelle Impostazioni.',
+        ),
+      },
+      {
+        'pregunta': _uiTr(
+          es: '¿Qué incluye la versión Premium?',
+          en: 'What does Premium include?',
+          pt: 'O que a versão Premium inclui?',
+          it: 'Cosa include la versione Premium?',
+        ),
+        'respuesta': _uiTr(
+          es: 'Premium incluye: categorías personalizadas, múltiples monedas, reportes avanzados, análisis predictivo, respaldos en la nube, y más funciones premium.',
+          en: 'Premium includes: custom categories, multiple currencies, advanced reports, predictive insights, cloud backups, and more premium features.',
+          pt: 'O Premium inclui: categorias personalizadas, múltiplas moedas, relatórios avançados, análises preditivas, backups na nuvem e mais recursos premium.',
+          it: 'Premium include: categorie personalizzate, valute multiple, report avanzati, analisi predittive, backup cloud e altre funzioni premium.',
+        ),
+      },
+      {
+        'pregunta': _uiTr(
+          es: '¿Cómo funcionan los ahorros en monedas extranjeras?',
+          en: 'How do savings in foreign currencies work?',
+          pt: 'Como funcionam as economias em moedas estrangeiras?',
+          it: 'Come funzionano i risparmi in valuta estera?',
+        ),
+        'respuesta': _uiTr(
+          es: 'Ve a la pestaña "Ahorros" y toca "Ahorros en Monedas". Puedes agregar, retirar y ver el historial de transacciones en cualquiera de las 16 monedas soportadas.',
+          en: 'Go to the "Savings" tab and tap "Savings in Currencies". You can add, withdraw, and view transaction history in any of the 16 supported currencies.',
+          pt: 'Vá para a aba "Poupança" e toque em "Poupança em Moedas". Você pode adicionar, retirar e ver o histórico em qualquer uma das 16 moedas suportadas.',
+          it: 'Vai alla scheda "Risparmi" e tocca "Risparmi in valute". Puoi aggiungere, prelevare e vedere lo storico in una delle 16 valute supportate.',
+        ),
+      },
+      {
+        'pregunta': _uiTr(
+          es: '¿Puedo programar transacciones recurrentes?',
+          en: 'Can I schedule recurring transactions?',
+          pt: 'Posso programar transações recorrentes?',
+          it: 'Posso programmare transazioni ricorrenti?',
+        ),
+        'respuesta': _uiTr(
+          es: 'Sí, en la pestaña "Gastos Fijos" puedes configurar gastos que se repiten mensualmente, como alquiler, servicios, suscripciones, etc.',
+          en: 'Yes, in the "Fixed Expenses" tab you can set expenses that repeat monthly, such as rent, services, and subscriptions.',
+          pt: 'Sim, na aba "Despesas Fixas" você pode configurar despesas que se repetem mensalmente, como aluguel, serviços e assinaturas.',
+          it: 'Sì, nella scheda "Spese fisse" puoi configurare spese mensili ricorrenti, come affitto, utenze e abbonamenti.',
+        ),
+      },
+      {
+        'pregunta': _uiTr(
+          es: '¿Cómo activo el tema oscuro?',
+          en: 'How do I enable dark mode?',
+          pt: 'Como ativo o tema escuro?',
+          it: 'Come attivo il tema scuro?',
+        ),
+        'respuesta': _uiTr(
+          es: 'Ve a Configuración > Tema y selecciona "Oscuro" o "Automático" para que siga el tema del sistema.',
+          en: 'Go to Settings > Theme and choose "Dark" or "System" to follow the device theme.',
+          pt: 'Vá em Configurações > Tema e selecione "Escuro" ou "Sistema" para seguir o tema do dispositivo.',
+          it: 'Vai su Impostazioni > Tema e seleziona "Scuro" o "Sistema" per seguire il tema del dispositivo.',
+        ),
+      },
+      {
+        'pregunta': _uiTr(
+          es: '¿Puedo compartir eventos de gastos?',
+          en: 'Can I share expense events?',
+          pt: 'Posso compartilhar eventos de gastos?',
+          it: 'Posso condividere eventi di spesa?',
+        ),
+        'respuesta': _uiTr(
+          es: 'Sí, usa la función "Eventos Compartidos" para planificar gastos grupales con amigos o familia. Genera un código QR para que otros se unan.',
+          en: 'Yes, use the "Shared Events" feature to plan group expenses with friends or family. Generate a QR code so others can join.',
+          pt: 'Sim, use o recurso "Eventos Compartilhados" para planejar gastos em grupo com amigos ou família. Gere um código QR para que outros participem.',
+          it: 'Sì, usa la funzione "Eventi condivisi" per pianificare spese di gruppo con amici o famiglia. Genera un codice QR per permettere agli altri di partecipare.',
+        ),
+      },
+    ];
+  }
+
   Future<void> _autenticarConBiometria() async {
     if (kIsWeb) {
       setState(() {
@@ -540,15 +748,14 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
       return;
     }
     _recordTiming('Creating banner ads');
-    // Determinar el Ad Unit ID según la plataforma
-    String adUnitId;
-    if (kIsWeb) {
-      // En web usamos el ID de Android por defecto
-      adUnitId = 'ca-app-pub-3940256099942544/6300978111';
-    } else if (Platform.isAndroid) {
-      adUnitId = 'ca-app-pub-3940256099942544/6300978111'; // Test ID Android
-    } else {
-      adUnitId = 'ca-app-pub-3940256099942544/2934735716'; // Test ID iOS
+    final bool isAndroid = Platform.isAndroid;
+    final String adUnitId = kDebugMode
+        ? (isAndroid ? _debugBannerAdUnitIdAndroid : _debugBannerAdUnitIdIOS)
+        : (isAndroid ? _releaseBannerAdUnitIdAndroid : _releaseBannerAdUnitIdIOS);
+
+    if (adUnitId.isEmpty) {
+      print('[TIMING] Banner ads skipped - missing release AdMob banner ID');
+      return;
     }
 
     // Banner para pestaña de Transacciones
@@ -1073,7 +1280,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                   onTap: () {
                     Navigator.of(context).pop();
                     Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => const AnalyticsScreen()),
+                      MaterialPageRoute(builder: (_) => AnalyticsScreen(strings: _strings)),
                     );
                   },
                 ),
@@ -1880,48 +2087,7 @@ Una app completa para controlar tus gastos y ahorros:
 
   void _mostrarPreguntasFrecuentes() {
     // Lista de preguntas frecuentes
-    final List<Map<String, String>> faqs = [
-      {
-        'pregunta': '¿Cómo agrego una nueva transacción?',
-        'respuesta': 'Toca el botón "+" en la pantalla principal y selecciona "Ingreso" o "Egreso". Completa los campos requeridos y guarda.',
-      },
-      {
-        'pregunta': '¿Puedo usar múltiples monedas?',
-        'respuesta': 'Sí, Zentavo soporta 16 monedas diferentes. Puedes cambiar la moneda principal en Configuración > Moneda, y registrar transacciones en cualquier moneda extranjera.',
-      },
-      {
-        'pregunta': '¿Cómo configuro un presupuesto mensual?',
-        'respuesta': 'Ve a la pestaña "Transacciones", toca el ícono de configuración (⚙️) arriba a la derecha, y selecciona "Establecer presupuesto mensual".',
-      },
-      {
-        'pregunta': '¿Puedo exportar mis datos?',
-        'respuesta': 'Sí, puedes exportar en múltiples formatos: PDF, Excel, CSV, JSON. Ve a la pestaña "Transacciones" y toca el botón de exportar.',
-      },
-      {
-        'pregunta': '¿Los datos están seguros?',
-        'respuesta': 'Todos tus datos se almacenan localmente en tu dispositivo. Puedes habilitar protección con biometría en Configuración.',
-      },
-      {
-        'pregunta': '¿Qué incluye la versión Premium?',
-        'respuesta': 'Premium incluye: categorías personalizadas, múltiples monedas, reportes avanzados, análisis predictivo, respaldos en la nube, y más funciones premium.',
-      },
-      {
-        'pregunta': '¿Cómo funcionan los ahorros en monedas extranjeras?',
-        'respuesta': 'Ve a la pestaña "Ahorros" y toca "Ahorros en Monedas". Puedes agregar, retirar y ver el historial de transacciones en cualquiera de las 16 monedas soportadas.',
-      },
-      {
-        'pregunta': '¿Puedo programar transacciones recurrentes?',
-        'respuesta': 'Sí, en la pestaña "Gastos Fijos" puedes configurar gastos que se repiten mensualmente, como alquiler, servicios, suscripciones, etc.',
-      },
-      {
-        'pregunta': '¿Cómo activo el tema oscuro?',
-        'respuesta': 'Ve a Configuración > Tema y selecciona "Oscuro" o "Automático" para que siga el tema del sistema.',
-      },
-      {
-        'pregunta': '¿Puedo compartir eventos de gastos?',
-        'respuesta': 'Sí, usa la función "Eventos Compartidos" para planificar gastos grupales con amigos o familia. Genera un código QR para que otros se unan.',
-      },
-    ];
+    final List<Map<String, String>> faqs = _buildFaqs();
 
     showDialog(
       context: context,
@@ -2103,7 +2269,12 @@ Una app completa para controlar tus gastos y ahorros:
                             final Uri emailUri = Uri(
                               scheme: 'mailto',
                               path: 'soporte@zentavo.com',
-                              query: 'subject=Soporte Zentavo&body=Describe tu consulta aquí...',
+                              query: _uiTr(
+                                es: 'subject=Soporte Zentavo&body=Describe tu consulta aquí...',
+                                en: 'subject=Zentavo Support&body=Please describe your request here...',
+                                pt: 'subject=Suporte Zentavo&body=Descreva sua solicitação aqui...',
+                                it: 'subject=Supporto Zentavo&body=Descrivi qui la tua richiesta...',
+                              ),
                             );
                             try {
                               if (await canLaunchUrl(emailUri)) {
@@ -2111,8 +2282,15 @@ Una app completa para controlar tus gastos y ahorros:
                               } else {
                                 if (context.mounted) {
                                   ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text('No se pudo abrir el cliente de correo'),
+                                    SnackBar(
+                                      content: Text(
+                                        _uiTr(
+                                          es: 'No se pudo abrir el cliente de correo',
+                                          en: 'Could not open the email client',
+                                          pt: 'Não foi possível abrir o cliente de e-mail',
+                                          it: 'Impossibile aprire il client di posta',
+                                        ),
+                                      ),
                                       backgroundColor: Color(0xFFEF4444),
                                     ),
                                   );
@@ -2122,7 +2300,7 @@ Una app completa para controlar tus gastos y ahorros:
                               if (context.mounted) {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(
-                                    content: Text('Error: $e'),
+                                    content: Text('${_uiTr(es: 'Error', en: 'Error', pt: 'Erro', it: 'Errore')}: $e'),
                                     backgroundColor: const Color(0xFFEF4444),
                                   ),
                                 );
@@ -2178,24 +2356,39 @@ Una app completa para controlar tus gastos y ahorros:
                         ],
                       ),
                       const SizedBox(height: 8),
-                      const Text(
-                        'Lunes a Viernes: 9:00 AM - 6:00 PM',
+                      Text(
+                        _uiTr(
+                          es: 'Lunes a Viernes: 9:00 AM - 6:00 PM',
+                          en: 'Monday to Friday: 9:00 AM - 6:00 PM',
+                          pt: 'Segunda a Sexta: 9:00 AM - 6:00 PM',
+                          it: 'Lunedì a Venerdì: 9:00 - 18:00',
+                        ),
                         style: TextStyle(
                           fontSize: 14,
                           color: Color(0xFF6B7280),
                         ),
                       ),
                       const SizedBox(height: 4),
-                      const Text(
-                        'Sábados: 10:00 AM - 2:00 PM',
+                      Text(
+                        _uiTr(
+                          es: 'Sábados: 10:00 AM - 2:00 PM',
+                          en: 'Saturdays: 10:00 AM - 2:00 PM',
+                          pt: 'Sábados: 10:00 AM - 2:00 PM',
+                          it: 'Sabato: 10:00 - 14:00',
+                        ),
                         style: TextStyle(
                           fontSize: 14,
                           color: Color(0xFF6B7280),
                         ),
                       ),
                       const SizedBox(height: 4),
-                      const Text(
-                        'Zona horaria: UTC-5 (COT)',
+                      Text(
+                        _uiTr(
+                          es: 'Zona horaria: UTC-5 (COT)',
+                          en: 'Time zone: UTC-5 (COT)',
+                          pt: 'Fuso horário: UTC-5 (COT)',
+                          it: 'Fuso orario: UTC-5 (COT)',
+                        ),
                         style: TextStyle(
                           fontSize: 13,
                           color: Color(0xFF9CA3AF),
@@ -2221,10 +2414,15 @@ Una app completa para controlar tus gastos y ahorros:
                         size: 20,
                       ),
                       const SizedBox(width: 12),
-                      const Expanded(
+                      Expanded(
                         child: Text(
-                          'Responderemos tu consulta en un máximo de 24 horas.',
-                          style: TextStyle(
+                          _uiTr(
+                            es: 'Responderemos tu consulta en un máximo de 24 horas.',
+                            en: 'We will reply to your request within 24 hours.',
+                            pt: 'Responderemos à sua solicitação em até 24 horas.',
+                            it: 'Risponderemo alla tua richiesta entro 24 ore.',
+                          ),
+                          style: const TextStyle(
                             fontSize: 13,
                             color: Color(0xFF92400E),
                           ),
@@ -2512,11 +2710,16 @@ Una app completa para controlar tus gastos y ahorros:
               textAlign: TextAlign.center,
             ),
             if (_isPremium)
-              const Padding(
+              Padding(
                 padding: EdgeInsets.only(top: 12),
                 child: Text(
-                  '✨ Exportación anual disponible',
-                  style: TextStyle(fontSize: 14, color: Color(0xFFF59E0B)),
+                  _uiTr(
+                    es: '✨ Exportación anual disponible',
+                    en: '✨ Annual export available',
+                    pt: '✨ Exportação anual disponível',
+                    it: '✨ Esportazione annuale disponibile',
+                  ),
+                  style: const TextStyle(fontSize: 14, color: Color(0xFFF59E0B)),
                 ),
               ),
             const SizedBox(height: 32),
@@ -2572,11 +2775,16 @@ Una app completa para controlar tus gastos y ahorros:
             children: [
               Text(_strings.seleccionaFormatoReporte),
               if (_isPremium)
-                const Padding(
+                Padding(
                   padding: EdgeInsets.only(top: 8),
                   child: Text(
-                    '✨ Exportación anual disponible',
-                    style: TextStyle(fontSize: 12, color: Color(0xFFF59E0B)),
+                    _uiTr(
+                      es: '✨ Exportación anual disponible',
+                      en: '✨ Annual export available',
+                      pt: '✨ Exportação anual disponível',
+                      it: '✨ Esportazione annuale disponibile',
+                    ),
+                    style: const TextStyle(fontSize: 12, color: Color(0xFFF59E0B)),
                   ),
                 ),
             ],
@@ -2690,6 +2898,7 @@ Una app completa para controlar tus gastos y ahorros:
           transactions: transaccionesMes,
           ingresos: _calcularIngresos(),
           egresos: _calcularEgresos(),
+          language: _appLanguage,
         );
         final file = File(filePath);
         await file.writeAsBytes(pdfBytes);
@@ -2699,6 +2908,7 @@ Una app completa para controlar tus gastos y ahorros:
           transactions: transaccionesMes,
           ingresos: _calcularIngresos(),
           egresos: _calcularEgresos(),
+          language: _appLanguage,
         );
         final file = File(filePath);
         await file.writeAsBytes(excelBytes);
@@ -2706,12 +2916,21 @@ Una app completa para controlar tus gastos y ahorros:
       
       // Mostrar diálogo con opciones
       if (mounted) {
-        _mostrarDialogoArchivoGuardado(filePath, fileName, 'Informe Mensual $monthStr');
+        _mostrarDialogoArchivoGuardado(
+          filePath,
+          fileName,
+          _uiTr(
+            es: 'Informe Mensual $monthStr',
+            en: 'Monthly Report $monthStr',
+            pt: 'Relatório Mensal $monthStr',
+            it: 'Report Mensile $monthStr',
+          ),
+        );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error al generar informe: $e')),
+          SnackBar(content: Text('${_strings.errorAlGenerar}: $e')),
         );
       }
     }
@@ -2721,11 +2940,18 @@ Una app completa para controlar tus gastos y ahorros:
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Row(
+        title: Row(
           children: [
-            Icon(Icons.check_circle, color: Colors.green, size: 28),
-            SizedBox(width: 8),
-            Text('Informe guardado'),
+            const Icon(Icons.check_circle, color: Colors.green, size: 28),
+            const SizedBox(width: 8),
+            Text(
+              _uiTr(
+                es: 'Informe guardado',
+                en: 'Report saved',
+                pt: 'Relatório salvo',
+                it: 'Report salvato',
+              ),
+            ),
           ],
         ),
         content: Column(
@@ -2733,7 +2959,12 @@ Una app completa para controlar tus gastos y ahorros:
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'El informe se guard\u00f3 correctamente:',
+              _uiTr(
+                es: 'El informe se guardó correctamente:',
+                en: 'The report was saved successfully:',
+                pt: 'O relatório foi salvo com sucesso:',
+                it: 'Il report è stato salvato correttamente:',
+              ),
               style: const TextStyle(fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: 12),
@@ -2763,7 +2994,12 @@ Una app completa para controlar tus gastos y ahorros:
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Ubicaci\u00f3n: Documentos de la app',
+                    _uiTr(
+                      es: 'Ubicación: Documentos de la app',
+                      en: 'Location: App Documents',
+                      pt: 'Local: Documentos do app',
+                      it: 'Posizione: Documenti dell\'app',
+                    ),
                     style: TextStyle(
                       fontSize: 12,
                       color: Colors.grey[600],
@@ -2774,7 +3010,12 @@ Una app completa para controlar tus gastos y ahorros:
             ),
             const SizedBox(height: 16),
             Text(
-              '\u00bfQu\u00e9 deseas hacer?',
+              _uiTr(
+                es: '¿Qué deseas hacer?',
+                en: 'What would you like to do?',
+                pt: 'O que você deseja fazer?',
+                it: 'Cosa vuoi fare?',
+              ),
               style: TextStyle(
                 fontSize: 13,
                 color: Colors.grey[700],
@@ -2785,7 +3026,7 @@ Una app completa para controlar tus gastos y ahorros:
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cerrar'),
+            child: Text(_strings.cerrar),
           ),
           TextButton.icon(
             onPressed: () async {
@@ -2793,7 +3034,7 @@ Una app completa para controlar tus gastos y ahorros:
               await Share.shareXFiles([XFile(filePath)], text: descripcion);
             },
             icon: const Icon(Icons.share),
-            label: const Text('Compartir'),
+            label: Text(_strings.compartir),
           ),
           ElevatedButton.icon(
             onPressed: () async {
@@ -2801,7 +3042,15 @@ Una app completa para controlar tus gastos y ahorros:
               // Intentar abrir el archivo con la aplicaci\u00f3n predeterminada
               try {
                 if (Platform.isAndroid || Platform.isIOS) {
-                  await Share.shareXFiles([XFile(filePath)], text: 'Abrir con...');
+                  await Share.shareXFiles(
+                    [XFile(filePath)],
+                    text: _uiTr(
+                      es: 'Abrir con...',
+                      en: 'Open with...',
+                      pt: 'Abrir com...',
+                      it: 'Apri con...',
+                    ),
+                  );
                 } else {
                   // En escritorio, intentar abrir directamente
                   final uri = Uri.file(filePath);
@@ -2812,13 +3061,17 @@ Una app completa para controlar tus gastos y ahorros:
               } catch (e) {
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('No se pudo abrir el archivo: $e')),
+                    SnackBar(
+                      content: Text(
+                        '${_uiTr(es: 'No se pudo abrir el archivo', en: 'Could not open file', pt: 'Não foi possível abrir o arquivo', it: 'Impossibile aprire il file')}: $e',
+                      ),
+                    ),
                   );
                 }
               }
             },
             icon: const Icon(Icons.open_in_new),
-            label: const Text('Abrir'),
+            label: Text(_uiTr(es: 'Abrir', en: 'Open', pt: 'Abrir', it: 'Apri')),
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF0EA5A4),
               foregroundColor: Colors.white,
@@ -2878,6 +3131,7 @@ Una app completa para controlar tus gastos y ahorros:
           transactions: transaccionesAnio,
           ingresos: ingresosAnuales,
           egresos: egresosAnuales,
+          language: _appLanguage,
         );
         final file = File(filePath);
         await file.writeAsBytes(pdfBytes);
@@ -2887,18 +3141,28 @@ Una app completa para controlar tus gastos y ahorros:
           transactions: transaccionesAnio,
           ingresos: ingresosAnuales,
           egresos: egresosAnuales,
+          language: _appLanguage,
         );
         final file = File(filePath);
         await file.writeAsBytes(excelBytes);
       }
       
       if (mounted) {
-        _mostrarDialogoArchivoGuardado(filePath, fileName, 'Informe Anual $yearStr');
+        _mostrarDialogoArchivoGuardado(
+          filePath,
+          fileName,
+          _uiTr(
+            es: 'Informe Anual $yearStr',
+            en: 'Annual Report $yearStr',
+            pt: 'Relatório Anual $yearStr',
+            it: 'Report Annuale $yearStr',
+          ),
+        );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error al generar informe: $e')),
+          SnackBar(content: Text('${_strings.errorAlGenerar}: $e')),
         );
       }
     }
@@ -2941,6 +3205,7 @@ Una app completa para controlar tus gastos y ahorros:
           transactions: _transacciones,
           ingresos: ingresosTotal,
           egresos: egresosTotal,
+          language: _appLanguage,
         );
         final file = File(filePath);
         await file.writeAsBytes(pdfBytes);
@@ -2950,18 +3215,28 @@ Una app completa para controlar tus gastos y ahorros:
           transactions: _transacciones,
           ingresos: ingresosTotal,
           egresos: egresosTotal,
+          language: _appLanguage,
         );
         final file = File(filePath);
         await file.writeAsBytes(excelBytes);
       }
       
       if (mounted) {
-        _mostrarDialogoArchivoGuardado(filePath, fileName, 'Informe Completo');
+        _mostrarDialogoArchivoGuardado(
+          filePath,
+          fileName,
+          _uiTr(
+            es: 'Informe Completo',
+            en: 'Full Report',
+            pt: 'Relatório Completo',
+            it: 'Report Completo',
+          ),
+        );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error al generar informe: $e')),
+          SnackBar(content: Text('${_strings.errorAlGenerar}: $e')),
         );
       }
     }
@@ -3974,12 +4249,7 @@ Una app completa para controlar tus gastos y ahorros:
             ElevatedButton(
               onPressed: () async {
                 Navigator.pop(context);
-                final result = await Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => PremiumScreen(strings: _strings)),
-                );
-                if (result == true) {
-                  _checkPremiumStatus();
-                }
+                await _openPremiumAndRefresh();
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFFF59E0B),
@@ -5314,17 +5584,7 @@ Una app completa para controlar tus gastos y ahorros:
               });
               _prefs.setBool('mostro_popup_conversion', true);
               Navigator.pop(context);
-              final result = await Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => PremiumScreen(
-                    strings: _strings,
-                    source: 'popup_5_transacciones',
-                  ),
-                ),
-              );
-              if (result == true) {
-                _checkPremiumStatus();
-              }
+              await _openPremiumAndRefresh(source: 'popup_5_transacciones');
             },
             icon: const Icon(Icons.workspace_premium),
             label: const Text('Ver Premium'),
@@ -5436,17 +5696,7 @@ Una app completa para controlar tus gastos y ahorros:
           ElevatedButton(
             onPressed: () async {
               Navigator.pop(context);
-              final result = await Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => PremiumScreen(
-                    strings: _strings,
-                    source: 'popup_ahorro',
-                  ),
-                ),
-              );
-              if (result == true) {
-                _checkPremiumStatus();
-              }
+              await _openPremiumAndRefresh(source: 'popup_ahorro');
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF0EA5A4),
@@ -6875,12 +7125,7 @@ Una app completa para controlar tus gastos y ahorros:
               } else if (value == 'monedas_multiples') {
                 _mostrarDialogoMonedas();
               } else if (value == 'premium') {
-                final result = await Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => PremiumScreen(strings: _strings)),
-                );
-                if (result == true) {
-                  _checkPremiumStatus();
-                }
+                await _openPremiumAndRefresh();
               } else if (value == 'perfil') {
                 Navigator.of(context).push(
                   MaterialPageRoute(builder: (_) => ProfileScreen(strings: _strings)),
@@ -7338,12 +7583,7 @@ Una app completa para controlar tus gastos y ahorros:
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               child: GestureDetector(
                 onTap: () async {
-                  final result = await Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => PremiumScreen(strings: _strings)),
-                  );
-                  if (result == true) {
-                    _checkPremiumStatus();
-                  }
+                  await _openPremiumAndRefresh();
                 },
                 child: Container(
                   decoration: BoxDecoration(
