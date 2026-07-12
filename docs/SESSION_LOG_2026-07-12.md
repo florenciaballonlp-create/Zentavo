@@ -60,3 +60,21 @@
 ## Notas de entorno
 - En este entorno no estuvo disponible el comando flutter para correr flutter analyze.
 - Validaciones previas se apoyaron en chequeo de problemas del editor.
+
+## Actualización final del día
+1. Se mitigó incidente de secret scanning y se reescribió historial Git para remover la clave expuesta de rutas históricas.
+2. Se endurecieron reglas de Firestore para producción (strict auth) y se publicaron en main.
+3. Se configuró iOS con entitlements y background remote notifications para push.
+4. Se dejó tablero GO/NO-GO y protocolo final de validación para release 107.
+5. Se intentó archivar build iOS 107 múltiples veces con xcodebuild.
+
+## Bloqueo actual para retomar mañana
+- El archive iOS falla por provisioning/signing en Apple Developer/Xcode.
+- Error principal observado: el perfil histórico "Zent 2026" no incluye Push/aps-environment.
+- Al pasar a automático, Xcode intenta perfil de desarrollo y puede requerir dispositivo o perfil generado correctamente para el bundle.
+- Estado de archivo a revisar al retomar: `ios/Runner.xcodeproj/project.pbxproj` (ajustes de CODE_SIGN_STYLE/IDENTITY/PROVISIONING).
+
+## Próximo primer paso (mañana)
+1. Definir estrategia única de firma para Release (manual con perfil App Store nuevo que incluya Push, o automático totalmente coherente).
+2. Ejecutar archive build 107.
+3. Subir por Organizer a App Store Connect.
