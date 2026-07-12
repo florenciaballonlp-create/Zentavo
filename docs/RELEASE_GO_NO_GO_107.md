@@ -18,8 +18,8 @@ Regla:
 - [x] Regla strict-auth activa en Firestore (sin bypass MVP).
 - [x] Solo usuarios autenticados pueden leer/escribir chats/notas/devices.
 - [x] Tokens en users/{uid}/devices/* restringidos al owner.
-- [ ] Secret leak mitigado: key revocada/rotada en Google Cloud.
-- [ ] GitHub Secret Scanning alert cerrada como revoked.
+- [x] Secret leak mitigado: key revocada/rotada en Google Cloud.
+- [x] GitHub Secret Scanning alert cerrada como revoked.
 
 Evidencia:
 - Commit de hardening: e889496
