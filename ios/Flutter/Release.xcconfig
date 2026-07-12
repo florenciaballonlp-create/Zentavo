@@ -1,1 +1,4 @@
+#include? "Pods/Target Support Files/Pods-Runner/Pods-Runner.release.xcconfig"
 #include "Generated.xcconfig"
+
+ADMOB_APP_ID_IOS=ca-app-pub-2279654768858652~7871732646

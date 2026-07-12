@@ -1,0 +1,16 @@
+DirectoryIndex index.html index.php
+
+<IfModule mod_setenvif.c>
+  SetEnvIf Request_URI "^/$" NO_CACHE_ROOT=1
+</IfModule>
+
+<IfModule mod_headers.c>
+  <FilesMatch "\.html$">
+    Header set Cache-Control "no-cache, no-store, must-revalidate"
+    Header set Pragma "no-cache"
+    Header set Expires "0"
+  </FilesMatch>
+  Header set Cache-Control "no-cache, no-store, must-revalidate" env=NO_CACHE_ROOT
+  Header set Pragma "no-cache" env=NO_CACHE_ROOT
+  Header set Expires "0" env=NO_CACHE_ROOT
+</IfModule>

@@ -1,7 +1,9 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+import 'dart:async';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -23,6 +25,7 @@ import 'onboarding_screen.dart';
 import 'notifications_service.dart';
 
 import 'profile_screen.dart';
+import 'messages_screen.dart';
 import 'recurring_transactions.dart';
 import 'backup_service.dart';
 import 'package:intl/intl.dart';
@@ -32,6 +35,11 @@ import 'currency_exchange_service.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'firebase_shared_events_service.dart';
+import 'firebase_friends_service.dart';
+import 'push_messaging_service.dart';
+import 'direct_chat_service.dart';
+import 'event_chat_service.dart';
+import 'event_notes_service.dart';
 
 // Modo seguro de inicio: desactiva inicializaciones pesadas para pruebas o builds especiales
 const bool kSafeStartupMode = false;
@@ -56,7 +64,7 @@ const String _releaseBannerAdUnitIdIOS =
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  if (kUseFirebaseSharedEvents) {
+  if (kUseFirebaseSharedEvents || kUseFirebaseFriendsSync) {
     try {
       await Firebase.initializeApp();
     } catch (_) {
@@ -289,6 +297,10 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   // Performance timing
   late DateTime _appStartTime;
   final Map<String, DateTime> _timingMarkers = {};
+  bool _pushMessagingInitialized = false;
+  bool _pushNavigationRegistered = false;
+  StreamSubscription<Map<String, dynamic>>? _localPushTapSub;
+  StreamSubscription<RemoteMessage>? _remotePushOpenSub;
 
   void _recordTiming(String marker) {
     if (!kDebugMode) return;
@@ -811,6 +823,8 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     _montoFocus.dispose();
     _justificacionFocus.dispose();
     _tabController.dispose();
+    _localPushTapSub?.cancel();
+    _remotePushOpenSub?.cancel();
     _bannerAdTransacciones?.dispose();
     _bannerAdAhorros?.dispose();
     super.dispose();
@@ -841,6 +855,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     _recordTiming('_cargarTransacciones START');
     _prefs = await SharedPreferences.getInstance();
     _recordTiming('SharedPreferences inicializado');
+    await _ensureLocalUserIdentity();
     final String? datosGuardados = _prefs.getString('transacciones');
     _recordTiming('Transacciones cargadas de prefs');
     
@@ -1011,6 +1026,162 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
 
     if (mounted) {
       setState(() {});
+    }
+
+    await _inicializarPushMensajeria();
+  }
+
+  Future<void> _ensureLocalUserIdentity() async {
+    String? userId = _prefs.getString('user_id');
+    if (userId == null || userId.trim().isEmpty) {
+      userId = 'user_${DateTime.now().millisecondsSinceEpoch}';
+      await _prefs.setString('user_id', userId);
+    }
+  }
+
+  Future<void> _inicializarPushMensajeria() async {
+    if (_pushMessagingInitialized) return;
+
+    final userId = _prefs.getString('user_id') ?? '';
+    if (userId.isEmpty) return;
+
+    final displayName = (_prefs.getString('profile_nombre') ?? '').trim().isEmpty
+        ? _strings.usuario
+        : (_prefs.getString('profile_nombre') ?? '').trim();
+
+    try {
+      await PushMessagingService().initialize(
+        userId: userId,
+        displayName: displayName,
+      );
+      _pushMessagingInitialized = true;
+      await _registrarNavegacionPush();
+    } catch (e) {
+      print('Error al inicializar push messaging: $e');
+    }
+  }
+
+  Future<void> _registrarNavegacionPush() async {
+    if (_pushNavigationRegistered) return;
+    _pushNavigationRegistered = true;
+
+    _localPushTapSub = PushMessagingService().notificationTapStream.listen((data) {
+      _abrirDestinoDesdePush(data);
+    });
+
+    _remotePushOpenSub = FirebaseMessaging.onMessageOpenedApp.listen((message) {
+      _abrirDestinoDesdePush(message.data);
+    });
+
+    final initialMessage = await FirebaseMessaging.instance.getInitialMessage();
+    if (initialMessage != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _abrirDestinoDesdePush(initialMessage.data);
+      });
+    }
+  }
+
+  Future<void> _abrirDestinoDesdePush(Map<String, dynamic> data) async {
+    if (!mounted) return;
+
+    final type = (data['type'] ?? '').toString();
+    final userId = _prefs.getString('user_id') ?? '';
+    if (userId.isEmpty) return;
+
+    if (type == 'direct') {
+      final chatId = (data['chatId'] ?? '').toString();
+      if (chatId.isEmpty) return;
+
+      final title = await _resolverTituloChatDirecto(chatId, userId);
+
+      if (!mounted) return;
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => DirectChatThreadScreen(
+            strings: _strings,
+            chatId: chatId,
+            currentUserId: userId,
+            title: title,
+            service: DirectChatService(),
+          ),
+        ),
+      );
+      return;
+    }
+
+    if (type == 'event') {
+      final eventId = (data['eventId'] ?? '').toString();
+      if (eventId.isEmpty) return;
+
+      final eventName = await _resolverNombreEvento(eventId);
+
+      if (!mounted) return;
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => EventChatThreadScreen(
+            strings: _strings,
+            eventId: eventId,
+            eventName: eventName,
+            currentUserId: userId,
+            service: EventChatService(),
+          ),
+        ),
+      );
+      return;
+    }
+
+    if (type == 'event_note') {
+      final eventId = (data['eventId'] ?? '').toString();
+      final postId = (data['postId'] ?? '').toString();
+      if (eventId.isEmpty) return;
+
+      final eventName = await _resolverNombreEvento(eventId);
+
+      if (!mounted) return;
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => EventNotesThreadScreen(
+            strings: _strings,
+            eventId: eventId,
+            eventName: eventName,
+            currentUserId: userId,
+            service: EventNotesService(),
+            highlightPostId: postId.isEmpty ? null : postId,
+          ),
+        ),
+      );
+    }
+  }
+
+  Future<String> _resolverTituloChatDirecto(String chatId, String currentUserId) async {
+    try {
+      final doc = await FirebaseFirestore.instance.collection('direct_chats').doc(chatId).get();
+      if (!doc.exists) return _strings.usuario;
+
+      final data = doc.data() ?? <String, dynamic>{};
+      final participants = List<String>.from(data['participants'] ?? const <String>[]);
+      final names = Map<String, dynamic>.from(data['participantNames'] ?? const {});
+      final otherId = participants.firstWhere(
+        (id) => id != currentUserId,
+        orElse: () => '',
+      );
+
+      final resolved = (names[otherId] ?? '').toString().trim();
+      return resolved.isEmpty ? _strings.usuario : resolved;
+    } catch (_) {
+      return _strings.usuario;
+    }
+  }
+
+  Future<String> _resolverNombreEvento(String eventId) async {
+    try {
+      final doc = await FirebaseFirestore.instance.collection('event_chats').doc(eventId).get();
+      if (!doc.exists) return eventId;
+      final data = doc.data() ?? <String, dynamic>{};
+      final eventName = (data['eventName'] ?? '').toString().trim();
+      return eventName.isEmpty ? eventId : eventName;
+    } catch (_) {
+      return eventId;
     }
   }
 
@@ -4562,16 +4733,20 @@ Una app completa para controlar tus gastos y ahorros:
         return StatefulBuilder(
           builder: (context, setState) {
             return AlertDialog(
-              title: Text(index == null ? 'Nuevo Gasto Fijo' : 'Editar Gasto Fijo'),
+              title: Text(
+                index == null
+                    ? (_strings.language == AppLanguage.spanish ? 'Nuevo gasto fijo' : 'New fixed expense')
+                    : (_strings.language == AppLanguage.spanish ? 'Editar gasto fijo' : 'Edit fixed expense'),
+              ),
               content: SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     TextField(
                       controller: _nombreGastoController,
-                      decoration: const InputDecoration(
-                        labelText: 'Nombre (ej. Alquiler, Internet)',
-                        border: OutlineInputBorder(),
+                      decoration: InputDecoration(
+                        labelText: _strings.language == AppLanguage.spanish ? 'Nombre' : 'Name',
+                        border: const OutlineInputBorder(),
                       ),
                     ),
                     const SizedBox(height: 12),
@@ -4579,16 +4754,20 @@ Una app completa para controlar tus gastos y ahorros:
                       controller: _montoGastoFijoController,
                       keyboardType: const TextInputType.numberWithOptions(decimal: true),
                       inputFormatters: _amountInputFormatters(),
-                      decoration: const InputDecoration(
-                        labelText: 'Monto',
-                        border: OutlineInputBorder(),
+                      decoration: InputDecoration(
+                        labelText: _strings.monto,
+                        border: const OutlineInputBorder(),
                       ),
                     ),
                     const SizedBox(height: 12),
                     Row(
                       children: [
                         Expanded(
-                          child: Text('Día de vencimiento: $_diaVencimientoSeleccionado'),
+                          child: Text(
+                            _strings.language == AppLanguage.spanish
+                                ? 'Día de vencimiento: $_diaVencimientoSeleccionado'
+                                : 'Due day: $_diaVencimientoSeleccionado',
+                          ),
                         ),
                         Slider(
                           value: _diaVencimientoSeleccionado.toDouble(),
@@ -4620,7 +4799,7 @@ Una app completa para controlar tus gastos y ahorros:
                       _editarGastoFijo(index);
                     }
                   },
-                  child: Text(index == null ? 'Agregar' : 'Actualizar'),
+                  child: Text(index == null ? _strings.agregar : _strings.guardar),
                 ),
               ],
             );
@@ -6605,7 +6784,9 @@ Una app completa para controlar tus gastos y ahorros:
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      index == null ? (tipo == 'Ingreso' ? 'Nuevo Ingreso' : 'Nuevo Egreso') : 'Editar Movimiento',
+                      index == null
+                          ? (tipo == 'Ingreso' ? _strings.agregarIngreso : _strings.agregarEgreso)
+                          : (_strings.language == AppLanguage.spanish ? 'Editar movimiento' : 'Edit transaction'),
                       style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                     ),
                     const SizedBox(height: 20),
@@ -6614,7 +6795,7 @@ Una app completa para controlar tus gastos y ahorros:
                       focusNode: _tituloFocus,
                       textInputAction: TextInputAction.next,
                       onSubmitted: (_) => _montoFocus.requestFocus(),
-                      decoration: const InputDecoration(labelText: 'Título (ej. Sueldo, Alquiler)'),
+                      decoration: InputDecoration(labelText: _strings.titulo),
                     ),
                     const SizedBox(height: 12),
                     // Selector de Moneda
@@ -6712,7 +6893,7 @@ Una app completa para controlar tus gastos y ahorros:
                       ],
                       onSubmitted: (_) => _justificacionFocus.requestFocus(),
                       decoration: InputDecoration(
-                        labelText: 'Monto ${monedaTransaccion.symbol}',
+                        labelText: '${_strings.monto} ${monedaTransaccion.symbol}',
                         hintText: '${monedaTransaccion.symbol}0.00',
                       ),
                     ),
@@ -6864,7 +7045,7 @@ Una app completa para controlar tus gastos y ahorros:
                         children: [
                           DropdownButtonFormField<String>(
                             initialValue: _categoriaSeleccionada,
-                            decoration: const InputDecoration(labelText: 'Categoría'),
+                            decoration: InputDecoration(labelText: _strings.categoria),
                             items: _obtenerTodasLasCategorias().entries.map((entry) {
                               return DropdownMenuItem(
                                 value: entry.key,
@@ -6884,7 +7065,7 @@ Una app completa para controlar tus gastos y ahorros:
                                 _mostrarDialogoCategoriasPersonalizadas();
                               },
                               icon: const Icon(Icons.add_circle_outline, size: 16),
-                              label: const Text('Gestionar categorías'),
+                              label: Text(_strings.language == AppLanguage.spanish ? 'Gestionar categorías' : 'Manage categories'),
                             ),
                         ],
                       ),
@@ -6897,7 +7078,7 @@ Una app completa para controlar tus gastos y ahorros:
                             registrarComoGastoFijo = value ?? false;
                           });
                         },
-                        title: const Text('Marcar como gasto fijo'),
+                        title: Text(_strings.language == AppLanguage.spanish ? 'Marcar como gasto fijo' : 'Mark as fixed expense'),
                         controlAffinity: ListTileControlAffinity.leading,
                         contentPadding: EdgeInsets.zero,
                       ),
@@ -6907,7 +7088,11 @@ Una app completa para controlar tus gastos y ahorros:
                           Row(
                             children: [
                               Expanded(
-                                child: Text('Día de vencimiento: $diaVencimientoLocal'),
+                                child: Text(
+                                  _strings.language == AppLanguage.spanish
+                                      ? 'Día de vencimiento: $diaVencimientoLocal'
+                                      : 'Due day: $diaVencimientoLocal',
+                                ),
                               ),
                               Slider(
                                 value: diaVencimientoLocal.toDouble(),
@@ -6931,7 +7116,7 @@ Una app completa para controlar tus gastos y ahorros:
                       focusNode: _justificacionFocus,
                       textInputAction: TextInputAction.done,
                       onSubmitted: (_) => submitForm(),
-                      decoration: const InputDecoration(labelText: 'Justificación'),
+                      decoration: InputDecoration(labelText: _strings.justificacion),
                     ),
                     const SizedBox(height: 20),
                     Row(
@@ -7130,6 +7315,10 @@ Una app completa para controlar tus gastos y ahorros:
                 Navigator.of(context).push(
                   MaterialPageRoute(builder: (_) => ProfileScreen(strings: _strings)),
                 );
+              } else if (value == 'mensajes') {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => MessagesScreen(strings: _strings)),
+                );
               } else if (value == 'datos_demo') {
                 _cargarDatosDemo();
               }
@@ -7153,6 +7342,17 @@ Una app completa para controlar tus gastos y ahorros:
               if (!_isPremium)
                 PopupMenuItem(value: 'premium', child: Text('⭐ Premium')),
               const PopupMenuDivider(),
+              PopupMenuItem(
+                value: 'mensajes',
+                child: Text(
+                  _uiTr(
+                    es: '💬 Mensajes',
+                    en: '💬 Messages',
+                    pt: '💬 Mensagens',
+                    it: '💬 Messaggi',
+                  ),
+                ),
+              ),
               PopupMenuItem(value: 'perfil', child: Text('👤 ${_strings.miPerfil}')),
               PopupMenuItem(value: 'configuracion', child: Text('⚙️ ${_strings.configuracion}')),
             ],

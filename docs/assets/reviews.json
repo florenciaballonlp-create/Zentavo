@@ -1,0 +1,34 @@
+{
+  "reviews": [
+    {
+      "quote": "La uso cuando salgo del super: cargo el gasto en 10 segundos y listo. Antes me olvidaba y despues no entendia en que se me iba la plata.",
+      "author": "Sofia G. · Rosario",
+      "lang": "es"
+    },
+    {
+      "quote": "I check it on the bus ride home. Seeing the weekly total helps me avoid random takeout orders.",
+      "author": "Daniel K. · Leeds",
+      "lang": "en"
+    },
+    {
+      "quote": "Divido cuentas de casa con mi pareja y ya no discutimos por quien pago que. Queda todo claro en el momento.",
+      "author": "Marina y Leo · Cordoba",
+      "lang": "es"
+    },
+    {
+      "quote": "Uso no fim do dia, antes de dormir. Em 2 minutos vejo se passei do limite da semana e ajusto no dia seguinte.",
+      "author": "Bruna S. · Curitiba",
+      "lang": "pt"
+    },
+    {
+      "quote": "La categoria Eventi condivisi mi salva nei viaggi con amici: ognuno registra le sue spese e non facciamo piu calcoli strani.",
+      "author": "Marco T. · Milano",
+      "lang": "it"
+    },
+    {
+      "quote": "Ryokochu no warikan kanri ga hontoni raku ni narimashita. Reshito o minagara sonoba de ireru dake de ato de komarimasen.",
+      "author": "Yuki · Tokyo",
+      "lang": "ja"
+    }
+  ]
+}

@@ -7,6 +7,9 @@ import 'package:qr_flutter/qr_flutter.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'dart:convert';
 import 'localization.dart';
+import 'firebase_friends_service.dart';
+import 'messages_screen.dart';
+import 'direct_chat_service.dart';
 
 class ProfileScreen extends StatefulWidget {
   final AppStrings strings;
@@ -43,6 +46,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   bool _loading = true;
   String _userId = '';
   List<Map<String, dynamic>> _amigos = [];
+  final FirebaseFriendsService _firebaseFriendsService = FirebaseFriendsService();
+  final DirectChatService _directChatService = DirectChatService();
   bool _isPremium = false;
   String _planPremium = '';
   DateTime? _fechaExpiracionPremium;
@@ -110,6 +115,72 @@ class _ProfileScreenState extends State<ProfileScreen> {
       _fechaExpiracionPremium = fechaExpiracion;
       _loading = false;
     });
+
+    await _sincronizarAmigosDesdeNube();
+  }
+
+  Future<void> _sincronizarAmigosDesdeNube() async {
+    if (_userId.isEmpty) return;
+
+    final nombrePropio = _nombreController.text.trim().isEmpty
+        ? loc.usuario
+        : _nombreController.text.trim();
+
+    try {
+      await _firebaseFriendsService.upsertUserProfile(
+        userId: _userId,
+        displayName: nombrePropio,
+      );
+
+      final amigosNube = await _firebaseFriendsService.fetchFriendsForUser(_userId);
+      if (amigosNube.isEmpty) return;
+
+      final Map<String, Map<String, dynamic>> merged = {
+        for (final amigo in _amigos)
+          if ((amigo['userId'] ?? '').toString().isNotEmpty)
+            (amigo['userId'] as String): Map<String, dynamic>.from(amigo),
+      };
+
+      bool huboCambios = false;
+
+      for (final amigoNube in amigosNube) {
+        final friendId = (amigoNube['userId'] ?? '').toString();
+        if (friendId.isEmpty || friendId == _userId) continue;
+
+        final existing = merged[friendId];
+        if (existing == null) {
+          merged[friendId] = {
+            'userId': friendId,
+            'nombre': (amigoNube['nombre'] ?? loc.usuario).toString(),
+            'fechaAgregado': (amigoNube['fechaAgregado'] ?? DateTime.now().toIso8601String()).toString(),
+          };
+          huboCambios = true;
+          continue;
+        }
+
+        final cloudName = (amigoNube['nombre'] ?? '').toString().trim();
+        if (cloudName.isNotEmpty && (existing['nombre'] ?? '').toString().trim() != cloudName) {
+          existing['nombre'] = cloudName;
+          huboCambios = true;
+        }
+      }
+
+      if (huboCambios) {
+        final listaActualizada = merged.values.toList()
+          ..sort((a, b) => ((a['nombre'] ?? '').toString()).toLowerCase().compareTo(((b['nombre'] ?? '').toString()).toLowerCase()));
+
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('amigos_list', jsonEncode(listaActualizada));
+
+        if (mounted) {
+          setState(() {
+            _amigos = listaActualizada;
+          });
+        }
+      }
+    } catch (_) {
+      // Si la sincronización en nube falla, la app sigue con modo local.
+    }
   }
   
   Future<void> _guardarDatos() async {
@@ -419,6 +490,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
         // Verificar si ya está agregado
         final int existenteIndex = _amigos.indexWhere((amigo) => amigo['userId'] == userId);
         if (existenteIndex != -1) {
+          final miNombre = _nombreController.text.trim().isEmpty
+              ? loc.usuario
+              : _nombreController.text.trim();
+
+          final bool synced = await _firebaseFriendsService.createMutualFriendship(
+            userAId: _userId,
+            userAName: miNombre,
+            userBId: userId,
+            userBName: nombre,
+          );
+
           final String nombreActual = (_amigos[existenteIndex]['nombre'] ?? '').toString();
           if (nombreActual.trim() != nombre.trim() && nombre.trim().isNotEmpty) {
             setState(() {
@@ -451,7 +533,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             );
           }
           if (mounted) {
-            await _mostrarDialogoVinculacionMutua(nombre);
+            _mostrarAvisoVinculacionMutua(nombre, synced: synced);
           }
           return;
         }
@@ -468,6 +550,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
         // Guardar
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('amigos_list', jsonEncode(_amigos));
+
+        final miNombre = _nombreController.text.trim().isEmpty
+            ? loc.usuario
+            : _nombreController.text.trim();
+
+        final bool synced = await _firebaseFriendsService.createMutualFriendship(
+          userAId: _userId,
+          userAName: miNombre,
+          userBId: userId,
+          userBName: nombre,
+        );
+        await _firebaseFriendsService.upsertUserProfile(
+          userId: _userId,
+          displayName: miNombre,
+        );
         
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -476,8 +573,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               backgroundColor: Colors.green,
             ),
           );
-
-          await _mostrarDialogoVinculacionMutua(nombre);
+          _mostrarAvisoVinculacionMutua(nombre, synced: synced);
         }
       } catch (e) {
         if (mounted) {
@@ -490,6 +586,30 @@ class _ProfileScreenState extends State<ProfileScreen> {
         }
       }
     }
+  }
+
+  void _mostrarAvisoVinculacionMutua(String nombreAmigo, {required bool synced}) {
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          synced
+              ? _tr(
+                  es: '$nombreAmigo agregado. La vinculación mutua quedó sincronizada automáticamente.',
+                  en: '$nombreAmigo added. Mutual linking was synced automatically.',
+                  pt: '$nombreAmigo adicionado. O vínculo mútuo foi sincronizado automaticamente.',
+                  it: '$nombreAmigo aggiunto. Il collegamento reciproco è stato sincronizzato automaticamente.',
+                )
+              : _tr(
+                  es: '$nombreAmigo agregado localmente. Activa conexión para sincronizar vínculo mutuo en ambos dispositivos.',
+                  en: '$nombreAmigo added locally. Enable connection to sync mutual linking on both devices.',
+                  pt: '$nombreAmigo adicionado localmente. Ative a conexão para sincronizar o vínculo mútuo nos dois dispositivos.',
+                  it: '$nombreAmigo aggiunto localmente. Attiva la connessione per sincronizzare il collegamento reciproco su entrambi i dispositivi.',
+                ),
+        ),
+      ),
+    );
   }
 
   Future<void> _mostrarDialogoVinculacionMutua(String nombreAmigo) async {
@@ -582,6 +702,37 @@ class _ProfileScreenState extends State<ProfileScreen> {
         );
       }
     }
+  }
+
+  Future<void> _abrirChatConAmigo(Map<String, dynamic> amigo) async {
+    final friendId = (amigo['userId'] ?? '').toString();
+    if (friendId.isEmpty || _userId.isEmpty) return;
+
+    final myName = _nombreController.text.trim().isEmpty
+        ? loc.usuario
+        : _nombreController.text.trim();
+    final friendName = (amigo['nombre'] ?? loc.usuario).toString();
+
+    final chatId = await _directChatService.getOrCreateChat(
+      currentUserId: _userId,
+      currentUserName: myName,
+      otherUserId: friendId,
+      otherUserName: friendName,
+    );
+
+    if (!mounted || chatId == null) return;
+
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => DirectChatThreadScreen(
+          strings: loc,
+          chatId: chatId,
+          currentUserId: _userId,
+          title: friendName,
+          service: _directChatService,
+        ),
+      ),
+    );
   }
   
   String _calcularTiempoRestante(AppStrings loc) {
@@ -839,6 +990,28 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               ),
                             ],
                           ),
+                          const SizedBox(height: 10),
+                          SizedBox(
+                            width: double.infinity,
+                            child: OutlinedButton.icon(
+                              onPressed: () {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (_) => MessagesScreen(strings: loc),
+                                  ),
+                                );
+                              },
+                              icon: const Icon(Icons.forum_outlined),
+                              label: Text(
+                                _tr(
+                                  es: 'Abrir mensajes',
+                                  en: 'Open messages',
+                                  pt: 'Abrir mensagens',
+                                  it: 'Apri messaggi',
+                                ),
+                              ),
+                            ),
+                          ),
                           const SizedBox(height: 16),
                           
                           const Divider(),
@@ -928,10 +1101,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                       color: Colors.grey[600],
                                     ),
                                   ),
-                                  trailing: IconButton(
-                                    icon: const Icon(Icons.delete_outline, color: Colors.red),
-                                    onPressed: () => _eliminarAmigo(index),
+                                  trailing: SizedBox(
+                                    width: 92,
+                                    child: Row(
+                                      mainAxisAlignment: MainAxisAlignment.end,
+                                      children: [
+                                        IconButton(
+                                          icon: const Icon(Icons.chat_bubble_outline, color: Color(0xFF0EA5A4)),
+                                          onPressed: () => _abrirChatConAmigo(amigo),
+                                        ),
+                                        IconButton(
+                                          icon: const Icon(Icons.delete_outline, color: Colors.red),
+                                          onPressed: () => _eliminarAmigo(index),
+                                        ),
+                                      ],
+                                    ),
                                   ),
+                                  onTap: () => _abrirChatConAmigo(amigo),
                                 );
                               },
                             ),

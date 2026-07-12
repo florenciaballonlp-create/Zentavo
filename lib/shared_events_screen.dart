@@ -9,6 +9,8 @@ import 'premium_screen.dart';
 import 'payment_request_service.dart';
 import 'payment_qr_widget.dart';
 import 'firebase_shared_events_service.dart';
+import 'event_chat_service.dart';
+import 'event_notes_service.dart';
 
 /// Modelo de datos para un evento compartido
 class EventoCompartido {
@@ -187,6 +189,8 @@ class _EventosCompartidosScreenState extends State<EventosCompartidosScreen> {
   static const int _maxEventosGratis = 5;
   static const String _eventTokenPrefix = 'ZENTAVO_EVT:';
   final FirebaseSharedEventsService _firebaseEventsService = FirebaseSharedEventsService();
+  final EventChatService _eventChatService = EventChatService();
+  final EventNotesService _eventNotesService = EventNotesService();
 
   String _tr({
     required String es,
@@ -234,6 +238,41 @@ class _EventosCompartidosScreenState extends State<EventosCompartidosScreen> {
       setState(() {
         _eventos = decoded.map((e) => EventoCompartido.fromJson(e)).toList();
       });
+
+      for (final evento in _eventos) {
+        _sincronizarCanalesMensajes(evento);
+      }
+    }
+  }
+
+  Future<void> _sincronizarCanalesMensajes(EventoCompartido evento) async {
+    final userId = _prefs.getString('user_id') ?? '';
+    if (userId.isEmpty) return;
+
+    final userName = (_prefs.getString('profile_nombre') ?? '').trim();
+
+    final memberIds = <String>{userId};
+    for (final participante in evento.participantes) {
+      if (participante.id.startsWith('user_')) {
+        memberIds.add(participante.id);
+      }
+    }
+
+    final eventRefId = evento.codigoCompartir;
+    await _eventChatService.ensureChat(
+      eventId: eventRefId,
+      eventName: evento.nombre,
+      memberIds: memberIds.toList(),
+    );
+    await _eventNotesService.ensureThread(
+      eventId: eventRefId,
+      eventName: evento.nombre,
+      memberIds: memberIds.toList(),
+    );
+
+    // Referencia local para soporte de nombre si la app crea mensajes directos luego.
+    if (userName.isNotEmpty) {
+      await _prefs.setString('profile_nombre', userName);
     }
   }
 
@@ -277,6 +316,7 @@ class _EventosCompartidosScreenState extends State<EventosCompartidosScreen> {
           });
           _guardarEventos();
           _publicarEventoEnNube(evento);
+          _sincronizarCanalesMensajes(evento);
         },
         generarCodigo: _generarCodigoCompartir,
         strings: widget.strings,
@@ -598,6 +638,7 @@ Descarga Zentavo y únete usando este código.
       _eventos.add(eventoImportado);
     });
     await _guardarEventos();
+    await _sincronizarCanalesMensajes(eventoImportado);
 
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -1032,7 +1073,7 @@ class _EventoCard extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Presupuesto',
+                            _tr(es: 'Presupuesto', en: 'Budget', pt: 'Orçamento', it: 'Budget', zh: '预算', ja: '予算'),
                             style: TextStyle(
                               color: Colors.grey[600],
                               fontSize: 12,
@@ -1051,7 +1092,7 @@ class _EventoCard extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
                           Text(
-                            'Gastado',
+                            _tr(es: 'Gastado', en: 'Spent', pt: 'Gasto', it: 'Speso', zh: '已花费', ja: '支出済み'),
                             style: TextStyle(
                               color: Colors.grey[600],
                               fontSize: 12,
@@ -1071,7 +1112,7 @@ class _EventoCard extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
                           Text(
-                            'Restante',
+                            _tr(es: 'Restante', en: 'Remaining', pt: 'Restante', it: 'Rimanente', zh: '剩余', ja: '残り'),
                             style: TextStyle(
                               color: Colors.grey[600],
                               fontSize: 12,
@@ -1894,19 +1935,19 @@ class _DetalleEventoScreenState extends State<DetalleEventoScreen> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       _InfoChip(
-                        label: 'Presupuesto',
+                        label: _tr(es: 'Presupuesto', en: 'Budget', pt: 'Orçamento', it: 'Budget', zh: '预算', ja: '予算'),
                         valor: widget.currency.formatAmount(widget.evento.presupuesto),
                         icono: Icons.account_balance_wallet,
                         color: Colors.blue,
                       ),
                       _InfoChip(
-                        label: 'Gastado',
+                        label: _tr(es: 'Gastado', en: 'Spent', pt: 'Gasto', it: 'Speso', zh: '已花费', ja: '支出済み'),
                         valor: widget.currency.formatAmount(widget.evento.totalGastado),
                         icono: Icons.shopping_cart,
                         color: widget.evento.porcentajeGastado > 100 ? Colors.red : Colors.orange,
                       ),
                       _InfoChip(
-                        label: 'Restante',
+                        label: _tr(es: 'Restante', en: 'Remaining', pt: 'Restante', it: 'Rimanente', zh: '剩余', ja: '残り'),
                         valor: widget.currency.formatAmount(widget.evento.saldoRestante),
                         icono: Icons.savings,
                         color: widget.evento.porcentajeGastado > 100 ? Colors.red : Colors.green,
@@ -1927,7 +1968,7 @@ class _DetalleEventoScreenState extends State<DetalleEventoScreen> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    '${widget.evento.porcentajeGastado.toStringAsFixed(1)}% del presupuesto',
+                    '${widget.evento.porcentajeGastado.toStringAsFixed(1)}% ${_tr(es: 'del presupuesto', en: 'of budget', pt: 'do orçamento', it: 'del budget', zh: '预算已使用', ja: '予算に対して')}',
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
                       color: widget.evento.porcentajeGastado > 100 ? Colors.red : null,
@@ -1948,18 +1989,18 @@ class _DetalleEventoScreenState extends State<DetalleEventoScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Row(
+                      Row(
                         children: [
-                          Icon(Icons.people, color: Color(0xFF0EA5A4)),
-                          SizedBox(width: 8),
+                          const Icon(Icons.people, color: Color(0xFF0EA5A4)),
+                          const SizedBox(width: 8),
                           Text(
-                            'Gastos por Participante',
-                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                            _tr(es: 'Gastos por Participante', en: 'Expenses by Participant', pt: 'Gastos por Participante', it: 'Spese per partecipante', zh: '按参与者支出', ja: '参加者ごとの支出'),
+                            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                           ),
                         ],
                       ),
                       Text(
-                        'Mantén presionado para eliminar',
+                        _tr(es: 'Mantén presionado para eliminar', en: 'Long press to remove', pt: 'Pressione e segure para remover', it: 'Tieni premuto per rimuovere', zh: '长按以删除', ja: '長押しで削除'),
                         style: TextStyle(
                           fontSize: 10,
                           color: Colors.grey[600],
@@ -2289,9 +2330,9 @@ class _DetalleEventoScreenState extends State<DetalleEventoScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
-                'Gastos Registrados',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              Text(
+                _tr(es: 'Gastos Registrados', en: 'Registered Expenses', pt: 'Gastos Registrados', it: 'Spese registrate', zh: '已登记支出', ja: '登録済み支出'),
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
               Text(
                 '${widget.evento.gastos.length}',
@@ -2309,7 +2350,7 @@ class _DetalleEventoScreenState extends State<DetalleEventoScreen> {
                     Icon(Icons.receipt_long, size: 64, color: Colors.grey[300]),
                     const SizedBox(height: 8),
                     Text(
-                      'No hay gastos registrados',
+                      _tr(es: 'No hay gastos registrados', en: 'No expenses recorded', pt: 'Não há gastos registrados', it: 'Nessuna spesa registrata', zh: '暂无支出记录', ja: '支出の記録はありません'),
                       style: TextStyle(color: Colors.grey[600]),
                     ),
                   ],

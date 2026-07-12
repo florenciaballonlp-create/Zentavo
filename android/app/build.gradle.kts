@@ -53,10 +53,18 @@ android {
         targetSdk = 35
         versionCode = versionProperties["versionCode"].toString().toInt()
         versionName = versionProperties["versionName"].toString()
+        manifestPlaceholders["ADMOB_APP_ID_ANDROID"] = "ca-app-pub-3940256099942544~3347511713"
     }
 
     buildTypes {
+        debug {
+            manifestPlaceholders["ADMOB_APP_ID_ANDROID"] = "ca-app-pub-3940256099942544~3347511713"
+        }
+
         release {
+            manifestPlaceholders["ADMOB_APP_ID_ANDROID"] =
+                project.findProperty("ADMOB_APP_ID_ANDROID") as String?
+                    ?: "ca-app-pub-2279654768858652~6408956281"
             // Usar configuración de firma release si existe, sino usar debug
             signingConfig = if (keystorePropertiesFile.exists()) {
                 signingConfigs.getByName("release")

@@ -1,317 +1,1349 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Política de Privacidad de Zentavo - Control de Gastos">
-    <title>Política de Privacidad - Zentavo</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            line-height: 1.6;
-            color: #333;
-            background: #f5f5f5;
-        }
-        
-        header {
-            background: linear-gradient(135deg, #2196F3 0%, #1976D2 100%);
-            color: white;
-            padding: 2rem 1rem;
-            text-align: center;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-        
-        header h1 {
-            font-size: 2rem;
-            margin-bottom: 0.5rem;
-        }
-        
-        header p {
-            font-size: 0.9rem;
-            opacity: 0.9;
-        }
-        
-        .container {
-            max-width: 900px;
-            margin: 2rem auto;
-            background: white;
-            padding: 2rem;
-            border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-        
-        h2 {
-            color: #2196F3;
-            margin-top: 2rem;
-            margin-bottom: 1rem;
-            font-size: 1.5rem;
-            border-bottom: 2px solid #2196F3;
-            padding-bottom: 0.5rem;
-        }
-        
-        h3 {
-            color: #1976D2;
-            margin-top: 1.5rem;
-            margin-bottom: 0.75rem;
-            font-size: 1.2rem;
-        }
-        
-        p, li {
-            margin-bottom: 0.75rem;
-        }
-        
-        ul {
-            margin-left: 2rem;
-            margin-bottom: 1rem;
-        }
-        
-        .highlight-box {
-            background: #E3F2FD;
-            border-left: 4px solid #2196F3;
-            padding: 1rem;
-            margin: 1.5rem 0;
-            border-radius: 4px;
-        }
-        
-        .tldr {
-            background: #E8F5E9;
-            border-left: 4px solid #4CAF50;
-            padding: 1.5rem;
-            margin: 2rem 0;
-            border-radius: 4px;
-        }
-        
-        .tldr h2 {
-            color: #4CAF50;
-            margin-top: 0;
-            border-bottom: 2px solid #4CAF50;
-        }
-        
-        .contact-box {
-            background: #FFF3E0;
-            border-left: 4px solid #FF9800;
-            padding: 1rem;
-            margin: 2rem 0;
-            border-radius: 4px;
-        }
-        
-        footer {
-            text-align: center;
-            padding: 2rem 1rem;
-            color: #666;
-            font-size: 0.9rem;
-        }
-        
-        a {
-            color: #2196F3;
-            text-decoration: none;
-        }
-        
-        a:hover {
-            text-decoration: underline;
-        }
-        
-        .last-updated {
-            font-style: italic;
-            color: #666;
-            margin-bottom: 2rem;
-        }
-        
-        @media (max-width: 768px) {
-            .container {
-                margin: 1rem;
-                padding: 1rem;
-            }
-            
-            header h1 {
-                font-size: 1.5rem;
-            }
-        }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Zentavo</title>
+  <meta name="description" content="Zentavo - Control de gastos personales" />
+  <link rel="canonical" href="https://zentavo.it/" />
+  <link rel="icon" href="assets/logo.png" type="image/png" />
+  <link rel="apple-touch-icon" href="assets/logo.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Literata:opsz,wght@7..72,500;7..72,700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #f7f8f4;
+      --bg-2: #eef4ec;
+      --card: rgba(255, 255, 255, 0.9);
+      --line: rgba(11, 58, 53, 0.14);
+      --text: #10191b;
+      --muted: #5b6c70;
+      --brand: #0d6760;
+      --brand-2: #22a28f;
+      --accent: #c0f2de;
+      --deep: #102a2f;
+      --shadow: 0 20px 45px rgba(16, 25, 27, 0.1);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Space Grotesk", "Segoe UI", sans-serif;
+      color: var(--text);
+      position: relative;
+      background:
+        radial-gradient(circle at 8% 0%, rgba(34, 162, 143, 0.22), transparent 30%),
+        radial-gradient(circle at 95% 10%, rgba(13, 103, 96, 0.12), transparent 28%),
+        linear-gradient(180deg, var(--bg) 0%, var(--bg-2) 100%);
+      min-height: 100vh;
+    }
+    .top-guard {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: clamp(220px, 26vh, 360px);
+      background:
+        linear-gradient(180deg, rgba(13, 103, 96, 0.95) 0%, rgba(28, 140, 125, 0.78) 48%, rgba(34, 162, 143, 0.32) 100%);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.22);
+      box-shadow: inset 0 -22px 45px rgba(255, 255, 255, 0.18);
+      z-index: 0;
+    }
+    .ambient,
+    .ambient-2 {
+      position: fixed;
+      width: 300px;
+      height: 300px;
+      border-radius: 50%;
+      pointer-events: none;
+      filter: blur(10px);
+      z-index: 0;
+    }
+    .ambient {
+      inset: auto -110px -120px auto;
+      background: radial-gradient(circle, rgba(34, 162, 143, 0.28), rgba(34, 162, 143, 0));
+    }
+    .ambient-2 {
+      inset: -90px auto auto -100px;
+      background: radial-gradient(circle, rgba(16, 42, 47, 0.12), rgba(16, 42, 47, 0));
+    }
+    main { max-width: 1260px; margin: 0 auto; padding: 24px 18px 54px; position: relative; z-index: 1; }
+    .topbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    .wordmark {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 700;
+      color: var(--brand);
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      font-size: 13px;
+    }
+    .wordmark img {
+      width: 26px;
+      height: 26px;
+      border-radius: 8px;
+      object-fit: cover;
+      border: 1px solid rgba(13, 103, 96, 0.2);
+      box-shadow: 0 6px 14px rgba(16, 42, 47, 0.12);
+      background: #fff;
+    }
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 999px;
+      background: linear-gradient(135deg, var(--brand) 0%, var(--brand-2) 100%);
+      box-shadow: 0 0 0 4px rgba(34, 162, 143, 0.2);
+    }
+    .top-link {
+      color: var(--deep);
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 700;
+      padding: 8px 10px;
+      border-radius: 10px;
+      border: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.76);
+    }
+    .shell {
+      display: block;
+    }
+    .guard-content {
+      position: relative;
+      z-index: 1;
+      min-height: clamp(220px, 26vh, 360px);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: 8px 4px 14px;
+      margin-bottom: 8px;
+    }
+    .guard-content .brand-logo {
+      width: 64px;
+      height: 64px;
+      border-radius: 18px;
+      border-color: rgba(255, 255, 255, 0.38);
+      box-shadow: 0 14px 30px rgba(16, 42, 47, 0.26);
+    }
+    .guard-content .brand-row {
+      gap: 12px;
+    }
+    .brand-name {
+      font-weight: 800;
+      font-size: clamp(20px, 2.8vw, 30px);
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: #f3fffd;
+      line-height: 1.05;
+    }
+    .guard-subtext {
+      color: rgba(243, 255, 253, 0.9);
+      font-size: clamp(14px, 1.4vw, 18px);
+      margin-top: 4px;
+      line-height: 1.35;
+    }
+    .guard-content .eyebrow {
+      background: rgba(255, 255, 255, 0.18);
+      color: #f3fffd;
+      border: 1px solid rgba(255, 255, 255, 0.22);
+      font-size: 14px;
+      padding: 10px 14px;
+      margin: 14px 0 0;
+    }
+    .hero {
+      background: var(--card);
+      border: 1px solid var(--line);
+      backdrop-filter: blur(14px);
+      border-radius: 28px;
+      box-shadow: var(--shadow);
+    }
+    .hero { padding: 40px; overflow: hidden; position: relative; }
+    .hero::after {
+      content: "";
+      position: absolute;
+      width: 260px;
+      height: 260px;
+      border-radius: 50%;
+      right: -90px;
+      top: -90px;
+      background: radial-gradient(circle, rgba(34, 162, 143, 0.22), transparent 64%);
+    }
+    .brand-row { display: flex; align-items: center; gap: 14px; position: relative; z-index: 1; }
+    .brand-logo {
+      width: 56px;
+      height: 56px;
+      border-radius: 16px;
+      object-fit: cover;
+      border: 1px solid rgba(13, 103, 96, 0.2);
+      box-shadow: 0 12px 24px rgba(13, 103, 96, 0.25);
+      background: #fff;
+    }
+    .eyebrow {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 8px 12px; border-radius: 999px;
+      background: rgba(34, 162, 143, 0.14); color: var(--brand);
+      font-size: 13px; font-weight: 700; margin: 22px 0 14px;
+    }
+    h1 {
+      margin: 0;
+      font-family: "Sora", "Space Grotesk", sans-serif;
+      font-size: clamp(34px, 4.8vw, 54px);
+      line-height: 1.04;
+      letter-spacing: -0.03em;
+      max-width: 18ch;
+    }
+    .subtitle { margin: 18px 0 0; max-width: 70ch; font-size: 18px; line-height: 1.7; color: var(--muted); }
+    .hero-header {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(230px, 320px);
+      gap: 18px;
+      align-items: start;
+    }
+    .feature-cascade {
+      display: grid;
+      gap: 9px;
+      margin-top: 6px;
+    }
+    .feature-chip {
+      position: relative;
+      border-radius: 14px;
+      border: 1px solid rgba(11, 58, 53, 0.14);
+      background: rgba(255, 255, 255, 0.88);
+      color: var(--deep);
+      font-size: 13px;
+      font-weight: 700;
+      padding: 10px 12px 10px 34px;
+      box-shadow: 0 8px 16px rgba(16, 42, 47, 0.1);
+      white-space: nowrap;
+    }
+    .feature-chip::before {
+      content: "⚡";
+      position: absolute;
+      left: 11px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 12px;
+      color: var(--brand);
+      opacity: 0.9;
+    }
+    .feature-chip:nth-child(1) { transform: translateX(0); }
+    .feature-chip:nth-child(2) { transform: translateX(10px); }
+    .feature-chip:nth-child(3) { transform: translateX(20px); }
+    .feature-chip:nth-child(4) { transform: translateX(10px); }
+    .feature-chip:nth-child(5) { transform: translateX(0); }
+    .cta-row { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 26px; }
+    .button {
+      display: inline-flex; align-items: center; justify-content: center; gap: 10px;
+      padding: 13px 16px; border-radius: 14px; text-decoration: none; font-weight: 700;
+      border: 1px solid transparent;
+      transition: transform .18s ease, box-shadow .18s ease, background .18s ease;
+    }
+    .button.primary { background: linear-gradient(135deg, var(--brand) 0%, var(--brand-2) 100%); color: white; }
+    .button.secondary { background: linear-gradient(135deg, var(--brand) 0%, var(--brand-2) 100%); color: white; border-color: transparent; }
+    .button:hover { transform: translateY(-1px); box-shadow: 0 8px 16px rgba(16, 42, 47, .12); }
+    .store-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 14px;
+      align-items: center;
+      justify-content: center;
+    }
+    .store-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 10px;
+      text-decoration: none;
+      border-radius: 20px;
+      width: min(92vw, 220px);
+      min-height: 220px;
+      padding: 18px;
+      font-size: 17px;
+      font-weight: 700;
+      color: #ffffff;
+      background: linear-gradient(135deg, #0c2830 0%, #123f46 100%);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      box-shadow: 0 14px 26px rgba(16, 42, 47, 0.22);
+      cursor: pointer;
+      font-family: inherit;
+      text-align: center;
+    }
+    .store-btn-logo {
+      width: 86px;
+      height: 86px;
+      border-radius: 20px;
+      object-fit: cover;
+      border: 1px solid rgba(255, 255, 255, 0.28);
+      background: rgba(255, 255, 255, 0.96);
+      box-shadow: 0 12px 22px rgba(16, 42, 47, 0.26);
+    }
+    .store-btn-text {
+      display: block;
+      line-height: 1.2;
+      letter-spacing: 0.01em;
+    }
+    .floating-store-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(5, 20, 24, 0.4);
+      backdrop-filter: blur(2px);
+      z-index: 34;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity .16s ease;
+    }
+    .floating-store-backdrop.is-open {
+      opacity: 1;
+      visibility: visible;
+    }
+    .floating-store-buttons {
+      position: fixed;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 35;
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+      width: min(94vw, 560px);
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+      transition: opacity .16s ease;
+    }
+    .floating-store-buttons.is-open {
+      opacity: 1;
+      visibility: visible;
+      pointer-events: auto;
+    }
+    .floating-store-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 10px;
+      text-decoration: none;
+      border-radius: 18px;
+      padding: 16px;
+      width: 100%;
+      min-height: 260px;
+      font-size: 16px;
+      font-weight: 700;
+      color: #ffffff;
+      background: linear-gradient(135deg, #0c2830 0%, #123f46 100%);
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      box-shadow: 0 12px 24px rgba(16, 42, 47, 0.26);
+      transition: transform .18s ease, box-shadow .18s ease;
+      text-align: center;
+    }
+    .floating-store-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 16px 30px rgba(16, 42, 47, 0.3);
+    }
+    .floating-store-btn .download-option-icon {
+      width: 72px;
+      height: 72px;
+      flex: 0 0 72px;
+    }
+    .floating-store-btn .download-option-icon.apple {
+      color: #ffffff;
+      font-size: 56px;
+    }
+    .floating-store-btn .download-option-icon.play svg {
+      width: 58px;
+      height: 58px;
+    }
+    .floating-store-note {
+      margin: 0;
+      grid-column: 1 / -1;
+      text-align: center;
+      font-size: 12px;
+      color: var(--muted);
+      padding: 8px 10px;
+      border-radius: 10px;
+      border: 1px solid rgba(11, 58, 53, 0.14);
+      background: rgba(255, 255, 255, 0.9);
+    }
+    .download-option-icon {
+      width: 18px;
+      height: 18px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex: 0 0 18px;
+    }
+    .download-option-icon.apple {
+      font-size: 17px;
+      line-height: 1;
+      color: #10191b;
+    }
+    .download-option-icon.play svg {
+      width: 18px;
+      height: 18px;
+      display: block;
+    }
+    .store-btn {
+      border: 0;
+    }
+    .store-note {
+      margin: 0;
+      font-size: 12px;
+      color: var(--muted);
+      width: 100%;
+    }
+    .stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 28px; }
+    .stat {
+      border-radius: 18px; padding: 16px; background: rgba(255, 255, 255, 0.8); border: 1px solid rgba(13, 103, 96, 0.1);
+    }
+    .stat strong { display: block; font-size: 22px; color: var(--brand); font-family: "Literata", Georgia, serif; }
+    .stat span { display: block; margin-top: 4px; color: var(--muted); font-size: 13px; line-height: 1.4; }
+    .panel { padding: 20px; display: flex; flex-direction: column; gap: 14px; }
+    .panel-grid { display: grid; gap: 12px; }
+    .card-link {
+      display: block; padding: 14px 15px; border-radius: 16px;
+      background: rgba(255,255,255,0.84); color: var(--brand); text-decoration: none;
+      font-weight: 700; border: 1px solid rgba(15, 118, 110, 0.08);
+      transition: transform .18s ease, box-shadow .18s ease;
+    }
+    .card-link:hover { background: white; transform: translateY(-1px); box-shadow: 0 6px 14px rgba(16, 42, 47, .1); }
+    .section-title { margin: 2px 0 2px; font-size: 14px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
+    .langs { display: grid; gap: 10px; }
+    .muted { color: var(--muted); font-size: 14px; margin: 4px 0 0; }
+    .footer-note { margin-top: 10px; color: var(--muted); font-size: 13px; line-height: 1.5; }
+    .trust-strip {
+      margin-top: 22px;
+      border: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.82);
+      border-radius: 20px;
+      padding: 14px 16px;
+      box-shadow: var(--shadow);
+    }
+    .screens-section {
+      margin-top: 22px;
+      border: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.84);
+      border-radius: 22px;
+      padding: 18px;
+      box-shadow: var(--shadow);
+    }
+    .screens-title {
+      margin: 0;
+      font-family: "Sora", "Space Grotesk", sans-serif;
+      font-size: clamp(24px, 2.8vw, 34px);
+      color: var(--deep);
+      letter-spacing: -0.02em;
+    }
+    .screens-sub {
+      margin: 8px 0 0;
+      color: var(--muted);
+      font-size: 15px;
+      line-height: 1.6;
+    }
+    .screens-carousel {
+      margin-top: 14px;
+    }
+    .screens-track {
+      display: flex;
+      gap: 14px;
+      overflow-x: auto;
+      scroll-snap-type: x mandatory;
+      scrollbar-width: none;
+      -ms-overflow-style: none;
+      padding-bottom: 4px;
+    }
+    .screens-track::-webkit-scrollbar {
+      display: none;
+    }
+    .screens-controls {
+      margin-top: 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .carousel-buttons {
+      display: grid;
+      grid-template-columns: auto auto;
+      gap: 8px;
+    }
+    .carousel-btn {
+      border: 1px solid rgba(11, 58, 53, 0.2);
+      background: rgba(255, 255, 255, 0.9);
+      color: var(--deep);
+      border-radius: 999px;
+      font-size: 13px;
+      font-weight: 700;
+      padding: 8px 12px;
+      cursor: pointer;
+    }
+    .carousel-btn:hover {
+      background: #ffffff;
+      border-color: rgba(13, 103, 96, 0.4);
+    }
+    .screens-dots {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .screens-dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 999px;
+      border: 0;
+      background: rgba(11, 58, 53, 0.24);
+      padding: 0;
+      cursor: pointer;
+    }
+    .screens-dot.is-active {
+      background: var(--brand);
+      box-shadow: 0 0 0 3px rgba(34, 162, 143, 0.18);
+    }
+    .screen-card {
+      flex: 0 0 clamp(210px, 26vw, 290px);
+      scroll-snap-align: start;
+      border-radius: 18px;
+      border: 1px solid rgba(11, 58, 53, 0.12);
+      background: rgba(255, 255, 255, 0.9);
+      padding: 10px;
+      box-shadow: 0 12px 24px rgba(16, 42, 47, 0.12);
+    }
+    .screen-card img {
+      width: 100%;
+      border-radius: 14px;
+      display: block;
+      aspect-ratio: 1170 / 2532;
+      object-fit: cover;
+      object-position: top;
+    }
+    .screen-card p {
+      margin: 10px 2px 2px;
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--muted);
+      text-align: center;
+    }
+    .trust-strip h3 {
+      margin: 0;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+    }
+    .trust-logos {
+      margin-top: 10px;
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+    }
+    .trust-logo {
+      border-radius: 12px;
+      border: 1px solid rgba(11, 58, 53, 0.12);
+      padding: 10px 12px;
+      text-align: center;
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--deep);
+      background: rgba(255, 255, 255, 0.9);
+    }
+    .value-section {
+      margin-top: 22px;
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+    }
+    .value-card {
+      border-radius: 20px;
+      border: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.88);
+      padding: 18px;
+      box-shadow: var(--shadow);
+    }
+    .value-card h4 {
+      margin: 0;
+      font-size: 18px;
+      color: var(--deep);
+      letter-spacing: -0.01em;
+    }
+    .value-card p {
+      margin: 8px 0 0;
+      color: var(--muted);
+      line-height: 1.6;
+      font-size: 14px;
+    }
+    .value-kpi {
+      display: inline-flex;
+      margin-top: 10px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--brand);
+      border: 1px solid rgba(13, 103, 96, 0.18);
+      background: rgba(34, 162, 143, 0.12);
+    }
+    .demo-band {
+      margin-top: 22px;
+      border-radius: 22px;
+      border: 1px solid var(--line);
+      background: linear-gradient(135deg, #10343a 0%, #16525a 45%, #1b726f 100%);
+      color: #fff;
+      padding: 24px;
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      align-items: center;
+      box-shadow: 0 20px 45px rgba(16, 42, 47, 0.24);
+    }
+    .demo-band h3 {
+      margin: 0;
+      font-family: "Literata", Georgia, serif;
+      font-size: clamp(24px, 3.2vw, 34px);
+      letter-spacing: -0.02em;
+    }
+    .demo-band p {
+      margin: 8px 0 0;
+      color: rgba(255, 255, 255, 0.85);
+      font-size: 15px;
+    }
+    .demo-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    .demo-button {
+      text-decoration: none;
+      font-weight: 700;
+      border-radius: 12px;
+      padding: 11px 14px;
+      border: 1px solid rgba(255, 255, 255, 0.28);
+      color: #fff;
+      background: rgba(255, 255, 255, 0.12);
+    }
+    .demo-button.primary {
+      background: #fff;
+      color: #10343a;
+      border-color: #fff;
+    }
+    .testimonials {
+      margin-top: 22px;
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+    }
+    .quote-card {
+      border-radius: 20px;
+      border: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.88);
+      padding: 18px;
+      box-shadow: var(--shadow);
+    }
+    .quote {
+      margin: 0;
+      color: var(--deep);
+      line-height: 1.65;
+      font-size: 15px;
+    }
+    .quote-author {
+      margin-top: 10px;
+      font-size: 13px;
+      color: var(--muted);
+      font-weight: 700;
+    }
+    .faq {
+      margin-top: 22px;
+      border-radius: 22px;
+      border: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.86);
+      padding: 20px;
+      box-shadow: var(--shadow);
+    }
+    .faq h3 {
+      margin: 0 0 10px;
+      font-family: "Literata", Georgia, serif;
+      font-size: clamp(24px, 3vw, 32px);
+      color: var(--deep);
+    }
+    .faq-item {
+      border-top: 1px solid rgba(11, 58, 53, 0.12);
+      padding: 10px 0;
+    }
+    .faq-item:first-of-type {
+      border-top: 0;
+      padding-top: 0;
+    }
+    .faq-item summary {
+      cursor: pointer;
+      font-weight: 700;
+      color: var(--deep);
+      list-style: none;
+    }
+    .faq-item summary::-webkit-details-marker { display: none; }
+    .faq-item p {
+      margin: 8px 0 0;
+      color: var(--muted);
+      line-height: 1.6;
+      font-size: 14px;
+    }
+    .mobile-sticky-cta {
+      display: none;
+      position: fixed;
+      left: 12px;
+      right: 12px;
+      bottom: 12px;
+      z-index: 30;
+      text-align: center;
+      text-decoration: none;
+      font-weight: 700;
+      padding: 13px 14px;
+      border-radius: 14px;
+      color: #fff;
+      background: linear-gradient(135deg, var(--brand) 0%, var(--brand-2) 100%);
+      box-shadow: 0 14px 28px rgba(16, 42, 47, 0.28);
+    }
+    .site-footer {
+      margin-top: 22px;
+      padding: 22px;
+      border-radius: 24px;
+      border: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.82);
+      box-shadow: var(--shadow);
+    }
+    .footer-grid {
+      display: grid;
+      grid-template-columns: 1.2fr 1fr 1fr 1fr;
+      gap: 16px;
+    }
+    .footer-title {
+      margin: 0 0 8px;
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: var(--brand);
+    }
+    .footer-brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 8px;
+      font-weight: 700;
+      color: var(--deep);
+    }
+    .footer-brand img {
+      width: 28px;
+      height: 28px;
+      border-radius: 8px;
+      object-fit: cover;
+      border: 1px solid rgba(13, 103, 96, 0.2);
+    }
+    .footer-links {
+      display: grid;
+      gap: 6px;
+    }
+    .footer-links a {
+      color: var(--deep);
+      text-decoration: none;
+      font-size: 14px;
+    }
+    .footer-links a:hover { color: var(--brand); }
+    .footer-download-link {
+      appearance: none;
+      background: transparent;
+      border: 0;
+      padding: 0;
+      margin: 0;
+      text-align: left;
+      color: var(--deep);
+      text-decoration: none;
+      font-size: 14px;
+      font-family: inherit;
+      cursor: pointer;
+    }
+    .footer-download-link:hover { color: var(--brand); }
+    .footer-bottom {
+      margin-top: 14px;
+      padding-top: 12px;
+      border-top: 1px solid rgba(11, 58, 53, 0.12);
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      flex-wrap: wrap;
+      font-size: 13px;
+      color: var(--muted);
+    }
+    .fade-up {
+      animation: fadeUp .55s ease both;
+    }
+    .delay-1 { animation-delay: .07s; }
+    .delay-2 { animation-delay: .14s; }
+    .delay-3 { animation-delay: .21s; }
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(12px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @media (max-width: 920px) {
+      .topbar { margin-bottom: 12px; }
+      .stats { grid-template-columns: 1fr; }
+      .screen-card { flex-basis: 74%; }
+      .carousel-buttons { display: none; }
+      .trust-logos { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .value-section { grid-template-columns: 1fr; }
+      .testimonials { grid-template-columns: 1fr; }
+      .demo-band { flex-direction: column; align-items: flex-start; }
+      .footer-grid { grid-template-columns: 1fr; }
+      .guard-content {
+        min-height: clamp(190px, 24vh, 250px);
+        padding-top: 6px;
+      }
+      .guard-content .brand-logo {
+        width: 54px;
+        height: 54px;
+        border-radius: 14px;
+      }
+      .guard-content .eyebrow {
+        font-size: 13px;
+      }
+      .hero { border-radius: 24px; }
+      .hero { padding: 26px; }
+      .hero-header { grid-template-columns: 1fr; }
+      .feature-cascade { margin-top: 2px; }
+      .feature-chip {
+        white-space: normal;
+        transform: none !important;
+      }
+      .floating-store-buttons {
+        width: calc(100% - 24px);
+        max-width: 520px;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+      .floating-store-btn {
+        width: 100%;
+        min-height: 210px;
+      }
+      .floating-store-btn .download-option-icon {
+        width: 64px;
+        height: 64px;
+        flex-basis: 64px;
+      }
+      .floating-store-btn .download-option-icon.apple {
+        font-size: 50px;
+      }
+      .floating-store-btn .download-option-icon.play svg {
+        width: 52px;
+        height: 52px;
+      }
+      .store-btn {
+        width: min(88vw, 210px);
+        min-height: 210px;
+      }
+      .store-btn-logo {
+        width: 78px;
+        height: 78px;
+      }
+      h1 { max-width: 100%; }
+      .mobile-sticky-cta { display: block; }
+      body { padding-bottom: 76px; }
+    }
+  </style>
 </head>
 <body>
-    <header>
-        <h1>Política de Privacidad</h1>
-        <p>Zentavo: Control de Gastos</p>
-    </header>
-
-    <div class="container">
-        <p class="last-updated"><strong>Última actualización:</strong> 10 de marzo de 2026</p>
-
-        <h2>1. Introducción</h2>
-        <p>Zentavo: Control de Gastos ("nosotros", "nuestra app" o "Zentavo") respeta su privacidad y se compromete a proteger sus datos personales. Esta política de privacidad explica cómo manejamos su información cuando utiliza nuestra aplicación de gestión financiera personal.</p>
-
-        <h2>2. Información que Recopilamos</h2>
-
-        <h3>2.1 Información Almacenada Localmente</h3>
-        <div class="highlight-box">
-            <p><strong>IMPORTANTE:</strong> Zentavo almacena TODA la información financiera localmente en su dispositivo. Esto incluye:</p>
+  <div class="top-guard" aria-hidden="true"></div>
+  <div class="ambient"></div>
+  <div class="ambient-2"></div>
+  <main>
+    <div class="guard-content fade-up delay-1">
+      <div class="brand-row">
+        <img class="brand-logo" src="assets/logo.png" alt="Logo de Zentavo" />
+        <div>
+          <div class="brand-name">Zentavo</div>
+          <div class="guard-subtext">Control de gastos y finanzas compartidas</div>
         </div>
-        <ul>
-            <li><strong>Transacciones financieras:</strong> ingresos, gastos, ahorros</li>
-            <li><strong>Categorías personalizadas:</strong> nombres y configuraciones</li>
-            <li><strong>Presupuestos:</strong> límites y metas establecidas</li>
-            <li><strong>Cuentas de ahorro:</strong> objetivos y saldos en múltiples monedas</li>
-            <li><strong>Configuraciones:</strong> preferencias de idioma, tema, moneda</li>
-            <li><strong>Recordatorios:</strong> fechas y descripciones de pagos programados</li>
-        </ul>
-        <p><strong>Esta información NO se envía a servidores externos, permanece únicamente en su dispositivo.</strong></p>
-
-        <h3>2.2 Información de Compras In-App</h3>
-        <p>Cuando realiza una compra Premium:</p>
-        <ul>
-            <li><strong>ID de transacción:</strong> Procesado por Google/Apple para validar compras</li>
-            <li><strong>Estado de suscripción:</strong> Para activar funciones Premium</li>
-        </ul>
-        <p>Esta información es gestionada por Google Play Services o Apple App Store.</p>
-
-        <h3>2.3 Información de Publicidad (Versión Gratuita)</h3>
-        <p>Si usa la versión gratuita con anuncios (Google AdMob):</p>
-        <ul>
-            <li><strong>ID de publicidad:</strong> Para personalizar anuncios</li>
-            <li><strong>Datos de interacción:</strong> Clics, impresiones</li>
-            <li><strong>Información del dispositivo:</strong> Modelo, versión de OS</li>
-        </ul>
-        <p>Política de AdMob: <a href="https://support.google.com/admob/answer/6128543" target="_blank">https://support.google.com/admob/answer/6128543</a></p>
-
-        <h2>3. Cómo Usamos su Información</h2>
-
-        <h3>3.1 Uso Local</h3>
-        <ul>
-            <li>Mostrar sus transacciones, estadísticas y reportes</li>
-            <li>Generar gráficos y análisis financieros</li>
-            <li>Enviar recordatorios de pagos (localmente)</li>
-            <li>Sincronizar datos entre pantallas de la app</li>
-        </ul>
-
-        <h3>3.2 Servicios de Terceros</h3>
-        <ul>
-            <li><strong>Google AdMob:</strong> Mostrar anuncios en versión gratuita</li>
-            <li><strong>Google Play/App Store:</strong> Validar compras Premium</li>
-            <li><strong>NO compartimos</strong> sus datos financieros con terceros</li>
-        </ul>
-
-        <h2>4. Exportación de Datos</h2>
-        <p>Zentavo permite exportar sus datos financieros en formato Excel/PDF:</p>
-        <ul>
-            <li><strong>Control total:</strong> Usted decide cuándo y dónde exportar</li>
-            <li><strong>Sin carga automática:</strong> Los archivos se guardan localmente</li>
-            <li><strong>Su responsabilidad:</strong> Proteger los archivos exportados</li>
-        </ul>
-
-        <h2>5. Permisos de la App</h2>
-        <p>Zentavo solicita los siguientes permisos:</p>
-
-        <h3>Android</h3>
-        <ul>
-            <li><strong>INTERNET:</strong> Para mostrar anuncios y validar compras</li>
-            <li><strong>BILLING:</strong> Para procesar compras Premium</li>
-            <li><strong>POST_NOTIFICATIONS:</strong> Para enviar recordatorios</li>
-            <li><strong>CAMERA:</strong> Para escanear códigos QR (opcional)</li>
-        </ul>
-
-        <h3>iOS</h3>
-        <ul>
-            <li><strong>Local Notifications:</strong> Para recordatorios de pagos</li>
-            <li><strong>Camera:</strong> Para escanear códigos QR (opcional)</li>
-        </ul>
-
-        <h2>6. Seguridad de Datos</h2>
-
-        <h3>6.1 Almacenamiento Local</h3>
-        <ul>
-            <li>Datos guardados en almacenamiento seguro del dispositivo</li>
-            <li>Protegidos por medidas de seguridad de Android/iOS</li>
-            <li>No accesibles por otras apps</li>
-        </ul>
-
-        <h3>6.2 Autenticación Biométrica</h3>
-        <ul>
-            <li>Opción de bloquear app con huella/Face ID</li>
-            <li>Procesado localmente, no enviamos datos biométricos</li>
-        </ul>
-
-        <h2>7. Retención de Datos</h2>
-        <ul>
-            <li><strong>Duración:</strong> Los datos permanecen en su dispositivo indefinidamente</li>
-            <li><strong>Eliminación:</strong> Desinstalar la app elimina TODOS los datos locales</li>
-            <li>No hay recuperación posible tras desinstalación</li>
-        </ul>
-
-        <h2>8. Privacidad de Menores</h2>
-        <p>Zentavo NO está dirigido a menores de 13 años. No recopilamos intencionalmente información de menores.</p>
-
-        <h2>9. Sus Derechos</h2>
-
-        <h3>9.1 Acceso y Portabilidad</h3>
-        <ul>
-            <li><strong>Acceso completo:</strong> Vea todos sus datos en la app</li>
-            <li><strong>Exportación:</strong> Use función de exportar a Excel/PDF</li>
-        </ul>
-
-        <h3>9.2 Eliminación</h3>
-        <ul>
-            <li><strong>Método 1:</strong> Desinstale la app (elimina todos los datos)</li>
-            <li><strong>Método 2:</strong> Elimine transacciones manualmente desde la app</li>
-        </ul>
-
-        <h3>9.3 Oposición a Publicidad</h3>
-        <ul>
-            <li><strong>Opción 1:</strong> Actualice a versión Premium (sin anuncios)</li>
-            <li><strong>Opción 2:</strong> Limite seguimiento en configuración del dispositivo</li>
-        </ul>
-
-        <h2>10. Transferencias Internacionales</h2>
-        <p><strong>No aplicable:</strong> Todos los datos permanecen en su dispositivo local. No transferimos datos a otros países.</p>
-
-        <h2>11. Actualizaciones de esta Política</h2>
-        <p>Podemos actualizar esta política ocasionalmente. Le notificaremos cambios significativos mediante actualización de la fecha "Última actualización" arriba.</p>
-
-        <h2>12. Base Legal (GDPR - Usuarios UE)</h2>
-        <p>Si está en la Unión Europea, procesamos datos bajo estas bases legales:</p>
-        <ul>
-            <li><strong>Consentimiento:</strong> Al aceptar esta política al instalar</li>
-            <li><strong>Ejecución de contrato:</strong> Para proporcionar servicios de la app</li>
-            <li><strong>Interés legítimo:</strong> Para mejorar funcionalidad</li>
-        </ul>
-
-        <div class="contact-box">
-            <h2>13. Contacto</h2>
-            <p>Si tiene preguntas sobre esta política de privacidad o sus datos:</p>
-            <p><strong>Email de Soporte:</strong> <a href="mailto:soporte@zentavo.com">soporte@zentavo.com</a><br>
-            <strong>Tiempo de respuesta:</strong> Dentro de 48 horas hábiles</p>
-        </div>
-
-        <h2>14. Quejas y Autoridades</h2>
-        <p>Si no está satisfecho con nuestra respuesta (usuarios UE), puede presentar queja ante su autoridad de protección de datos local.</p>
-
-        <div class="tldr">
-            <h2>Resumen Ejecutivo (TL;DR)</h2>
-            <p><strong>En pocas palabras:</strong></p>
-            <ul>
-                <li>✅ Tus datos financieros SOLO están en tu teléfono</li>
-                <li>✅ NO los enviamos a servidores</li>
-                <li>✅ NO los compartimos con terceros</li>
-                <li>✅ Publicidad solo en versión gratuita</li>
-                <li>✅ Puedes exportar todos tus datos cuando quieras</li>
-                <li>✅ Desinstalar = eliminar todo (sin recuperación)</li>
-            </ul>
-        </div>
-
-        <p style="text-align: center; margin-top: 3rem; font-weight: bold; color: #2196F3;">
-            Zentavo - Tu dinero, tu control, tu privacidad
-        </p>
+      </div>
+      <div class="eyebrow">Finanzas personales, simples y claras</div>
     </div>
 
-    <footer>
-        <p>&copy; 2026 Zentavo. Todos los derechos reservados.</p>
-        <p><a href="https://github.com/florenciaballonlp-create/Zentavo">GitHub</a> | <a href="mailto:soporte@zentavo.com">Contacto</a></p>
+    <div class="shell">
+      <section class="hero fade-up">
+        <div class="hero-header fade-up delay-2">
+          <div>
+            <h1>Zentavo, la forma simple de controlar tus finanzas con una experiencia moderna.</h1>
+            <p class="subtitle">Gestiona gastos, ingresos y objetivos en un solo lugar, con una experiencia clara, rápida y pensada para tu día a día.</p>
+          </div>
+          <div class="feature-cascade" aria-label="Detalles clave de Zentavo">
+            <div class="feature-chip">Multidioma</div>
+            <div class="feature-chip">Hosting estático</div>
+            <div class="feature-chip">Múltiples Monedas</div>
+            <div class="feature-chip">Reportes avanzados (Premium)</div>
+            <div class="feature-chip">Soporte web centralizado</div>
+          </div>
+        </div>
+
+        <div class="stats fade-up delay-3">
+          <div class="stat">
+            <strong>6</strong>
+            <span>idiomas disponibles para páginas legales y soporte.</span>
+          </div>
+          <div class="stat">
+            <strong>3</strong>
+            <span>secciones claves: Transacciones, Ahorros y Eventos Compartidos.</span>
+          </div>
+          <div class="stat">
+            <strong>1</strong>
+            <span>experiencia visual consistente entre web y app.</span>
+          </div>
+        </div>
+      </section>
+
+      <div class="store-row fade-up delay-3">
+        <button class="store-btn download-trigger" type="button" aria-expanded="false" aria-controls="floating-store-buttons">
+          <img class="store-btn-logo" src="assets/logo.png" alt="Logo Zentavo" />
+          <span class="store-btn-text">Descargar app</span>
+        </button>
+      </div>
+
+    </div>
+
+    <section class="screens-section fade-up delay-2" aria-label="Vistas de la app">
+      <h2 class="screens-title">Vistas reales de la app</h2>
+      <p class="screens-sub">Recorrido visual con más detalle de funciones clave: panel principal, eventos compartidos, ahorros, premium y opciones de compartir.</p>
+      <div class="screens-carousel">
+        <div class="screens-track" data-screens-track>
+          <article class="screen-card">
+            <img src="assets/screenshots/en-01.png" alt="Dashboard principal de Zentavo" />
+            <p>Dashboard principal</p>
+          </article>
+          <article class="screen-card">
+            <img src="assets/screenshots/en-02.png" alt="Pantalla de compartir app y codigos QR" />
+            <p>Compartir app (QR)</p>
+          </article>
+          <article class="screen-card">
+            <img src="assets/screenshots/en-03.png" alt="Resumen financiero con panel de control" />
+            <p>Resumen financiero</p>
+          </article>
+          <article class="screen-card">
+            <img src="assets/screenshots/en-04.png" alt="Pantalla de eventos compartidos" />
+            <p>Eventos compartidos</p>
+          </article>
+          <article class="screen-card">
+            <img src="assets/screenshots/en-05.png" alt="Modulo de ahorros" />
+            <p>Modulo de ahorros</p>
+          </article>
+          <article class="screen-card">
+            <img src="assets/screenshots/en-06.png" alt="Opciones premium de la aplicacion" />
+            <p>Funciones premium</p>
+          </article>
+          <article class="screen-card">
+            <img src="assets/screenshots/en-07.png" alt="Vista adicional de configuracion o flujo" />
+            <p>Vista avanzada</p>
+          </article>
+        </div>
+        <div class="screens-controls">
+          <div class="carousel-buttons">
+            <button class="carousel-btn" type="button" data-screens-dir="-1">Anterior</button>
+            <button class="carousel-btn" type="button" data-screens-dir="1">Siguiente</button>
+          </div>
+          <div class="screens-dots" aria-label="Navegacion del carrusel">
+            <button class="screens-dot is-active" type="button" data-screens-index="0" aria-label="Ir a captura 1"></button>
+            <button class="screens-dot" type="button" data-screens-index="1" aria-label="Ir a captura 2"></button>
+            <button class="screens-dot" type="button" data-screens-index="2" aria-label="Ir a captura 3"></button>
+            <button class="screens-dot" type="button" data-screens-index="3" aria-label="Ir a captura 4"></button>
+            <button class="screens-dot" type="button" data-screens-index="4" aria-label="Ir a captura 5"></button>
+            <button class="screens-dot" type="button" data-screens-index="5" aria-label="Ir a captura 6"></button>
+            <button class="screens-dot" type="button" data-screens-index="6" aria-label="Ir a captura 7"></button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="trust-strip fade-up delay-3">
+      <h3>Con la confianza de equipos financieros en crecimiento</h3>
+      <div class="trust-logos">
+        <div class="trust-logo">FinOps Teams</div>
+        <div class="trust-logo">PME & Startups</div>
+        <div class="trust-logo">Agencias y consultoras</div>
+        <div class="trust-logo">Equipos remotos</div>
+      </div>
+    </section>
+
+    <section class="value-section fade-up delay-3">
+      <article class="value-card">
+        <h4>Planificación más rápida</h4>
+        <p>Automatiza seguimiento de gastos e ingresos para tomar decisiones con contexto real y sin fricción manual.</p>
+        <span class="value-kpi">Menos tareas repetitivas</span>
+      </article>
+      <article class="value-card">
+        <h4>Visión clara del mes</h4>
+        <p>Concentra datos en paneles simples y accionables para revisar avances, desvíos y prioridades en minutos.</p>
+        <span class="value-kpi">Más control financiero</span>
+      </article>
+      <article class="value-card">
+        <h4>Escala contigo</h4>
+        <p>Desde finanzas personales hasta uso colaborativo, Zentavo mantiene rendimiento y orden a medida que creces.</p>
+        <span class="value-kpi">Preparado para crecer</span>
+      </article>
+    </section>
+
+    <section class="demo-band fade-up delay-3">
+      <div>
+        <h3>Empieza hoy con una gestión financiera más inteligente</h3>
+        <p>Configura tu flujo en minutos y accede a soporte, privacidad y términos en un solo lugar.</p>
+      </div>
+      <div class="demo-actions">
+        <a class="demo-button primary" href="support.html">Ir a soporte</a>
+        <a class="demo-button" href="privacy.html">Ver privacidad</a>
+      </div>
+    </section>
+
+    <section class="testimonials fade-up delay-3" aria-label="Testimonios" data-reviews-container></section>
+
+    <section class="faq fade-up delay-3" aria-label="Preguntas frecuentes">
+      <h3>Preguntas frecuentes</h3>
+      <details class="faq-item" open>
+        <summary>¿Zentavo funciona en más de un idioma?</summary>
+        <p>Sí, el sitio y los documentos están disponibles en español, inglés, portugués, italiano, chino y japonés.</p>
+      </details>
+      <details class="faq-item">
+        <summary>¿Dónde encuentro soporte y políticas?</summary>
+        <p>Puedes acceder desde los botones principales de esta portada o desde el zócalo inferior en cualquier momento.</p>
+      </details>
+      <details class="faq-item">
+        <summary>¿Cómo contacto al equipo?</summary>
+        <p>Escríbenos a <a href="mailto:soporte@zentavo.it">soporte@zentavo.it</a> y te respondemos a la brevedad.</p>
+      </details>
+    </section>
+
+    <footer class="site-footer fade-up delay-3">
+      <div class="footer-grid">
+        <div>
+          <div class="footer-brand">
+            <img src="assets/logo.png" alt="Logo Zentavo" />
+            <span>Zentavo</span>
+          </div>
+          <p class="muted" style="margin: 0;">Controla tus finanzas con una experiencia simple, moderna y multidioma.</p>
+        </div>
+
+        <div>
+          <p class="footer-title">Navegación</p>
+          <div class="footer-links">
+            <a href="support.html">Soporte</a>
+            <a href="manual.html">Manual de uso</a>
+            <button class="footer-download-link download-trigger" type="button" aria-expanded="false" aria-controls="floating-store-buttons">Descargar app</button>
+            <a href="privacy.html">Privacidad</a>
+            <a href="terms.html">Términos de uso</a>
+          </div>
+        </div>
+
+        <div>
+          <p class="footer-title">Idiomas</p>
+          <div class="footer-links">
+            <a href="en/support.html">English</a>
+            <a href="pt/support.html">Português</a>
+            <a href="it/support.html">Italiano</a>
+            <a href="zh/support.html">中文</a>
+            <a href="ja/support.html">日本語</a>
+            <a href="support.html">Español</a>
+          </div>
+        </div>
+
+        <div>
+          <p class="footer-title">Contacto</p>
+          <div class="footer-links">
+            <a href="mailto:soporte@zentavo.it">soporte@zentavo.it</a>
+          </div>
+        </div>
+      </div>
+
+      <div class="footer-bottom">
+        <span>© 2026 Zentavo. Todos los derechos reservados.</span>
+        <span>Sitio público para soporte y documentos legales.</span>
+      </div>
     </footer>
+  </main>
+  <div class="floating-store-backdrop" data-store-close></div>
+  <div class="floating-store-buttons" id="floating-store-buttons" aria-label="Descarga Zentavo" aria-hidden="true">
+    <a class="floating-store-btn" href="https://apps.apple.com/app/zentavo/id6760400355" target="_blank" rel="noopener noreferrer" aria-label="Descargar Zentavo en Apple App Store">
+      <span class="download-option-icon apple" aria-hidden="true"></span>
+      <span>Apple App Store</span>
+    </a>
+    <a class="floating-store-btn" href="https://play.google.com/store/apps/details?id=com.zentavo.control_gastos" target="_blank" rel="noopener noreferrer" aria-label="Descargar Zentavo en Google Play Store">
+      <span class="download-option-icon play" aria-hidden="true">
+        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Google Play">
+          <polygon points="2,2 13.5,12 2,22" fill="#00c3ff"/>
+          <polygon points="13.5,12 18,8.8 21.5,10.8 21.5,13.2 18,15.2" fill="#ffb300"/>
+          <polygon points="2,2 18,8.8 13.5,12" fill="#22c55e"/>
+          <polygon points="2,22 13.5,12 18,15.2" fill="#ef4444"/>
+        </svg>
+      </span>
+      <span>Google Play Store</span>
+    </a>
+    <p class="floating-store-note">Zentavo ya disponible en App Store y Google Play.</p>
+  </div>
+  <a class="mobile-sticky-cta" href="support.html">Abrir soporte de Zentavo</a>
+  <script>
+    (function () {
+      var reviewsContainer = document.querySelector("[data-reviews-container]");
+      if (!reviewsContainer) return;
+
+      var fallbackReviews = [
+        {
+          quote: "La uso cuando salgo del super: cargo el gasto en 10 segundos y listo. Antes me olvidaba y despues no entendia en que se me iba la plata.",
+          author: "Sofia G. · Rosario",
+          lang: "es"
+        },
+        {
+          quote: "I check it on the bus ride home. Seeing the weekly total helps me avoid random takeout orders.",
+          author: "Daniel K. · Leeds",
+          lang: "en"
+        },
+        {
+          quote: "Divido cuentas de casa con mi pareja y ya no discutimos por quien pago que. Queda todo claro en el momento.",
+          author: "Marina y Leo · Cordoba",
+          lang: "es"
+        },
+        {
+          quote: "Uso no fim do dia, antes de dormir. Em 2 minutos vejo se passei do limite da semana e ajusto no dia seguinte.",
+          author: "Bruna S. · Curitiba",
+          lang: "pt"
+        },
+        {
+          quote: "La categoria Eventi condivisi mi salva nei viaggi con amici: ognuno registra le sue spese e non facciamo piu calcoli strani.",
+          author: "Marco T. · Milano",
+          lang: "it"
+        },
+        {
+          quote: "Ryokochu no warikan kanri ga hontoni raku ni narimashita. Reshito o minagara sonoba de ireru dake de ato de komarimasen.",
+          author: "Yuki · Tokyo",
+          lang: "ja"
+        }
+      ];
+
+      function normalizeLang(value) {
+        return String(value || "").toLowerCase().split("-")[0];
+      }
+
+      function selectReviewsForCurrentLang(reviews) {
+        var lang = normalizeLang(document.documentElement.lang || "es");
+        var all = Array.isArray(reviews) ? reviews : [];
+        var valid = all.filter(function (review) {
+          return review && review.quote && review.author;
+        });
+
+        var byLang = valid.filter(function (review) {
+          return normalizeLang(review.lang) === lang;
+        });
+        var seen = new Set();
+
+        return byLang.filter(function (review) {
+          var key = (sanitizeText(review.quote) + "|" + sanitizeText(review.author)).toLowerCase();
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        }).slice(0, 6);
+      }
+
+      function emptyReviewsMessageByLang() {
+        var lang = normalizeLang(document.documentElement.lang || "es");
+        var messages = {
+          es: "Aun no hay reseñas en este idioma.",
+          en: "There are no reviews in this language yet.",
+          pt: "Ainda nao ha avaliacoes neste idioma.",
+          it: "Non ci sono ancora recensioni in questa lingua.",
+          ja: "この言語のレビューはまだありません。",
+          zh: "该语言暂时还没有评论。"
+        };
+        return messages[lang] || messages.en;
+      }
+
+      function sanitizeText(value) {
+        return String(value || "")
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/\"/g, "&quot;")
+          .replace(/'/g, "&#39;");
+      }
+
+      function renderReviews(reviews) {
+        var localizedReviews = selectReviewsForCurrentLang(reviews);
+
+        if (!localizedReviews.length) {
+          reviewsContainer.innerHTML =
+            '<article class="quote-card">' +
+              '<p class="quote">' + sanitizeText(emptyReviewsMessageByLang()) + '</p>' +
+            '</article>';
+          return;
+        }
+
+        reviewsContainer.innerHTML = localizedReviews
+          .slice(0, 6)
+          .map(function (review) {
+            return (
+              '<article class="quote-card">' +
+                '<p class="quote">"' + sanitizeText(review.quote) + '"</p>' +
+                '<p class="quote-author">' + sanitizeText(review.author) + '</p>' +
+              '</article>'
+            );
+          })
+          .join("");
+      }
+
+      fetch("assets/reviews.json", { cache: "no-cache" })
+        .then(function (response) {
+          if (!response.ok) throw new Error("reviews-json-not-found");
+          return response.json();
+        })
+        .then(function (data) {
+          if (data && Array.isArray(data.reviews) && data.reviews.length) {
+            renderReviews(data.reviews);
+            return;
+          }
+          renderReviews(fallbackReviews);
+        })
+        .catch(function () {
+          renderReviews(fallbackReviews);
+        });
+    })();
+
+    (function () {
+      var triggers = Array.prototype.slice.call(document.querySelectorAll(".download-trigger"));
+      var panel = document.getElementById("floating-store-buttons");
+      var backdrop = document.querySelector(".floating-store-backdrop");
+
+      if (!triggers.length || !panel || !backdrop) return;
+
+      function setExpanded(value) {
+        triggers.forEach(function (trigger) {
+          trigger.setAttribute("aria-expanded", value ? "true" : "false");
+        });
+      }
+
+      function openPanel() {
+        panel.classList.add("is-open");
+        backdrop.classList.add("is-open");
+        panel.setAttribute("aria-hidden", "false");
+        setExpanded(true);
+      }
+
+      function closePanel() {
+        panel.classList.remove("is-open");
+        backdrop.classList.remove("is-open");
+        panel.setAttribute("aria-hidden", "true");
+        setExpanded(false);
+      }
+
+      triggers.forEach(function (trigger) {
+        trigger.addEventListener("click", function () {
+          if (panel.classList.contains("is-open")) closePanel();
+          else openPanel();
+        });
+      });
+
+      backdrop.addEventListener("click", closePanel);
+
+      document.addEventListener("keydown", function (event) {
+        if (event.key === "Escape") closePanel();
+      });
+    })();
+
+    (function () {
+      var track = document.querySelector("[data-screens-track]");
+      if (!track) return;
+
+      var dots = Array.prototype.slice.call(document.querySelectorAll("[data-screens-index]"));
+      var buttons = Array.prototype.slice.call(document.querySelectorAll("[data-screens-dir]"));
+
+      function getStep() {
+        var firstCard = track.querySelector(".screen-card");
+        if (!firstCard) return 300;
+        return firstCard.getBoundingClientRect().width + 14;
+      }
+
+      function setActiveDot(index) {
+        dots.forEach(function (dot, i) {
+          dot.classList.toggle("is-active", i === index);
+        });
+      }
+
+      function currentIndex() {
+        var step = getStep();
+        return Math.max(0, Math.min(dots.length - 1, Math.round(track.scrollLeft / step)));
+      }
+
+      function goToIndex(index) {
+        var step = getStep();
+        track.scrollTo({ left: index * step, behavior: "smooth" });
+      }
+
+      var autoTimer = null;
+      var resumeTimer = null;
+
+      function stopAuto() {
+        if (autoTimer) {
+          clearInterval(autoTimer);
+          autoTimer = null;
+        }
+      }
+
+      function startAuto() {
+        if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+        stopAuto();
+        autoTimer = setInterval(function () {
+          var next = (currentIndex() + 1) % dots.length;
+          goToIndex(next);
+        }, 3600);
+      }
+
+      function pauseThenResume() {
+        stopAuto();
+        if (resumeTimer) clearTimeout(resumeTimer);
+        resumeTimer = setTimeout(startAuto, 6500);
+      }
+
+      buttons.forEach(function (btn) {
+        btn.addEventListener("click", function () {
+          var dir = Number(btn.getAttribute("data-screens-dir")) || 1;
+          var next = currentIndex() + dir;
+          if (next < 0) next = dots.length - 1;
+          if (next >= dots.length) next = 0;
+          goToIndex(next);
+          pauseThenResume();
+        });
+      });
+
+      dots.forEach(function (dot) {
+        dot.addEventListener("click", function () {
+          var index = Number(dot.getAttribute("data-screens-index")) || 0;
+          goToIndex(index);
+          pauseThenResume();
+        });
+      });
+
+      track.addEventListener("scroll", function () {
+        setActiveDot(currentIndex());
+      }, { passive: true });
+
+      track.addEventListener("pointerdown", pauseThenResume, { passive: true });
+      track.addEventListener("touchstart", pauseThenResume, { passive: true });
+      track.addEventListener("mouseenter", stopAuto);
+      track.addEventListener("mouseleave", startAuto);
+
+      document.addEventListener("visibilitychange", function () {
+        if (document.hidden) stopAuto();
+        else startAuto();
+      });
+
+      startAuto();
+    })();
+  </script>
 </body>
 </html>

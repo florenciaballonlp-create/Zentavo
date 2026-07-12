@@ -1,0 +1,293 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Zentavo - Preview Chat y Notas</title>
+  <style>
+    :root {
+      --bg: #eef7f6;
+      --card: #ffffff;
+      --line: #dbe8e7;
+      --text: #162124;
+      --muted: #64757a;
+      --teal: #0ea5a4;
+      --green: #22c55e;
+      --amber: #f59e0b;
+      --red: #ef4444;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Avenir Next", "Segoe UI", sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at 5% 10%, #d7f3ef, transparent 25%),
+        radial-gradient(circle at 95% 0%, #d6efe8, transparent 30%),
+        var(--bg);
+      min-height: 100vh;
+      padding: 24px;
+    }
+    h1 {
+      margin: 0 0 8px;
+      font-size: 30px;
+      letter-spacing: -0.02em;
+    }
+    p.lead {
+      margin: 0 0 22px;
+      color: var(--muted);
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 22px;
+    }
+    .phone {
+      background: #0d1f24;
+      border-radius: 28px;
+      padding: 10px;
+      box-shadow: 0 24px 40px rgba(13, 31, 36, 0.2);
+    }
+    .screen {
+      background: var(--card);
+      border-radius: 22px;
+      overflow: hidden;
+      min-height: 640px;
+      border: 1px solid rgba(255,255,255,.2);
+    }
+    .appbar {
+      background: var(--teal);
+      color: #fff;
+      padding: 16px 16px 12px;
+      font-weight: 700;
+      font-size: 18px;
+    }
+    .tabs {
+      display: flex;
+      background: var(--teal);
+      color: #fff;
+      font-size: 13px;
+      border-top: 1px solid rgba(255,255,255,.25);
+    }
+    .tab {
+      flex: 1;
+      text-align: center;
+      padding: 8px 4px;
+      opacity: .75;
+      border-bottom: 2px solid transparent;
+    }
+    .tab.active {
+      opacity: 1;
+      border-bottom-color: #fff;
+      font-weight: 700;
+    }
+    .list { padding: 8px 0; }
+    .row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 11px 14px;
+      border-bottom: 1px solid #edf3f2;
+    }
+    .avatar {
+      width: 38px;
+      height: 38px;
+      border-radius: 999px;
+      display: grid;
+      place-items: center;
+      font-weight: 700;
+      color: var(--teal);
+      background: #d9f3f1;
+    }
+    .title { font-weight: 700; font-size: 14px; }
+    .sub { color: var(--muted); font-size: 12px; margin-top: 2px; }
+    .meta { margin-left: auto; }
+    .badge {
+      font-size: 11px;
+      font-weight: 700;
+      color: #fff;
+      background: var(--red);
+      border-radius: 10px;
+      padding: 4px 8px;
+    }
+    .chat {
+      background: #f5f9f9;
+      height: 560px;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .bubble {
+      max-width: 75%;
+      padding: 10px 12px;
+      border-radius: 12px;
+      font-size: 13px;
+      line-height: 1.3;
+    }
+    .me {
+      margin-left: auto;
+      background: var(--green);
+      color: #fff;
+      border-bottom-right-radius: 6px;
+    }
+    .other {
+      background: #e7efef;
+      color: #1f2a2e;
+      border-bottom-left-radius: 6px;
+    }
+    .composer {
+      border-top: 1px solid var(--line);
+      padding: 10px;
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+    .input {
+      flex: 1;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 10px;
+      font-size: 13px;
+      color: #8a9aa0;
+      background: #fff;
+    }
+    .send {
+      width: 36px;
+      height: 36px;
+      border-radius: 999px;
+      background: var(--teal);
+      color: #fff;
+      display: grid;
+      place-items: center;
+      font-weight: 700;
+      font-size: 11px;
+    }
+    .note-row {
+      position: relative;
+      border-left: 4px solid transparent;
+      transition: all .2s;
+    }
+    .note-row.highlight {
+      background: #fff5df;
+      border-left-color: var(--amber);
+    }
+    .tag {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: .04em;
+      padding: 4px 6px;
+      border-radius: 999px;
+      color: #fff;
+      background: var(--amber);
+    }
+    .caption {
+      margin-top: 8px;
+      color: #4e5e64;
+      font-size: 13px;
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+  <h1>Preview de cómo quedaría</h1>
+  <p class="lead">Mockup visual del estado actual implementado: lista de mensajes, chat y notas con foco por notificación.</p>
+
+  <div class="grid">
+    <div>
+      <div class="phone" id="mock-mensajes">
+        <div class="screen">
+          <div class="appbar">Mensajes</div>
+          <div class="tabs">
+            <div class="tab active">Amigos</div>
+            <div class="tab">Eventos</div>
+            <div class="tab">Notas</div>
+          </div>
+          <div class="list">
+            <div class="row">
+              <div class="avatar">M</div>
+              <div>
+                <div class="title">Mama</div>
+                <div class="sub">Te mandé la lista de compras</div>
+              </div>
+              <div class="meta"><span class="badge">2</span></div>
+            </div>
+            <div class="row">
+              <div class="avatar">A</div>
+              <div>
+                <div class="title">Ana</div>
+                <div class="sub">Listo, te transfiero hoy</div>
+              </div>
+            </div>
+            <div class="row">
+              <div class="avatar">V</div>
+              <div>
+                <div class="title">Viaje Bariloche</div>
+                <div class="sub">Nuevo mensaje en el evento</div>
+              </div>
+              <div class="meta"><span class="badge">5</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="caption">1) Lista de Mensajes con contador numérico de no leídos</div>
+    </div>
+
+    <div>
+      <div class="phone" id="mock-chat">
+        <div class="screen">
+          <div class="appbar">Mama</div>
+          <div class="chat">
+            <div class="bubble other">Te pasé ideas para el menú del finde.</div>
+            <div class="bubble me">Genial, recién lo vi.</div>
+            <div class="bubble other">También agregué el presupuesto del súper.</div>
+            <div class="bubble me">Perfecto. Hoy cierro gastos en Zentavo.</div>
+            <div class="bubble other">Dale, y vemos qué falta.</div>
+          </div>
+          <div class="composer">
+            <div class="input">Escribe un mensaje</div>
+            <div class="send">ENVIAR</div>
+          </div>
+        </div>
+      </div>
+      <div class="caption">2) Hilo directo entre amigos</div>
+    </div>
+
+    <div>
+      <div class="phone" id="mock-notas">
+        <div class="screen">
+          <div class="appbar">Viaje Bariloche - Notas</div>
+          <div class="list">
+            <div class="row note-row highlight">
+              <div class="avatar">A</div>
+              <div>
+                <div class="title">Lista de compras base</div>
+                <div class="sub">Arroz, fideos, agua, snacks, carbón...</div>
+              </div>
+              <div class="tag">NUEVA</div>
+            </div>
+            <div class="row note-row">
+              <div class="avatar">F</div>
+              <div>
+                <div class="title">Distribución de autos</div>
+                <div class="sub">Salimos 7:00, auto 1 y auto 2 confirmados.</div>
+              </div>
+            </div>
+            <div class="row note-row">
+              <div class="avatar">M</div>
+              <div>
+                <div class="title">Recordatorio de pagos</div>
+                <div class="sub">Antes del jueves pasar transferencias.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="caption">3) Nota enfocada al abrir desde notificación (highlight)</div>
+    </div>
+  </div>
+</body>
+</html>

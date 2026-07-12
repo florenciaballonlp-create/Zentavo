@@ -1,6 +1,7 @@
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'localization.dart';
 
 /// Servicio de Analytics para trackear el uso de la app
 class AnalyticsService {
@@ -233,7 +234,9 @@ class AnalyticsService {
 
 /// Pantalla para mostrar estadísticas de analytics (solo para desarrollo/admin)
 class AnalyticsScreen extends StatefulWidget {
-  const AnalyticsScreen({Key? key}) : super(key: key);
+  final AppStrings? strings;
+
+  const AnalyticsScreen({Key? key, this.strings}) : super(key: key);
 
   @override
   State<AnalyticsScreen> createState() => _AnalyticsScreenState();
@@ -243,6 +246,42 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
   final _analytics = AnalyticsService();
   Map<String, dynamic> _stats = {};
   bool _loading = true;
+
+  AppStrings get _strings => widget.strings ?? AppStrings();
+
+  String _tr({required String es, String? en, String? pt, String? it}) {
+    switch (_strings.language) {
+      case AppLanguage.english:
+        return en ?? es;
+      case AppLanguage.portuguese:
+        return pt ?? es;
+      case AppLanguage.italian:
+        return it ?? es;
+      case AppLanguage.chinese:
+      case AppLanguage.japanese:
+      case AppLanguage.spanish:
+        return es;
+    }
+  }
+
+  String _localizedFeatureName(String feature) {
+    switch (feature) {
+      case 'Transacciones':
+        return _tr(es: 'Transacciones', en: 'Transactions', pt: 'Transações', it: 'Transazioni');
+      case 'Eventos Compartidos':
+        return _tr(es: 'Eventos Compartidos', en: 'Shared Events', pt: 'Eventos Compartilhados', it: 'Eventi Condivisi');
+      case 'Gráficos':
+        return _tr(es: 'Gráficos', en: 'Charts', pt: 'Gráficos', it: 'Grafici');
+      case 'Informes':
+        return _tr(es: 'Informes', en: 'Reports', pt: 'Relatórios', it: 'Report');
+      case 'Gastos Fijos':
+        return _tr(es: 'Gastos Fijos', en: 'Fixed Expenses', pt: 'Despesas Fixas', it: 'Spese Fisse');
+      case 'Recomendaciones':
+        return _tr(es: 'Recomendaciones', en: 'Recommendations', pt: 'Recomendações', it: 'Raccomandazioni');
+      default:
+        return feature;
+    }
+  }
 
   @override
   void initState() {
@@ -256,7 +295,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     final mostUsed = await _analytics.getMostUsedFeature();
     final conversionRate = await _analytics.getPremiumConversionRate();
     
-    stats['most_used_feature'] = mostUsed;
+    stats['most_used_feature'] = _localizedFeatureName(mostUsed);
     stats['premium_conversion_rate'] = conversionRate;
     
     setState(() {
@@ -269,7 +308,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Analytics Dashboard'),
+        title: Text(_tr(es: 'Panel de Analíticas', en: 'Analytics Dashboard', pt: 'Painel de Analytics', it: 'Dashboard Analytics')),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
@@ -281,17 +320,17 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
               final confirm = await showDialog<bool>(
                 context: context,
                 builder: (context) => AlertDialog(
-                  title: const Text('Limpiar Analytics'),
-                  content: const Text('¿Estás seguro de borrar todos los datos de analytics?'),
+                  title: Text(_tr(es: 'Limpiar Analíticas', en: 'Clear Analytics', pt: 'Limpar Analytics', it: 'Cancella Analytics')),
+                  content: Text(_tr(es: '¿Estás seguro de borrar todos los datos de analíticas?', en: 'Are you sure you want to delete all analytics data?', pt: 'Tem certeza de que deseja excluir todos os dados de analytics?', it: 'Sei sicuro di voler eliminare tutti i dati analytics?')),
                   actions: [
                     TextButton(
                       onPressed: () => Navigator.pop(context, false),
-                      child: const Text('Cancelar'),
+                      child: Text(_strings.cancelar),
                     ),
                     ElevatedButton(
                       onPressed: () => Navigator.pop(context, true),
                       style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-                      child: const Text('Borrar'),
+                      child: Text(_tr(es: 'Borrar', en: 'Delete', pt: 'Excluir', it: 'Elimina')),
                     ),
                   ],
                 ),
@@ -302,7 +341,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                 _loadStats();
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Analytics limpiado')),
+                    SnackBar(content: Text(_tr(es: 'Analíticas limpiadas', en: 'Analytics cleared', pt: 'Analytics limpo', it: 'Analytics pulito'))),
                   );
                 }
               }
@@ -316,53 +355,53 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
               padding: const EdgeInsets.all(16),
               children: [
                 _buildCard(
-                  title: 'Resumen General',
+                  title: _tr(es: 'Resumen General', en: 'General Summary', pt: 'Resumo Geral', it: 'Riepilogo Generale'),
                   icon: Icons.analytics,
                   color: const Color(0xFF0EA5A4),
                   children: [
-                    _buildStatRow('Aperturas de app', _stats['app_opened'] ?? 0),
-                    _buildStatRow('Total de eventos', _stats['total_events'] ?? 0),
-                    _buildStatRow('Días de uso', _stats['days_since_first_open'] ?? 0),
+                    _buildStatRow(_tr(es: 'Aperturas de app', en: 'App opens', pt: 'Aberturas do app', it: 'Aperture app'), _stats['app_opened'] ?? 0),
+                    _buildStatRow(_tr(es: 'Total de eventos', en: 'Total events', pt: 'Total de eventos', it: 'Eventi totali'), _stats['total_events'] ?? 0),
+                    _buildStatRow(_tr(es: 'Días de uso', en: 'Days of use', pt: 'Dias de uso', it: 'Giorni di utilizzo'), _stats['days_since_first_open'] ?? 0),
                     if (_stats['first_open'] != null)
-                      _buildStatRow('Primera apertura', _formatDate(_stats['first_open'])),
+                      _buildStatRow(_tr(es: 'Primera apertura', en: 'First open', pt: 'Primeira abertura', it: 'Prima apertura'), _formatDate(_stats['first_open'])),
                     if (_stats['most_used_feature'] != null)
-                      _buildStatRow('Feature más usada', _stats['most_used_feature']),
+                      _buildStatRow(_tr(es: 'Función más usada', en: 'Most used feature', pt: 'Recurso mais usado', it: 'Funzione più usata'), _stats['most_used_feature']),
                   ],
                 ),
                 const SizedBox(height: 16),
                 _buildCard(
-                  title: 'Uso de Features',
+                  title: _tr(es: 'Uso de Funciones', en: 'Feature Usage', pt: 'Uso de Recursos', it: 'Uso Funzioni'),
                   icon: Icons.dashboard,
                   color: const Color(0xFF22C55E),
                   children: [
-                    _buildStatRow('Transacciones creadas', _stats['transactions_created'] ?? 0),
-                    _buildStatRow('Eventos compartidos', _stats['eventos_compartidos_created'] ?? 0),
-                    _buildStatRow('Vistas de gráficos', _stats['graficos_views'] ?? 0),
-                    _buildStatRow('Vistas de informes', _stats['informes_views'] ?? 0),
-                    _buildStatRow('Gastos fijos', _stats['gastos_fijos_views'] ?? 0),
-                    _buildStatRow('Recomendaciones', _stats['recomendaciones_views'] ?? 0),
+                    _buildStatRow(_tr(es: 'Transacciones creadas', en: 'Created transactions', pt: 'Transações criadas', it: 'Transazioni create'), _stats['transactions_created'] ?? 0),
+                    _buildStatRow(_tr(es: 'Eventos compartidos', en: 'Shared events', pt: 'Eventos compartilhados', it: 'Eventi condivisi'), _stats['eventos_compartidos_created'] ?? 0),
+                    _buildStatRow(_tr(es: 'Vistas de gráficos', en: 'Chart views', pt: 'Visualizações de gráficos', it: 'Visualizzazioni grafici'), _stats['graficos_views'] ?? 0),
+                    _buildStatRow(_tr(es: 'Vistas de informes', en: 'Report views', pt: 'Visualizações de relatórios', it: 'Visualizzazioni report'), _stats['informes_views'] ?? 0),
+                    _buildStatRow(_tr(es: 'Gastos fijos', en: 'Fixed expenses', pt: 'Despesas fixas', it: 'Spese fisse'), _stats['gastos_fijos_views'] ?? 0),
+                    _buildStatRow(_tr(es: 'Recomendaciones', en: 'Recommendations', pt: 'Recomendações', it: 'Raccomandazioni'), _stats['recomendaciones_views'] ?? 0),
                   ],
                 ),
                 const SizedBox(height: 16),
                 _buildCard(
-                  title: 'Conversión Premium',
+                  title: _tr(es: 'Conversión Premium', en: 'Premium Conversion', pt: 'Conversão Premium', it: 'Conversione Premium'),
                   icon: Icons.workspace_premium,
                   color: const Color(0xFFF59E0B),
                   children: [
-                    _buildStatRow('Vistas de Premium', _stats['premium_screen_views'] ?? 0),
+                    _buildStatRow(_tr(es: 'Vistas de Premium', en: 'Premium views', pt: 'Visualizações do Premium', it: 'Visualizzazioni Premium'), _stats['premium_screen_views'] ?? 0),
                     _buildStatRow(
-                      'Tasa de conversión',
+                      _tr(es: 'Tasa de conversión', en: 'Conversion rate', pt: 'Taxa de conversão', it: 'Tasso di conversione'),
                       '${(_stats['premium_conversion_rate'] ?? 0).toStringAsFixed(2)}%',
                     ),
                   ],
                 ),
                 const SizedBox(height: 16),
                 _buildCard(
-                  title: 'Otras Acciones',
+                  title: _tr(es: 'Otras Acciones', en: 'Other Actions', pt: 'Outras Ações', it: 'Altre Azioni'),
                   icon: Icons.more_horiz,
                   color: const Color(0xFF6366F1),
                   children: [
-                    _buildStatRow('Exportaciones', _stats['exports'] ?? 0),
+                    _buildStatRow(_tr(es: 'Exportaciones', en: 'Exports', pt: 'Exportações', it: 'Esportazioni'), _stats['exports'] ?? 0),
                   ],
                 ),
               ],

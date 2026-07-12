@@ -20,32 +20,16 @@ class PremiumScreen extends StatefulWidget {
 }
 
 class _PremiumScreenState extends State<PremiumScreen> {
-  static const String productIdMonthly = 'premium_monthly';
-  static const String productIdYearly = 'premium_yearly';
-  static const String productIdMonthlyScoped =
-      'com.zentavo.controlgastos.premium_monthly';
-  static const String productIdYearlyScoped =
-      'com.zentavo.controlgastos.premium_yearly';
-    static const String productIdMonthlyV2 = 'premium_monthly_v2';
-    static const String productIdYearlyV2 = 'premium_yearly_v2';
-    static const String productIdMonthlyMain = 'premium_monthly_main';
-    static const String productIdYearlyMain = 'premium_yearly_main';
-    static const String productIdMonthlyDotV2 =
-      'com.zentavo.controlgastos.premium.monthly.v2';
-    static const String productIdYearlyDotV2 =
-      'com.zentavo.controlgastos.premium.yearly.v2';
+  static const String productIdMonthly = 'premium_monthly_v2';
+  static const String productIdYearly = 'premium_yearly_v2';
+  static const String legacyProductIdMonthly = 'premium_monthly';
+  static const String legacyProductIdYearly = 'premium_yearly';
 
   static const Set<String> _productIds = {
     productIdMonthly,
     productIdYearly,
-    productIdMonthlyScoped,
-    productIdYearlyScoped,
-    productIdMonthlyV2,
-    productIdYearlyV2,
-    productIdMonthlyMain,
-    productIdYearlyMain,
-    productIdMonthlyDotV2,
-    productIdYearlyDotV2,
+    legacyProductIdMonthly,
+    legacyProductIdYearly,
   };
 
   final InAppPurchase _inAppPurchase = InAppPurchase.instance;
@@ -240,6 +224,8 @@ class _PremiumScreenState extends State<PremiumScreen> {
     setState(() {
       _isPremium = true;
     });
+
+    Navigator.of(context).pop(true);
   }
 
   void _listenToPurchaseUpdated(List<PurchaseDetails> purchaseDetailsList) {
@@ -294,6 +280,14 @@ class _PremiumScreenState extends State<PremiumScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_isPremium) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && Navigator.of(context).canPop()) {
+          Navigator.of(context).pop(true);
+        }
+      });
+    }
+
     return Scaffold(
       appBar: AppBar(title: Text(_tr(es: 'Premium'))),
       body: _loading
@@ -597,7 +591,7 @@ class _PremiumScreenState extends State<PremiumScreen> {
 
   Widget _buildProductCard(ProductDetails product) {
     final isYearly =
-        product.id == productIdYearly || product.id == productIdYearlyScoped;
+        product.id == productIdYearly || product.id == legacyProductIdYearly;
     final termText = isYearly
         ? _tr(
             es: 'Duración: 1 año',

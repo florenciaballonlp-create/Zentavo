@@ -1,0 +1,90 @@
+:root {
+  --bg: #f7f8f4;
+  --bg-2: #eef4ec;
+  --card: rgba(255, 255, 255, 0.92);
+  --line: rgba(11, 58, 53, 0.14);
+  --text: #10191b;
+  --muted: #5b6c70;
+  --brand: #0d6760;
+  --brand-2: #22a28f;
+  --shadow: 0 20px 45px rgba(16, 25, 27, 0.1);
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: "Space Grotesk", "Segoe UI", sans-serif;
+  color: var(--text);
+  background:
+    radial-gradient(circle at 8% 0%, rgba(34, 162, 143, 0.22), transparent 30%),
+    radial-gradient(circle at 95% 10%, rgba(13, 103, 96, 0.12), transparent 28%),
+    linear-gradient(180deg, var(--bg) 0%, var(--bg-2) 100%);
+  min-height: 100vh;
+}
+main { max-width: 980px; margin: 0 auto; padding: 26px 18px 48px; }
+.card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  backdrop-filter: blur(14px);
+  border-radius: 24px;
+  box-shadow: var(--shadow);
+  padding: 24px;
+}
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+.brand { display: flex; align-items: center; gap: 10px; }
+.brand-logo {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  object-fit: cover;
+  border: 1px solid rgba(13, 103, 96, 0.2);
+  background: #fff;
+  box-shadow: 0 8px 16px rgba(16, 42, 47, 0.12);
+}
+.brand strong { font-size: 14px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--brand); }
+.brand span { display: block; font-size: 12px; color: var(--muted); }
+.home-link {
+  color: var(--brand);
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: rgba(255,255,255,.8);
+}
+.langline { display: flex; flex-wrap: wrap; gap: 10px; margin: 0 0 14px; font-size: 13px; }
+.langline a { color: var(--brand); text-decoration: none; font-weight: 700; }
+h1 {
+  margin: 0;
+  font-family: "Literata", Georgia, serif;
+  font-size: clamp(30px, 4.2vw, 42px);
+  letter-spacing: -0.04em;
+}
+h2 { margin-top: 24px; color: var(--brand); font-size: 21px; }
+p, li { line-height: 1.68; }
+a { color: var(--brand); }
+.muted { color: var(--muted); }
+.lead {
+  margin-top: 12px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(13,103,96,.12);
+  background: rgba(34, 162, 143, 0.1);
+}
+.box {
+  margin-top: 10px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(13,103,96,.12);
+  background: rgba(34, 162, 143, 0.1);
+}
+@media (max-width: 640px) {
+  .card { padding: 18px; }
+}

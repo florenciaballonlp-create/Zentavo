@@ -122,7 +122,8 @@ function selectAndFormatReviews(reviews) {
     .slice(0, MAX_REVIEWS)
     .map((review) => ({
       quote: review.quote,
-      author: `${review.author} · ${review.store === "apple" ? "App Store" : "Google Play"}`
+      author: `${review.author} · ${review.store === "apple" ? "App Store" : "Google Play"}`,
+      lang: review.lang || "en"
     }));
 }
 
