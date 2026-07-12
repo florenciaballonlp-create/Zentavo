@@ -52,3 +52,9 @@ android-signing-config.txt
 setup-android-signing.ps1
 upload-keystore.jks
 
+# Firebase config (evitar exposición en repos públicos)
+GoogleService-Info.plist
+google-services.json
+docs/assets/GoogleService-Info.plist
+docs/assets/google-services.json
+
