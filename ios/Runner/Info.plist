@@ -34,6 +34,10 @@
 	<string>Usamos Face ID para proteger el acceso a tu app.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Necesitamos acceso a tu galería para adjuntar recibos y documentos a tus transacciones.</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>remote-notification</string>
+	</array>
 	<key>SKAdNetworkItems</key>
 	<array>
 		<dict>
