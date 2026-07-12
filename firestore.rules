@@ -1,11 +1,6 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    function mvpNoAuthEnabled() {
-      // Zentavo actual funciona mayormente sin login; mantener operatividad social en MVP.
-      return true;
-    }
-
     function signedIn() {
       return request.auth != null;
     }
@@ -86,11 +81,11 @@ service cloud.firestore {
 
     match /direct_chats/{chatId} {
       function userIsParticipantInExisting() {
-        return mvpNoAuthEnabled() || (signedIn() && request.auth.uid in resource.data.participants);
+        return signedIn() && request.auth.uid in resource.data.participants;
       }
 
       function userIsParticipantInNew() {
-        return mvpNoAuthEnabled() || (signedIn() && request.auth.uid in request.resource.data.participants);
+        return signedIn() && request.auth.uid in request.resource.data.participants;
       }
 
       allow read: if userIsParticipantInExisting();
@@ -107,6 +102,7 @@ service cloud.firestore {
         ]) &&
         request.resource.data.participants is list &&
         request.resource.data.participants.size() == 2 &&
+        request.auth.uid in request.resource.data.participants &&
         request.resource.data.participantNames is map;
 
       allow update: if userIsParticipantInExisting();
@@ -124,7 +120,7 @@ service cloud.firestore {
             'deletedForAll',
             'createdAt'
           ]) &&
-          (mvpNoAuthEnabled() || request.resource.data.senderId == request.auth.uid) &&
+            request.resource.data.senderId == request.auth.uid &&
           request.resource.data.text is string &&
           request.resource.data.text.size() > 0 &&
           request.resource.data.text.size() <= 1500 &&
@@ -136,11 +132,11 @@ service cloud.firestore {
 
     match /event_chats/{eventId} {
       function userIsMemberInExisting() {
-        return mvpNoAuthEnabled() || (signedIn() && request.auth.uid in resource.data.memberIds);
+        return signedIn() && request.auth.uid in resource.data.memberIds;
       }
 
       function userIsMemberInNew() {
-        return mvpNoAuthEnabled() || (signedIn() && request.auth.uid in request.resource.data.memberIds);
+        return signedIn() && request.auth.uid in request.resource.data.memberIds;
       }
 
       allow read: if userIsMemberInExisting();
@@ -156,6 +152,7 @@ service cloud.firestore {
           'updatedAt'
         ]) &&
         request.resource.data.eventId == eventId &&
+        request.auth.uid in request.resource.data.memberIds &&
         request.resource.data.memberIds is list;
 
       allow update: if userIsMemberInExisting();
@@ -173,7 +170,7 @@ service cloud.firestore {
             'deletedForAll',
             'createdAt'
           ]) &&
-          (mvpNoAuthEnabled() || request.resource.data.senderId == request.auth.uid) &&
+            request.resource.data.senderId == request.auth.uid &&
           request.resource.data.text is string &&
           request.resource.data.text.size() > 0 &&
           request.resource.data.text.size() <= 1500 &&
@@ -185,11 +182,11 @@ service cloud.firestore {
 
     match /event_notes/{eventId} {
       function userIsMemberInExisting() {
-        return mvpNoAuthEnabled() || (signedIn() && request.auth.uid in resource.data.memberIds);
+        return signedIn() && request.auth.uid in resource.data.memberIds;
       }
 
       function userIsMemberInNew() {
-        return mvpNoAuthEnabled() || (signedIn() && request.auth.uid in request.resource.data.memberIds);
+        return signedIn() && request.auth.uid in request.resource.data.memberIds;
       }
 
       allow read: if userIsMemberInExisting();
@@ -197,6 +194,7 @@ service cloud.firestore {
       allow create: if userIsMemberInNew() &&
         request.resource.data.keys().hasAll(['eventId', 'eventName', 'memberIds', 'updatedAt']) &&
         request.resource.data.eventId == eventId &&
+        request.auth.uid in request.resource.data.memberIds &&
         request.resource.data.memberIds is list;
 
       allow update: if userIsMemberInExisting();
@@ -215,7 +213,7 @@ service cloud.firestore {
             'createdAt',
             'updatedAt'
           ]) &&
-          (mvpNoAuthEnabled() || request.resource.data.authorId == request.auth.uid) &&
+          request.resource.data.authorId == request.auth.uid &&
           request.resource.data.title is string &&
           request.resource.data.title.size() > 0 &&
           request.resource.data.title.size() <= 120 &&
@@ -224,18 +222,18 @@ service cloud.firestore {
           request.resource.data.body.size() <= 4000;
 
         allow update: if userIsMemberInExisting() &&
-          (mvpNoAuthEnabled() || request.auth.uid == resource.data.authorId);
+          request.auth.uid == resource.data.authorId;
 
         allow delete: if userIsMemberInExisting() &&
-          (mvpNoAuthEnabled() || request.auth.uid == resource.data.authorId);
+          request.auth.uid == resource.data.authorId;
       }
     }
 
-    // Perfil/Dispositivos para mensajería push (MVP sin auth obligatorio)
+    // Perfil/Dispositivos para mensajería push (strict auth)
     match /users/{userId} {
-      allow read: if true;
+      allow read: if signedIn() && request.auth.uid == userId;
 
-      allow create, update: if
+      allow create, update: if signedIn() && request.auth.uid == userId &&
         request.resource.data.keys().hasOnly(['displayName', 'updatedAt']) &&
         request.resource.data.displayName is string &&
         request.resource.data.displayName.size() > 0 &&
@@ -244,13 +242,14 @@ service cloud.firestore {
       allow delete: if false;
 
       match /devices/{token} {
-        allow read: if true;
+        allow read: if signedIn() && request.auth.uid == userId;
 
-        allow create, update: if
+        allow create, update: if signedIn() && request.auth.uid == userId &&
           request.resource.data.keys().hasOnly(['token', 'platform', 'updatedAt']) &&
           request.resource.data.token is string &&
           request.resource.data.token.size() > 0 &&
           request.resource.data.token.size() <= 500 &&
+          request.resource.data.token == token &&
           request.resource.data.platform is string &&
           request.resource.data.platform.size() > 0 &&
           request.resource.data.platform.size() <= 20;
